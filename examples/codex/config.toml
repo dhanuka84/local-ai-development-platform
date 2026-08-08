@@ -1,0 +1,13 @@
+# Merge this table into ~/.codex/config.toml or a trusted project's .codex/config.toml.
+# Export HYBRID_AI_MCP_TOKEN with the same value as AUTH_TOKEN in this repo's .env.
+[mcp_servers.hybrid_knowledge]
+url = "http://127.0.0.1:8080/mcp"
+bearer_token_env_var = "HYBRID_AI_MCP_TOKEN"
+required = true
+startup_timeout_sec = 20
+tool_timeout_sec = 120
+default_tools_approval_mode = "writes"
+
+# Keep the explicit approval gate for publishing knowledge.
+[mcp_servers.hybrid_knowledge.tools.knowledge_candidate_decide]
+approval_mode = "prompt"

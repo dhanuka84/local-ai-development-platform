@@ -1,0 +1,23 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: hybrid-ai-milvus-init
+spec:
+  backoffLimit: 5
+  template:
+    spec:
+      serviceAccountName: hybrid-ai
+      restartPolicy: OnFailure
+      containers:
+        - name: milvus-init
+          image: ghcr.io/example/hybrid-ai-admin:0.1.0
+          args: [milvus-init]
+          envFrom:
+            - configMapRef: {name: hybrid-ai-config}
+            - secretRef: {name: hybrid-ai-secrets}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            seccompProfile: {type: RuntimeDefault}

@@ -1,0 +1,17 @@
+# Alternative with no listening MCP port. Build first with `make build`, then
+# replace /ABSOLUTE/PATH with this repository's absolute path.
+[mcp_servers.hybrid_knowledge_local]
+command = "/ABSOLUTE/PATH/bin/gateway"
+cwd = "/ABSOLUTE/PATH"
+startup_timeout_sec = 20
+tool_timeout_sec = 120
+default_tools_approval_mode = "writes"
+
+[mcp_servers.hybrid_knowledge_local.env]
+APP_ENV = "local"
+MCP_TRANSPORT = "stdio"
+AUTH_MODE = "none"
+DATABASE_URL = "postgres://hybrid:CHANGE_ME@127.0.0.1:5432/hybrid?sslmode=disable"
+OLLAMA_URL = "http://127.0.0.1:11434"
+MILVUS_ADDRESS = "127.0.0.1:19530"
+ARTIFACTS_PATH = "/ABSOLUTE/PATH/data/artifacts"

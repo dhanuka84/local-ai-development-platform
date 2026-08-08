@@ -1,0 +1,87 @@
+// Merge these sections into ~/.openclaw/openclaw.json after onboarding.
+// Secrets are environment references; do not replace them with literal keys in Git.
+{
+  models: {
+    mode: "merge",
+    providers: {
+      ollama: {
+        api: "ollama",
+        apiKey: "ollama-local",
+        baseUrl: "http://127.0.0.1:11434",
+        timeoutSeconds: 300,
+        models: [
+          {
+            id: "qwen3.6:35b",
+            name: "Qwen 3.6 35B local coding",
+            reasoning: true,
+            input: ["text", "image"],
+            contextWindow: 262144,
+            maxTokens: 16384,
+            params: { num_ctx: 65536, keep_alive: "15m" }
+          }
+        ]
+      }
+    }
+  },
+
+  agents: {
+    list: [
+      {
+        id: "developer",
+        default: true,
+        name: "Hybrid Developer",
+        workspace: "~/.openclaw/workspace-developer",
+        model: { primary: "ollama/qwen3.6:35b", fallbacks: [] },
+        subagents: { allowAgents: ["cloud-review"] },
+        tools: { profile: "coding" }
+      },
+      {
+        id: "maintenance",
+        name: "Local Maintenance",
+        workspace: "~/.openclaw/workspace-maintenance",
+        model: { primary: "ollama/qwen3.6:35b", fallbacks: [] },
+        modelPolicy: { allow: ["ollama/*"] },
+        tools: { profile: "coding" }
+      },
+      {
+        id: "cloud-review",
+        name: "Kimi Cloud Reviewer",
+        workspace: "~/.openclaw/workspace-cloud-review",
+        model: { primary: "moonshot/kimi-k3", fallbacks: [] },
+        sandbox: { mode: "all", scope: "agent", workspaceAccess: "ro" },
+        tools: { profile: "coding", deny: ["write", "edit", "apply_patch", "exec", "process"] }
+      }
+    ]
+  },
+
+  mcp: {
+    servers: {
+      hybridKnowledge: {
+        url: "http://127.0.0.1:8080/mcp",
+        transport: "streamable-http",
+        headers: { Authorization: "Bearer ${HYBRID_AI_MCP_TOKEN}" },
+        timeout: 120,
+        connectTimeout: 10,
+        supportsParallelToolCalls: true,
+        toolFilter: {
+          include: [
+            "platform_status",
+            "knowledge_search",
+            "knowledge_get",
+            "knowledge_candidates_list",
+            "repository_graph_get",
+            "repository_relation_search",
+            "repository_relation_upsert",
+            "generation_capture",
+            "review_record",
+            "knowledge_candidate_decide"
+          ]
+        },
+        codex: {
+          agents: ["developer", "maintenance", "cloud-review"],
+          defaultToolsApprovalMode: "writes"
+        }
+      }
+    }
+  }
+}

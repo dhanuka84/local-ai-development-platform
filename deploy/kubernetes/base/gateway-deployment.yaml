@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hybrid-ai-gateway
+spec:
+  replicas: 2
+  selector:
+    matchLabels: {app: hybrid-ai-gateway}
+  template:
+    metadata:
+      labels: {app: hybrid-ai-gateway}
+    spec:
+      serviceAccountName: hybrid-ai
+      securityContext:
+        fsGroup: 65532
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: gateway
+          image: ghcr.io/example/hybrid-ai-gateway:0.1.0
+          ports:
+            - {name: http, containerPort: 8080}
+          envFrom:
+            - configMapRef: {name: hybrid-ai-config}
+            - secretRef: {name: hybrid-ai-secrets}
+          readinessProbe:
+            httpGet: {path: /readyz, port: http}
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 20
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {cpu: "1", memory: 1Gi}
+          volumeMounts:
+            - {name: artifacts, mountPath: /var/lib/hybrid-ai/artifacts}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+      volumes:
+        - name: artifacts
+          persistentVolumeClaim: {claimName: hybrid-ai-artifacts}

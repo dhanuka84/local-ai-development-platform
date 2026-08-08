@@ -1,0 +1,16 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: hybrid-ai-default-deny-ingress
+spec:
+  podSelector:
+    matchExpressions:
+      - {key: app, operator: In, values: [hybrid-ai-gateway, hybrid-ai-worker]}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              hybrid-ai-client: "true"
+      ports:
+        - {protocol: TCP, port: 8080}

@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hybrid-ai-config
+data:
+  APP_ENV: enterprise
+  LOG_LEVEL: info
+  HTTP_ADDRESS: 0.0.0.0:8080
+  MCP_TRANSPORT: http
+  AUTH_MODE: token
+  ARTIFACTS_PATH: /var/lib/hybrid-ai/artifacts
+  OLLAMA_URL: http://ollama.inference.svc.cluster.local:11434
+  OLLAMA_EMBEDDING_MODEL: embeddinggemma
+  EMBEDDING_DIMENSION: "768"
+  MILVUS_ADDRESS: milvus-proxy.milvus.svc.cluster.local:19530
+  MILVUS_DATABASE: default
+  MILVUS_COLLECTION: approved_knowledge_v1
+  WORKER_BATCH_SIZE: "50"
+  WORKER_POLL_INTERVAL: 1s
+  SEARCH_LEXICAL_FALLBACK: "true"
+  AUTO_APPROVE_LOCAL: "false"

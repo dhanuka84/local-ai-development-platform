@@ -1,0 +1,99 @@
+---
+title: Local-to-Enterprise Evolution — Stable Contracts and Scale-Out Boundaries
+---
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "fontFamily": "Inter, ui-sans-serif, system-ui, sans-serif",
+    "fontSize": "16px",
+    "primaryTextColor": "#172033",
+    "lineColor": "#526178",
+    "edgeLabelBackground": "#ffffff"
+  },
+  "flowchart": {
+    "defaultRenderer": "elk",
+    "curve": "basis",
+    "htmlLabels": true,
+    "nodeSpacing": 45,
+    "rankSpacing": 60
+  }
+}}%%
+flowchart LR
+
+    subgraph LOCAL["LOCAL PROFILE · ONE GBX100"]
+        direction TB
+        LCLIENT["Codex + IDE + OpenClaw"]:::local
+        LMCP["One MCP gateway"]:::local
+        LAGENT["Local agent and workers"]:::local
+        LMODEL["Ollama<br/>coding · embeddings · reranking"]:::local
+        LPG[("Single PostgreSQL<br/>workflow · typed Git repository graph · outbox")]:::localData
+        LMILVUS[("Milvus Standalone<br/>knowledge + repository-relation vectors")]:::localData
+        LSTORE[("Product/knowledge Git + local artifact store")]:::localData
+
+        LCLIENT --> LMCP
+        LMCP --> LAGENT
+        LAGENT --> LMODEL
+        LAGENT --> LPG
+        LAGENT --> LMILVUS
+        LAGENT --> LSTORE
+    end
+
+    subgraph CONTRACTS["STABLE PLATFORM CONTRACTS"]
+        direction TB
+        C1["MCP tool schemas<br/>versioned and backward compatible"]:::contract
+        C2["Knowledge IDs + revisions<br/>tenant · project · classification"]:::contract
+        C3["PostgreSQL transaction + outbox<br/>idempotent event processing"]:::contract
+        C4["VectorIndex interface<br/>Milvus hidden behind retrieval service"]:::contract
+        C5["ModelProvider interface<br/>local · private · cloud adapters"]:::contract
+        C6["Canonical rebuild sources<br/>PostgreSQL graph + Git + object artifacts"]:::contract
+        C7["Policy context<br/>identity · purpose · residency · disclosure"]:::contract
+    end
+
+    subgraph ENTERPRISE["ENTERPRISE PROFILE · DISTRIBUTED"]
+        direction TB
+        ECLIENT["Workstations + CI/CD + edge sites"]:::enterprise
+        EMCP["Stateless MCP/API gateway replicas"]:::enterprise
+        EAGENT["Durable workflows + event bus<br/>sandboxed worker pools"]:::enterprise
+        EMODEL["Private GPU inference cluster<br/>policy-gated Kimi/OpenAI review"]:::enterprise
+        EPG[("PostgreSQL HA<br/>workflow + repository graph · multi-zone + DR")]:::enterpriseData
+        EMILVUS[("Milvus Distributed<br/>knowledge + relation search · scaled query + ingestion")]:::enterpriseData
+        ESTORE[("Enterprise Git + versioned object storage<br/>regional replication")]:::enterpriseData
+
+        ECLIENT --> EMCP
+        EMCP --> EAGENT
+        EAGENT --> EMODEL
+        EAGENT --> EPG
+        EAGENT --> EMILVUS
+        EAGENT --> ESTORE
+    end
+
+    LMCP ==>|"same MCP contracts"| C1
+    LPG ==>|"schema + IDs"| C2
+    LPG ==>|"reliable change stream"| C3
+    LMILVUS ==>|"adapter boundary"| C4
+    LMODEL ==>|"provider boundary"| C5
+    LSTORE ==>|"rebuildability"| C6
+    LCLIENT ==>|"request context"| C7
+
+    C1 ==>|"horizontal gateway scaling"| EMCP
+    C2 ==>|"tenant-aware enterprise records"| EPG
+    C3 ==>|"outbox relay → event bus"| EAGENT
+    C4 ==>|"backfill + validate + cutover"| EMILVUS
+    C5 ==>|"central routing and quotas"| EMODEL
+    C6 ==>|"object-backed recovery"| ESTORE
+    C7 ==>|"OIDC · RLS · tenant isolation"| ECLIENT
+
+    NOTE["Milvus migration rule<br/><b>Standalone cannot be upgraded online to Distributed.</b><br/>Create cluster → bulk reindex → validate → dual-write → cut over."]:::warning
+    C4 -.-> NOTE
+    NOTE -.-> EMILVUS
+
+    classDef local fill:#dcfce7,stroke:#16a34a,color:#14532d,stroke-width:1.5px;
+    classDef localData fill:#d1fae5,stroke:#059669,color:#064e3b,stroke-width:2px;
+    classDef contract fill:#e0e7ff,stroke:#4f46e5,color:#312e81,stroke-width:2px;
+    classDef enterprise fill:#dbeafe,stroke:#2563eb,color:#172554,stroke-width:1.5px;
+    classDef enterpriseData fill:#cffafe,stroke:#0891b2,color:#164e63,stroke-width:2px;
+    classDef warning fill:#fee2e2,stroke:#dc2626,color:#7f1d1d,stroke-width:2px;
+
+    style LOCAL fill:#f0fdf4,stroke:#22c55e,stroke-width:2.5px
+    style CONTRACTS fill:#eef2ff,stroke:#6366f1,stroke-width:2.5px
+    style ENTERPRISE fill:#eff6ff,stroke:#3b82f6,stroke-width:2.5px

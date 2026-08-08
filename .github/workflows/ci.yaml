@@ -1,0 +1,58 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  go:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 1.25.8
+          cache: true
+      - name: Format
+        run: test -z "$(gofmt -l cmd internal migrations)"
+      - name: Vet
+        run: go vet ./...
+      - name: Unit and race tests
+        run: go test -race -coverprofile=coverage.out ./...
+      - name: Build
+        run: go build ./cmd/...
+
+  configuration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Docker Compose
+        run: docker compose --env-file .env.example -f deploy/compose/compose.yaml config --quiet
+      - name: Render Kubernetes base
+        uses: imranismail/setup-kustomize@v2
+        with:
+          kustomize-version: 5.7.1
+      - run: kustomize build deploy/kubernetes/base >/dev/null
+
+  containers:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: [gateway, worker, admin]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: ${{ matrix.target }}
+          push: false
+          tags: hybrid-ai-${{ matrix.target }}:ci

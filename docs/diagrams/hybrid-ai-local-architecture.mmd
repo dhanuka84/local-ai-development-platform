@@ -1,0 +1,153 @@
+---
+title: Local Hybrid AI Engineering Platform — Single ASUS GBX100
+---
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "fontFamily": "Inter, ui-sans-serif, system-ui, sans-serif",
+    "fontSize": "16px",
+    "primaryTextColor": "#172033",
+    "lineColor": "#526178",
+    "clusterBkg": "#f8fafc",
+    "clusterBorder": "#94a3b8",
+    "edgeLabelBackground": "#ffffff"
+  },
+  "flowchart": {
+    "defaultRenderer": "elk",
+    "curve": "basis",
+    "htmlLabels": true,
+    "nodeSpacing": 42,
+    "rankSpacing": 56
+  }
+}}%%
+flowchart LR
+
+    subgraph USERS["USER AND DEVELOPMENT SURFACES"]
+        direction LR
+        ENGINEER["Software engineer<br/>IDE · terminal · browser"]:::user
+        CODEX["Codex CLI / IDE<br/>generation · review · capture hooks"]:::client
+        ADMIN["Platform administrator<br/>approval · policy · recovery"]:::user
+    end
+
+    subgraph LOCAL["LOCAL TRUST BOUNDARY · GBX100"]
+        direction TB
+
+        subgraph AGENTS["AGENT AND ACCESS LAYER"]
+            direction LR
+            OPENCLAW_DEV["OpenClaw<br/>development coordinator"]:::control
+            OPENCLAW_MAINT["OpenClaw<br/>maintenance agent<br/><b>local-only</b>"]:::maintenance
+            MCP["Engineering MCP gateway<br/>typed tools · scoped tokens · audit"]:::gateway
+            CLOUD_GUARD["Cloud disclosure gateway<br/>classify · minimize · redact · approve · inspect response"]:::security
+            EGRESS_DENY["Maintenance egress denied<br/>no cloud credentials · fail closed"]:::security
+        end
+
+        subgraph SERVICES["APPLICATION SERVICES"]
+            direction LR
+            ROUTER["Model router<br/>task + policy + classification"]:::service
+            RETRIEVAL["Knowledge retrieval<br/>hybrid search · ACL · graph expansion · rerank"]:::service
+            CAPTURE["Capture worker<br/>normalize · redact · hash · extract patterns"]:::service
+            REVIEW["Review and promotion<br/>candidate → validate → approve"]:::service
+            INDEXER["Knowledge indexer<br/>chunk · embed · idempotent upsert"]:::service
+            REPO["Knowledge + repository graph service<br/>transactions · typed edges · provenance · artifacts"]:::service
+        end
+
+        subgraph INFERENCE["LOCAL INFERENCE · OLLAMA"]
+            direction LR
+            CODER["Coding model<br/>development + maintenance"]:::model
+            EMBED["Embedding model<br/>code + text vectors"]:::model
+            RERANK["Local reranker / utility model"]:::model
+        end
+
+        subgraph DATA["LOCAL DATA PLANE"]
+            direction LR
+            PG[("PostgreSQL<br/><b>system of record</b><br/>workflow · provenance · outbox<br/>typed Git repository nodes + edges")]:::database
+            MILVUS[("Milvus Standalone<br/><b>derived semantic index</b><br/>approved patterns + repository-relation evidence")]:::vector
+            GIT[("Git repositories<br/><b>product source + approved knowledge</b><br/>revisions · patterns · ADRs · runbooks")]:::knowledge
+            ARTIFACTS[("Content-addressed artifacts<br/>prompts · outputs · patches · evidence")]:::storage
+            SPOOL[("Protected local spool<br/>non-blocking capture buffer")]:::storage
+        end
+
+        subgraph OPS["OPERATIONS AND SECURITY"]
+            direction LR
+            OBS["OpenTelemetry · Prometheus · Grafana<br/>traces · metrics · redacted logs"]:::ops
+            SECRETS["Local secret store<br/>provider keys separated by role"]:::security
+            BACKUP["Encrypted backup<br/>PostgreSQL · Git · artifacts · manifests"]:::ops
+        end
+    end
+
+    subgraph CLOUD["EXTERNAL CLOUD TRUST BOUNDARY · DEVELOPMENT REVIEW ONLY"]
+        direction LR
+        KIMI["Moonshot API<br/>Kimi architecture / optimization review"]:::cloud
+        OPENAI["OpenAI<br/>Codex code and diff review"]:::cloud
+    end
+
+    ENGINEER --> OPENCLAW_DEV
+    ENGINEER --> CODEX
+    ADMIN --> MCP
+    CODEX <-->|"scoped MCP tools"| MCP
+    OPENCLAW_DEV <-->|"agent tools"| MCP
+    OPENCLAW_MAINT <-->|"restricted tools"| MCP
+
+    OPENCLAW_DEV --> ROUTER
+    OPENCLAW_MAINT -->|"maintenance requests"| ROUTER
+    ROUTER -->|"normal development"| CODER
+    ROUTER -->|"maintenance: mandatory"| CODER
+    OPENCLAW_MAINT -.->|"hard control"| EGRESS_DENY
+
+    MCP --> RETRIEVAL
+    RETRIEVAL -->|"semantic + lexical candidates"| MILVUS
+    RETRIEVAL -->|"authoritative records · exact repository graph"| REPO
+    RETRIEVAL --> RERANK
+    RERANK --> RETRIEVAL
+
+    CODEX -->|"hook event"| SPOOL
+    OPENCLAW_DEV -->|"run envelope"| SPOOL
+    SPOOL --> CAPTURE
+    CAPTURE -->|"candidate + evidence"| REPO
+    CAPTURE -->|"pending candidate"| REVIEW
+    REVIEW -->|"validated decision"| REPO
+    REPO -->|"records + typed repo edges + outbox"| PG
+    REPO -->|"approved knowledge + repository evidence"| GIT
+    REPO -->|"immutable payloads"| ARTIFACTS
+    REPO -->|"index job + approved revision"| INDEXER
+    INDEXER --> EMBED
+    EMBED --> INDEXER
+    INDEXER -->|"knowledge + repository-relation vectors"| MILVUS
+
+    ROUTER -->|"explicit escalation"| CLOUD_GUARD
+    CODEX -.->|"approved scoped package"| CLOUD_GUARD
+    CLOUD_GUARD -->|"architecture package"| KIMI
+    CLOUD_GUARD -->|"code review package"| OPENAI
+    CLOUD_GUARD -->|"advisory findings"| REVIEW
+    SECRETS --> CLOUD_GUARD
+
+    MCP -.-> OBS
+    ROUTER -.-> OBS
+    REPO -.-> OBS
+    PG --> BACKUP
+    GIT --> BACKUP
+    ARTIFACTS --> BACKUP
+
+    classDef user fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e,stroke-width:1.5px;
+    classDef client fill:#ede9fe,stroke:#7c3aed,color:#3b0764,stroke-width:1.5px;
+    classDef gateway fill:#dbeafe,stroke:#2563eb,color:#172554,stroke-width:2.5px;
+    classDef control fill:#e0e7ff,stroke:#4f46e5,color:#312e81,stroke-width:2px;
+    classDef maintenance fill:#dcfce7,stroke:#16a34a,color:#14532d,stroke-width:2px;
+    classDef service fill:#f1f5f9,stroke:#475569,color:#172033,stroke-width:1.5px;
+    classDef model fill:#fef3c7,stroke:#d97706,color:#78350f,stroke-width:1.5px;
+    classDef database fill:#dbeafe,stroke:#1d4ed8,color:#172554,stroke-width:2px;
+    classDef vector fill:#cffafe,stroke:#0891b2,color:#164e63,stroke-width:2px;
+    classDef knowledge fill:#dcfce7,stroke:#15803d,color:#14532d,stroke-width:2px;
+    classDef storage fill:#f3e8ff,stroke:#9333ea,color:#581c87,stroke-width:1.5px;
+    classDef security fill:#fee2e2,stroke:#dc2626,color:#7f1d1d,stroke-width:1.5px;
+    classDef ops fill:#f8fafc,stroke:#64748b,color:#334155,stroke-width:1.5px;
+    classDef cloud fill:#ffedd5,stroke:#ea580c,color:#7c2d12,stroke-width:2px;
+
+    style LOCAL fill:#f8fafc,stroke:#334155,stroke-width:3px
+    style CLOUD fill:#fff7ed,stroke:#f97316,stroke-width:2px,stroke-dasharray: 8 5
+    style USERS fill:#ffffff,stroke:#94a3b8,stroke-width:1.5px
+    style AGENTS fill:#eef2ff,stroke:#818cf8,stroke-width:1.5px
+    style SERVICES fill:#f8fafc,stroke:#94a3b8,stroke-width:1.5px
+    style INFERENCE fill:#fffbeb,stroke:#f59e0b,stroke-width:1.5px
+    style DATA fill:#f0fdfa,stroke:#14b8a6,stroke-width:1.5px
+    style OPS fill:#ffffff,stroke:#94a3b8,stroke-width:1.5px

@@ -1,0 +1,8 @@
+.git
+.github
+.env
+bin
+data
+deploy/compose/volumes
+docs/diagrams/*.png
+docs/diagrams/*.svg
