@@ -4,31 +4,37 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 )
 
 type Config struct {
-	Environment        string
-	LogLevel           string
-	HTTPAddress        string
-	MCPTransport       string
-	AuthMode           string
-	AuthToken          string
-	DatabaseURL        string
-	ArtifactsPath      string
-	OllamaURL          string
-	EmbeddingModel     string
-	EmbeddingDimension int
-	MilvusAddress      string
-	MilvusDatabase     string
-	MilvusCollection   string
-	MilvusAPIKey       string
-	WorkerPollInterval time.Duration
-	WorkerBatchSize    int
-	SearchFallback     bool
-	AutoApproveLocal   bool
+	Environment           string
+	LogLevel              string
+	HTTPAddress           string
+	MCPTransport          string
+	AuthMode              string
+	AuthToken             string
+	DatabaseURL           string
+	ArtifactsPath         string
+	OllamaURL             string
+	EmbeddingModel        string
+	EmbeddingDimension    int
+	MilvusAddress         string
+	MilvusDatabase        string
+	MilvusCollection      string
+	MilvusAPIKey          string
+	WorkerPollInterval    time.Duration
+	WorkerBatchSize       int
+	SearchFallback        bool
+	AutoApproveLocal      bool
+	CodeGraphEnabled      bool
+	CodeGraphAllowedRoots []string
+	CodeGraphMaxFiles     int
+	CodeGraphMaxEntities  int
+	CodeGraphMaxRelations int
 }
 
 func Load() (Config, error) { return load(true) }
@@ -36,26 +42,32 @@ func Load() (Config, error) { return load(true) }
 func LoadCLI() (Config, error) { return load(false) }
 
 func load(validateAuth bool) (Config, error) {
+	environment := env("APP_ENV", "local")
 	cfg := Config{
-		Environment:        env("APP_ENV", "local"),
-		LogLevel:           env("LOG_LEVEL", "info"),
-		HTTPAddress:        env("HTTP_ADDRESS", "127.0.0.1:8080"),
-		MCPTransport:       env("MCP_TRANSPORT", "http"),
-		AuthMode:           env("AUTH_MODE", "token"),
-		AuthToken:          os.Getenv("AUTH_TOKEN"),
-		DatabaseURL:        env("DATABASE_URL", "postgres://hybrid:hybrid@127.0.0.1:5432/hybrid?sslmode=disable"),
-		ArtifactsPath:      env("ARTIFACTS_PATH", "./data/artifacts"),
-		OllamaURL:          strings.TrimRight(env("OLLAMA_URL", "http://127.0.0.1:11434"), "/"),
-		EmbeddingModel:     env("OLLAMA_EMBEDDING_MODEL", "embeddinggemma"),
-		MilvusAddress:      env("MILVUS_ADDRESS", "127.0.0.1:19530"),
-		MilvusDatabase:     env("MILVUS_DATABASE", "default"),
-		MilvusCollection:   env("MILVUS_COLLECTION", "approved_knowledge_v1"),
-		MilvusAPIKey:       os.Getenv("MILVUS_API_KEY"),
-		WorkerPollInterval: durationEnv("WORKER_POLL_INTERVAL", 2*time.Second),
-		EmbeddingDimension: intEnv("EMBEDDING_DIMENSION", 768),
-		WorkerBatchSize:    intEnv("WORKER_BATCH_SIZE", 25),
-		SearchFallback:     boolEnv("SEARCH_LEXICAL_FALLBACK", true),
-		AutoApproveLocal:   boolEnv("AUTO_APPROVE_LOCAL", false),
+		Environment:           environment,
+		LogLevel:              env("LOG_LEVEL", "info"),
+		HTTPAddress:           env("HTTP_ADDRESS", "127.0.0.1:8080"),
+		MCPTransport:          env("MCP_TRANSPORT", "http"),
+		AuthMode:              env("AUTH_MODE", "token"),
+		AuthToken:             os.Getenv("AUTH_TOKEN"),
+		DatabaseURL:           env("DATABASE_URL", "postgres://hybrid:hybrid@127.0.0.1:5432/hybrid?sslmode=disable"),
+		ArtifactsPath:         env("ARTIFACTS_PATH", "./data/artifacts"),
+		OllamaURL:             strings.TrimRight(env("OLLAMA_URL", "http://127.0.0.1:11434"), "/"),
+		EmbeddingModel:        env("OLLAMA_EMBEDDING_MODEL", "embeddinggemma"),
+		MilvusAddress:         env("MILVUS_ADDRESS", "127.0.0.1:19530"),
+		MilvusDatabase:        env("MILVUS_DATABASE", "default"),
+		MilvusCollection:      env("MILVUS_COLLECTION", "approved_knowledge_v1"),
+		MilvusAPIKey:          os.Getenv("MILVUS_API_KEY"),
+		WorkerPollInterval:    durationEnv("WORKER_POLL_INTERVAL", 2*time.Second),
+		EmbeddingDimension:    intEnv("EMBEDDING_DIMENSION", 768),
+		WorkerBatchSize:       intEnv("WORKER_BATCH_SIZE", 25),
+		SearchFallback:        boolEnv("SEARCH_LEXICAL_FALLBACK", true),
+		AutoApproveLocal:      boolEnv("AUTO_APPROVE_LOCAL", false),
+		CodeGraphEnabled:      boolEnv("CODEGRAPH_ENABLED", environment == "local"),
+		CodeGraphAllowedRoots: pathListEnv("CODEGRAPH_ALLOWED_ROOTS", "."),
+		CodeGraphMaxFiles:     intEnv("CODEGRAPH_MAX_FILES", 5000),
+		CodeGraphMaxEntities:  intEnv("CODEGRAPH_MAX_ENTITIES", 200000),
+		CodeGraphMaxRelations: intEnv("CODEGRAPH_MAX_RELATIONS", 1000000),
 	}
 
 	switch cfg.MCPTransport {
@@ -75,10 +87,22 @@ func load(validateAuth bool) (Config, error) {
 	default:
 		return Config{}, fmt.Errorf("AUTH_MODE must be token or none, got %q", cfg.AuthMode)
 	}
-	if cfg.EmbeddingDimension < 1 || cfg.WorkerBatchSize < 1 {
-		return Config{}, errors.New("EMBEDDING_DIMENSION and WORKER_BATCH_SIZE must be positive")
+	if cfg.EmbeddingDimension < 1 || cfg.WorkerBatchSize < 1 || (cfg.CodeGraphEnabled &&
+		(cfg.CodeGraphMaxFiles < 1 || cfg.CodeGraphMaxEntities < 1 || cfg.CodeGraphMaxRelations < 1)) {
+		return Config{}, errors.New("embedding, worker, and code-graph limits must be positive")
 	}
 	return cfg, nil
+}
+
+func pathListEnv(name, fallback string) []string {
+	value := env(name, fallback)
+	result := make([]string, 0)
+	for _, entry := range filepath.SplitList(value) {
+		if entry = strings.TrimSpace(entry); entry != "" {
+			result = append(result, entry)
+		}
+	}
+	return result
 }
 
 func env(name, fallback string) string {

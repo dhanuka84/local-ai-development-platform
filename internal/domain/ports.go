@@ -2,6 +2,8 @@ package domain
 
 import "context"
 
+import "github.com/dhanuka84/hybrid-ai-platform/components/codegraph"
+
 type Repository interface {
 	Ping(context.Context) error
 	RecordGeneration(context.Context, GenerationCapture) (KnowledgeItem, error)
@@ -21,6 +23,12 @@ type Repository interface {
 	GetRepositoryRelation(context.Context, string) (RepositoryRelation, error)
 	GetRepositoryRelationsMany(context.Context, []string) ([]RepositoryRelation, error)
 	GetRepositoryGraph(context.Context, string, string, int) ([]RepositoryRelation, error)
+	StoreCodeGraph(context.Context, string, SoftwareRepository, string, codegraph.Snapshot) (CodeAnalysis, error)
+	GetCodeEntity(context.Context, string) (CodeEntity, error)
+	GetCodeEntitiesMany(context.Context, []string) ([]CodeEntity, error)
+	SearchCodeEntitiesLexical(context.Context, string, string, string, int) ([]CodeEntity, error)
+	GetCodeGraph(context.Context, string, string, string, int) (CodeGraph, error)
+	RequeueCodeEntities(context.Context) (int64, error)
 }
 
 type ArtifactStore interface {
@@ -38,6 +46,8 @@ type VectorStore interface {
 	Search(context.Context, string, []float32, int) ([]VectorHit, error)
 	UpsertRelation(context.Context, RepositoryRelation, []float32) error
 	SearchRelations(context.Context, string, []float32, int) ([]VectorHit, error)
+	UpsertCodeEntity(context.Context, CodeEntity, []float32) error
+	SearchCodeEntities(context.Context, string, string, []float32, int) ([]VectorHit, error)
 	Ping(context.Context) error
 	Close(context.Context) error
 }

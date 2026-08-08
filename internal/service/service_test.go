@@ -3,8 +3,12 @@ package service
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
+	"time"
 
+	"github.com/dhanuka84/hybrid-ai-platform/components/codegraph"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/domain"
 )
 
@@ -14,6 +18,8 @@ type fakeRepository struct {
 	lexical        []domain.SearchHit
 	relations      []domain.RepositoryRelation
 	upsertRelation domain.RepositoryRelation
+	codeSnapshot   codegraph.Snapshot
+	codeEntities   []domain.CodeEntity
 }
 
 func (f *fakeRepository) Ping(context.Context) error { return nil }
@@ -65,6 +71,23 @@ func (f *fakeRepository) GetRepositoryRelationsMany(context.Context, []string) (
 func (f *fakeRepository) GetRepositoryGraph(context.Context, string, string, int) ([]domain.RepositoryRelation, error) {
 	return f.relations, nil
 }
+func (f *fakeRepository) StoreCodeGraph(_ context.Context, projectID string, repository domain.SoftwareRepository, requestedBy string, snapshot codegraph.Snapshot) (domain.CodeAnalysis, error) {
+	f.codeSnapshot = snapshot
+	return domain.CodeAnalysis{ID: "analysis", ProjectID: projectID, Repository: repository, Revision: snapshot.Revision, RequestedBy: requestedBy}, nil
+}
+func (f *fakeRepository) GetCodeEntity(context.Context, string) (domain.CodeEntity, error) {
+	return domain.CodeEntity{}, nil
+}
+func (f *fakeRepository) GetCodeEntitiesMany(context.Context, []string) ([]domain.CodeEntity, error) {
+	return f.codeEntities, nil
+}
+func (f *fakeRepository) SearchCodeEntitiesLexical(context.Context, string, string, string, int) ([]domain.CodeEntity, error) {
+	return f.codeEntities, nil
+}
+func (f *fakeRepository) GetCodeGraph(context.Context, string, string, string, int) (domain.CodeGraph, error) {
+	return domain.CodeGraph{Entities: f.codeEntities}, nil
+}
+func (f *fakeRepository) RequeueCodeEntities(context.Context) (int64, error) { return 0, nil }
 
 type fakeArtifacts struct{ count int }
 
@@ -84,6 +107,8 @@ func (f *fakeEmbedder) Ping(context.Context) error                           { r
 type fakeVectors struct {
 	hits         []domain.VectorHit
 	relationHits []domain.VectorHit
+	codeHits     []domain.VectorHit
+	codeRepo     string
 }
 
 func (f *fakeVectors) EnsureCollection(context.Context) error { return nil }
@@ -98,6 +123,13 @@ func (f *fakeVectors) UpsertRelation(context.Context, domain.RepositoryRelation,
 }
 func (f *fakeVectors) SearchRelations(context.Context, string, []float32, int) ([]domain.VectorHit, error) {
 	return f.relationHits, nil
+}
+func (f *fakeVectors) UpsertCodeEntity(context.Context, domain.CodeEntity, []float32) error {
+	return nil
+}
+func (f *fakeVectors) SearchCodeEntities(_ context.Context, _, repositoryID string, _ []float32, _ int) ([]domain.VectorHit, error) {
+	f.codeRepo = repositoryID
+	return f.codeHits, nil
 }
 func (f *fakeVectors) Ping(context.Context) error  { return nil }
 func (f *fakeVectors) Close(context.Context) error { return nil }
@@ -176,5 +208,66 @@ func TestRepositoryRelationRequiresEvidenceAndNormalizesType(t *testing.T) {
 	})
 	if !errors.Is(err, ErrInvalidInput) {
 		t.Fatalf("missing evidence error = %v", err)
+	}
+}
+
+type fakeCodeAnalyzer struct {
+	request codegraph.Request
+}
+
+func (f *fakeCodeAnalyzer) Name() string    { return "fake" }
+func (f *fakeCodeAnalyzer) Version() string { return "1" }
+func (f *fakeCodeAnalyzer) Analyze(_ context.Context, request codegraph.Request) (codegraph.Snapshot, error) {
+	f.request = request
+	now := time.Now()
+	return codegraph.Snapshot{
+		RepositoryPath: request.RepositoryPath, Revision: "abc123", Analyzer: f.Name(), AnalyzerVersion: f.Version(),
+		StartedAt: now, CompletedAt: now,
+	}, nil
+}
+
+func TestIndexCodeRepositoryEnforcesAllowedRoot(t *testing.T) {
+	root := t.TempDir()
+	repositoryPath := filepath.Join(root, "repo")
+	if err := os.Mkdir(repositoryPath, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	repository := &fakeRepository{}
+	analyzer := &fakeCodeAnalyzer{}
+	svc := New(repository, &fakeArtifacts{}, &fakeEmbedder{}, &fakeVectors{}, true, false)
+	if err := svc.ConfigureCodeGraph(analyzer, []string{root}, CodeGraphLimits{MaxFiles: 10, MaxEntities: 20, MaxRelations: 30}); err != nil {
+		t.Fatal(err)
+	}
+	analysis, err := svc.IndexCodeRepository(context.Background(), CodeIndexInput{
+		ProjectID: "product", RepositoryPath: repositoryPath, RequestedBy: "codex",
+		Repository: domain.SoftwareRepository{Name: "repo", CanonicalURL: "https://example.test/repo.git"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if analysis.ID != "analysis" || analyzer.request.MaxRelations != 30 || repository.codeSnapshot.Revision != "abc123" {
+		t.Fatalf("analysis=%#v request=%#v", analysis, analyzer.request)
+	}
+	_, err = svc.IndexCodeRepository(context.Background(), CodeIndexInput{
+		ProjectID: "product", RepositoryPath: filepath.Dir(root), RequestedBy: "codex",
+		Repository: domain.SoftwareRepository{Name: "repo", CanonicalURL: "https://example.test/repo.git"},
+	})
+	if !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("outside-root error = %v", err)
+	}
+}
+
+func TestCodeSearchPreservesVectorRankingAndRepositoryFilter(t *testing.T) {
+	repository := &fakeRepository{codeEntities: []domain.CodeEntity{
+		{ID: "a", RepositoryID: "repo-1"}, {ID: "b", RepositoryID: "repo-2"},
+	}}
+	vectors := &fakeVectors{codeHits: []domain.VectorHit{{ID: "b", Score: .9}, {ID: "a", Score: .8}}}
+	svc := New(repository, &fakeArtifacts{}, &fakeEmbedder{vectors: [][]float32{{1}}}, vectors, true, false)
+	entities, backend, err := svc.SearchCodeEntities(context.Background(), "product", "repo-1", "save", 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if backend != "milvus" || vectors.codeRepo != "repo-1" || len(entities) != 1 || entities[0].ID != "a" || entities[0].Score != .8 {
+		t.Fatalf("backend=%s entities=%#v", backend, entities)
 	}
 }

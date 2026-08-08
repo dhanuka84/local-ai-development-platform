@@ -6,6 +6,7 @@ The enterprise deployment changes scale and identity, not semantics:
 
 - PostgreSQL remains authoritative.
 - Milvus remains derived and project/tenant filtered.
+- Exact revisioned code graphs remain in PostgreSQL; Milvus code vectors use the same stable entity UUIDs.
 - Knowledge and repository relations require provenance and approval.
 - Maintenance remains local/private with no cloud fallback.
 - Cloud review is explicit, minimized, and audited.
@@ -23,6 +24,7 @@ The enterprise deployment changes scale and identity, not semantics:
 | Milvus Standalone | Milvus Distributed on Kubernetes or managed Zilliz/Milvus. |
 | Local artifact volume | Encrypted, versioned S3-compatible object storage. |
 | One worker | Independently scaled worker deployment partitioned by tenant/project. |
+| Synchronous analyzer in local gateway | Durable analysis queue plus sandboxed, autoscaled analyzer workers partitioned by tenant/repository. |
 | PostgreSQL outbox polling | Keep polling initially; add CDC to Kafka/NATS only after measured need. |
 | One Ollama daemon | Private GPU inference pool with model routing and quotas. |
 | Local Kimi/OpenAI credentials | Central egress broker, DLP, per-project policy, cost limits. |
@@ -37,9 +39,11 @@ The gateway uses the MCP SDK's stateless Streamable HTTP mode, allowing ordinary
 
 `project_id` is the current logical namespace. Enterprise deployments should derive it from authenticated authorization, not trust a model-supplied value. Add an authorization layer that maps subject and scopes to permitted projects, then enforce it in repository queries and, if needed, PostgreSQL row-level security. Include tenant/project in Milvus partitioning or scalar filters and in object-store prefixes.
 
-## Repository graph at scale
+## Repository and code graphs at scale
 
 PostgreSQL recursive CTEs are suitable for bounded product graphs. If deep, high-rate topology traversal becomes a measured bottleneck, introduce a graph projection (for example Neo4j) behind a domain interface. PostgreSQL must remain the authority, and updates should flow through the same outbox/CDC pattern. Milvus complements the graph with semantic discovery; it does not replace edge integrity or traversal.
+
+Do not run repository analysis inside stateless enterprise MCP gateways. `CODEGRAPH_ENABLED=false` removes the synchronous filesystem indexing tool while retaining symbol search and exact traversal. OpenClaw or CI submits durable jobs to a separate control-plane API; sandboxed analyzer workers consume those jobs, fetch an immutable revision, emit a deterministic snapshot, and let PostgreSQL atomically advance the repository head. Use incremental changed-file analysis, repository-scoped partitioning, batched projection events, retention for old runs, and explicit per-tenant resource quotas when scaling to thousands of repositories.
 
 ## Availability and consistency
 
@@ -48,12 +52,13 @@ Writes are strongly consistent in PostgreSQL. Milvus indexing is eventual. Track
 - Oldest pending outbox age.
 - Attempts and terminal/repeated errors.
 - PostgreSQL-to-Milvus projection delay.
+- Repository analysis queue age, duration, failures, and active-revision freshness.
 - Search fallback rate.
 - Embedding latency and dimension errors.
 - Candidate approval/rejection/revision rates.
 - Cloud review volume, exported bytes, latency, and cost.
 
-The gateway can continue exact PostgreSQL retrieval during a vector outage. Repository semantic search is unavailable, but exact graph traversal remains available.
+The gateway can continue exact PostgreSQL retrieval during a vector outage. Repository and code semantic discovery are unavailable, but exact graph traversal from a known repository or symbol remains available.
 
 ## Delivery phases
 

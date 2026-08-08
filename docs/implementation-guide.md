@@ -10,8 +10,9 @@ This is the canonical technical description of the code in this repository. It c
 |---|---|---|
 | MCP gateway | `cmd/gateway` | Typed agent boundary, authentication, health endpoints, Streamable HTTP/STDIO. |
 | Application service | `internal/service` | Validation, capture, retrieval, approval, graph, and fallback policy. |
+| Code graph analyzer | `components/codegraph/golang` | Headless Go module/package/type analysis and deterministic snapshots. |
 | PostgreSQL adapter | `internal/postgres` | Transactions, workflow state, full-text fallback, graph traversal, outbox. |
-| Milvus adapter | `internal/milvus` | Derived vector collection for knowledge and relationship documents. |
+| Milvus adapter | `internal/milvus` | Derived vector collection for knowledge, repository relationships, and selected code entities. |
 | Ollama adapter | `internal/ollama` | Batched local embeddings through `/api/embed`. |
 | Artifact store | `internal/artifacts` | Immutable content-addressed prompt/output blobs. |
 | Index worker | `cmd/worker` | Claims outbox events, embeds authoritative records, updates Milvus. |
@@ -29,7 +30,7 @@ Milvus                      disposable semantic projection
 OpenClaw/Codex sessions     transient agent context, never canonical knowledge
 ```
 
-Milvus IDs are PostgreSQL UUIDs. Search first returns vector IDs and scores; the application then hydrates content from PostgreSQL and drops anything no longer approved. This prevents a stale vector record from overriding workflow state.
+Milvus IDs are PostgreSQL UUIDs. Search first returns vector IDs and scores; the application then hydrates content from PostgreSQL and drops anything no longer approved or present in the active code snapshot. This prevents a stale vector record from overriding workflow or graph state.
 
 ## Capture and knowledge promotion
 
@@ -81,9 +82,27 @@ Each edge requires evidence and an accountable approval identity. Evidence shoul
 
 Both approved knowledge and repository edges share one Milvus collection with a dynamic `document_type` field. Searches always filter by `project_id` and `document_type`, preventing relation vectors from entering answer-pattern results.
 
+## Source-code graph
+
+`code_repository_index` analyzes a checked-out Go repository below `CODEGRAPH_ALLOWED_ROOTS`. The service resolves symlinks before checking the allowlist, verifies the requested Git revision, rejects a dirty worktree unless explicitly permitted, and applies file/entity/relation caps. The analyzer does not use an LLM and does not execute repository programs.
+
+Each successful run contains modules, packages, files, types, interfaces, functions, methods, fields, variables, constants, and tests plus typed `contains`, `defines`, `imports`, `calls`, `references`, `implements`, `embeds`, and `tests` edges. PostgreSQL writes the entire run and advances `code_repository_heads` in one transaction. A failed or partial analysis cannot replace the active graph.
+
+Logical identities use a repository-scoped stable key composed from language, entity kind, and qualified name. `code_entities` reuses its UUID across analysis revisions. Milvus stores selected first-party types, interfaces, functions, methods, and tests—including signatures, source paths, and available documentation—using that UUID as the vector primary key:
+
+```text
+semantic query → Milvus entity UUID → active PostgreSQL occurrence → exact SQL graph traversal
+```
+
+All graph edges remain in PostgreSQL. Milvus is used to discover a likely starting symbol, never to infer topology. `code_symbol_search` reports whether Milvus or PostgreSQL lexical fallback supplied the result. `code_graph_get` accepts an entity UUID, stable key, qualified name, or exact name and performs a bounded bidirectional traversal of the active snapshot.
+
+Milvus code searches always filter by project and `document_type`; when the caller supplies `repository_id`, that scalar filter is pushed into the vector query rather than applied only after retrieval. PostgreSQL hydration still rechecks the repository and active snapshot.
+
+The reusable analyzer boundary is isolated under `components/codegraph` and MPL-2.0. PostgreSQL, Milvus, MCP, worker, and policy integrations remain in the MIT portion of the platform.
+
 ## MCP contract and safety
 
-The service uses the official Go MCP SDK. Input and output schemas are inferred from typed structs. Tool annotations distinguish read-only and additive writes. Codex is configured with `default_tools_approval_mode = "writes"`; approval and repository-relationship writes have explicit prompt overrides.
+The service uses the official Go MCP SDK. Input and output schemas are inferred from typed structs. Tool annotations distinguish read-only and additive writes. Codex is configured with `default_tools_approval_mode = "writes"`; approval, repository-relationship, and code-index writes have explicit prompt overrides. `code_repository_index` is registered only when synchronous local analysis is enabled; code search and graph traversal remain available in query-only enterprise gateways.
 
 HTTP endpoints:
 
@@ -116,6 +135,11 @@ Configuration is environment-only and validated at startup. Important values:
 | `MILVUS_COLLECTION` | `approved_knowledge_v1` | Version the name when schema/embedding changes. |
 | `AUTO_APPROVE_LOCAL` | `false` | Leave false for shared or production use. |
 | `SEARCH_LEXICAL_FALLBACK` | `true` | Returns a visible backend marker. |
+| `CODEGRAPH_ENABLED` | `true` locally | Enables the synchronous local indexing tool; defaults false in enterprise mode. |
+| `CODEGRAPH_ALLOWED_ROOTS` | `.` | OS path-list of roots the analyzer may read; set explicitly for services. |
+| `CODEGRAPH_MAX_FILES` | `5000` | Hard cap per analysis request. |
+| `CODEGRAPH_MAX_ENTITIES` | `200000` | Hard cap per analysis request. |
+| `CODEGRAPH_MAX_RELATIONS` | `1000000` | Hard cap per analysis request. |
 
 ## Schema and embedding evolution
 
@@ -135,4 +159,6 @@ Milvus is intentionally versioned by collection name. To change the embedding mo
 - The current local artifact store does not compress blobs; content addressing and permissions are implemented. Enterprise object storage should add encryption, retention, and lifecycle policies.
 - The local MCP token represents one trust domain. Per-user authorization belongs at the enterprise gateway.
 - Repository relationship discovery is explicit. An automated scanner can propose edges from manifests later, but proposals should still require evidence and approval.
+- The local MCP gateway performs analysis synchronously. Enterprise scale requires queued jobs and sandboxed analyzer workers; OpenClaw should orchestrate those workers, not generate graph facts itself.
+- Removed symbols can leave stale Milvus rows until collection rebuild; active PostgreSQL hydration prevents them from being returned as facts.
 - PostgreSQL integration tests require a running service; unit tests isolate pure application and transport behavior.

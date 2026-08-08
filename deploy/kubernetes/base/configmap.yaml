@@ -19,3 +19,9 @@ data:
   WORKER_POLL_INTERVAL: 1s
   SEARCH_LEXICAL_FALLBACK: "true"
   AUTO_APPROVE_LOCAL: "false"
+  # Synchronous filesystem analysis is a local profile. Enterprise indexing is
+  # delegated to sandboxed queued analyzer workers.
+  CODEGRAPH_ENABLED: "false"
+  CODEGRAPH_MAX_FILES: "5000"
+  CODEGRAPH_MAX_ENTITIES: "200000"
+  CODEGRAPH_MAX_RELATIONS: "1000000"

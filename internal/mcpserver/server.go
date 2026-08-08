@@ -10,7 +10,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-const Version = "0.1.0"
+const Version = "0.2.0"
 
 type API struct {
 	service *service.Service
@@ -22,7 +22,7 @@ func New(svc *service.Service) *mcp.Server {
 		Name: "hybrid-ai-knowledge", Title: "Hybrid AI Knowledge Gateway", Version: Version,
 		Description: "Captures reviewed software-development knowledge and retrieves approved guidance for local or cloud agents.",
 	}, &mcp.ServerOptions{
-		Instructions: "Search approved knowledge before solving a task. Capture useful final outputs with generation_capture. Never treat pending candidates as approved facts.",
+		Instructions: "Search approved knowledge and relevant code symbols before solving a task. Use code_graph_get for exact topology after semantic discovery. Capture useful final outputs with generation_capture. Never treat pending candidates or vector similarity as authoritative facts.",
 	})
 	api.register(server)
 	return server
@@ -35,8 +35,13 @@ func (a *API) register(server *mcp.Server) {
 	mcp.AddTool(server, readTool("knowledge_candidates_list", "List review candidates", "List pending knowledge candidates for review."), a.listCandidates)
 	mcp.AddTool(server, readTool("repository_graph_get", "Get repository graph", "Traverse typed, evidence-backed relationships around a Git repository."), a.repositoryGraph)
 	mcp.AddTool(server, readTool("repository_relation_search", "Search repository relationships", "Semantically search approved Git repository relationships in Milvus."), a.repositoryRelationSearch)
+	mcp.AddTool(server, readTool("code_symbol_search", "Search code symbols", "Semantically search active, revision-specific source symbols with PostgreSQL lexical fallback."), a.codeSymbolSearch)
+	mcp.AddTool(server, readTool("code_graph_get", "Get code graph", "Traverse calls, references, implementations, imports, tests, and containment around a source symbol."), a.codeGraph)
 	mcp.AddTool(server, writeTool("generation_capture", "Capture a generation", "Persist a prompt, generated response, provenance, and a review candidate. This is additive and does not approve the candidate."), a.capture)
 	mcp.AddTool(server, writeTool("repository_relation_upsert", "Record repository relationship", "Upsert two Git repositories and an approved, evidence-backed relationship; vector indexing is queued transactionally."), a.repositoryRelationUpsert)
+	if a.service.CodeGraphAnalysisEnabled() {
+		mcp.AddTool(server, writeTool("code_repository_index", "Index a code repository", "Analyze an allowlisted local Go repository, persist a revisioned graph in PostgreSQL, and queue symbol embeddings."), a.codeRepositoryIndex)
+	}
 	mcp.AddTool(server, writeTool("review_record", "Record review feedback", "Attach Codex, ChatGPT, Kimi, or human review feedback to a candidate without approving it."), a.review)
 	mcp.AddTool(server, writeTool("knowledge_candidate_decide", "Approve or reject candidate", "Approve or reject a pending candidate. Approval schedules indexing into Milvus."), a.decide)
 }
@@ -255,4 +260,65 @@ type repositoryRelationSearchInput struct {
 func (a *API) repositoryRelationSearch(ctx context.Context, _ *mcp.CallToolRequest, input repositoryRelationSearchInput) (*mcp.CallToolResult, repositoryRelationsOutput, error) {
 	relations, err := a.service.SearchRepositoryRelations(ctx, input.ProjectID, input.Query, input.Limit)
 	return nil, repositoryRelationsOutput{Count: len(relations), Relations: relations}, err
+}
+
+type codeRepositoryIndexInput struct {
+	ProjectID      string          `json:"project_id" jsonschema:"software product or solution namespace; required"`
+	Repository     repositoryInput `json:"repository" jsonschema:"repository identity; required"`
+	RepositoryPath string          `json:"repository_path" jsonschema:"local path below CODEGRAPH_ALLOWED_ROOTS; required"`
+	Revision       string          `json:"revision,omitempty" jsonschema:"expected Git commit; analysis fails if it does not match"`
+	AllowDirty     bool            `json:"allow_dirty,omitempty" jsonschema:"permit uncommitted files and fingerprint the dirty snapshot"`
+	RequestedBy    string          `json:"requested_by" jsonschema:"accountable user or agent identity; required"`
+}
+
+type codeRepositoryIndexOutput struct {
+	Analysis   domain.CodeAnalysis `json:"analysis"`
+	IndexState string              `json:"index_state"`
+}
+
+func (a *API) codeRepositoryIndex(ctx context.Context, _ *mcp.CallToolRequest, input codeRepositoryIndexInput) (*mcp.CallToolResult, codeRepositoryIndexOutput, error) {
+	analysis, err := a.service.IndexCodeRepository(ctx, service.CodeIndexInput{
+		ProjectID: input.ProjectID,
+		Repository: domain.SoftwareRepository{
+			Name: input.Repository.Name, CanonicalURL: input.Repository.CanonicalURL,
+			DefaultBranch: input.Repository.DefaultBranch,
+		},
+		RepositoryPath: input.RepositoryPath, Revision: input.Revision,
+		AllowDirty: input.AllowDirty, RequestedBy: input.RequestedBy,
+	})
+	return nil, codeRepositoryIndexOutput{Analysis: analysis, IndexState: "queued"}, err
+}
+
+type codeSymbolSearchInput struct {
+	ProjectID    string `json:"project_id" jsonschema:"software product or solution namespace; required"`
+	RepositoryID string `json:"repository_id,omitempty" jsonschema:"optional repository UUID filter"`
+	Query        string `json:"query" jsonschema:"symbol name, behavior, or programming concept; required"`
+	Limit        int    `json:"limit,omitempty" jsonschema:"maximum results from 1 to 50"`
+}
+
+type codeSymbolSearchOutput struct {
+	Backend string              `json:"backend"`
+	Count   int                 `json:"count"`
+	Results []domain.CodeEntity `json:"results"`
+}
+
+func (a *API) codeSymbolSearch(ctx context.Context, _ *mcp.CallToolRequest, input codeSymbolSearchInput) (*mcp.CallToolResult, codeSymbolSearchOutput, error) {
+	entities, backend, err := a.service.SearchCodeEntities(ctx, input.ProjectID, input.RepositoryID, input.Query, input.Limit)
+	return nil, codeSymbolSearchOutput{Backend: backend, Count: len(entities), Results: entities}, err
+}
+
+type codeGraphInput struct {
+	ProjectID  string `json:"project_id" jsonschema:"software product or solution namespace; required"`
+	Repository string `json:"repository" jsonschema:"repository UUID, canonical URL, or exact name; required"`
+	Symbol     string `json:"symbol" jsonschema:"entity UUID, stable key, qualified name, or exact name; required"`
+	Depth      int    `json:"depth,omitempty" jsonschema:"bidirectional traversal depth from 1 to 5"`
+}
+
+type codeGraphOutput struct {
+	Graph domain.CodeGraph `json:"graph"`
+}
+
+func (a *API) codeGraph(ctx context.Context, _ *mcp.CallToolRequest, input codeGraphInput) (*mcp.CallToolResult, codeGraphOutput, error) {
+	graph, err := a.service.CodeGraph(ctx, input.ProjectID, input.Repository, input.Symbol, input.Depth)
+	return nil, codeGraphOutput{Graph: graph}, err
 }

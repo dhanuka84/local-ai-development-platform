@@ -13,6 +13,10 @@ x-platform-environment: &platform-environment
   MILVUS_COLLECTION: approved_knowledge_v1
   SEARCH_LEXICAL_FALLBACK: ${SEARCH_LEXICAL_FALLBACK:-true}
   AUTO_APPROVE_LOCAL: ${AUTO_APPROVE_LOCAL:-false}
+  CODEGRAPH_ENABLED: "false"
+  CODEGRAPH_MAX_FILES: ${CODEGRAPH_MAX_FILES:-5000}
+  CODEGRAPH_MAX_ENTITIES: ${CODEGRAPH_MAX_ENTITIES:-200000}
+  CODEGRAPH_MAX_RELATIONS: ${CODEGRAPH_MAX_RELATIONS:-1000000}
 
 services:
   postgres:
@@ -150,17 +154,20 @@ services:
   gateway:
     build:
       context: ../..
-      target: gateway
+      target: gateway-analyzer
     environment:
       <<: *platform-environment
       HTTP_ADDRESS: 0.0.0.0:8080
       MCP_TRANSPORT: http
       AUTH_MODE: token
       AUTH_TOKEN: ${AUTH_TOKEN:?set AUTH_TOKEN in .env}
+      CODEGRAPH_ENABLED: "true"
+      CODEGRAPH_ALLOWED_ROOTS: /workspace
     ports:
       - "127.0.0.1:8080:8080"
     volumes:
       - artifact-data:/var/lib/hybrid-ai/artifacts
+      - ${CODEGRAPH_HOST_ROOT:-../..}:/workspace:ro
     depends_on:
       migrate:
         condition: service_completed_successfully

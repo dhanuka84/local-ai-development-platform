@@ -11,3 +11,7 @@ default_tools_approval_mode = "writes"
 # Keep the explicit approval gate for publishing knowledge.
 [mcp_servers.hybrid_knowledge.tools.knowledge_candidate_decide]
 approval_mode = "prompt"
+
+# Indexing reads an allowlisted local repository and writes a new SQL snapshot.
+[mcp_servers.hybrid_knowledge.tools.code_repository_index]
+approval_mode = "prompt"

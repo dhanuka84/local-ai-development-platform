@@ -48,7 +48,8 @@ flowchart LR
             CAPTURE["Capture worker<br/>normalize · redact · hash · extract patterns"]:::service
             REVIEW["Review and promotion<br/>candidate → validate → approve"]:::service
             INDEXER["Knowledge indexer<br/>chunk · embed · idempotent upsert"]:::service
-            REPO["Knowledge + repository graph service<br/>transactions · typed edges · provenance · artifacts"]:::service
+            ANALYZER["Deterministic code analyzer<br/>Go packages · AST · types<br/>allowlisted source · revision caps"]:::service
+            REPO["Knowledge + graph service<br/>transactions · repository + exact code edges<br/>stable entity IDs · provenance"]:::service
         end
 
         subgraph INFERENCE["LOCAL INFERENCE · OLLAMA"]
@@ -60,8 +61,8 @@ flowchart LR
 
         subgraph DATA["LOCAL DATA PLANE"]
             direction LR
-            PG[("PostgreSQL<br/><b>system of record</b><br/>workflow · provenance · outbox<br/>typed Git repository nodes + edges")]:::database
-            MILVUS[("Milvus Standalone<br/><b>derived semantic index</b><br/>approved patterns + repository-relation evidence")]:::vector
+            PG[("PostgreSQL<br/><b>graph truth</b><br/>workflow · provenance · outbox<br/>revisioned code entities + exact edges")]:::database
+            MILVUS[("Milvus Standalone<br/><b>semantic discovery</b><br/>approved patterns · repository evidence<br/>selected code entities by stable SQL UUID")]:::vector
             GIT[("Git repositories<br/><b>product source + approved knowledge</b><br/>revisions · patterns · ADRs · runbooks")]:::knowledge
             ARTIFACTS[("Content-addressed artifacts<br/>prompts · outputs · patches · evidence")]:::storage
             SPOOL[("Protected local spool<br/>non-blocking capture buffer")]:::storage
@@ -95,6 +96,9 @@ flowchart LR
     OPENCLAW_MAINT -.->|"hard control"| EGRESS_DENY
 
     MCP --> RETRIEVAL
+    MCP -->|"approved index request"| ANALYZER
+    ANALYZER -->|"read-only revision"| GIT
+    ANALYZER -->|"complete deterministic snapshot"| REPO
     RETRIEVAL -->|"semantic + lexical candidates"| MILVUS
     RETRIEVAL -->|"authoritative records · exact repository graph"| REPO
     RETRIEVAL --> RERANK
@@ -112,7 +116,7 @@ flowchart LR
     REPO -->|"index job + approved revision"| INDEXER
     INDEXER --> EMBED
     EMBED --> INDEXER
-    INDEXER -->|"knowledge + repository-relation vectors"| MILVUS
+    INDEXER -->|"knowledge + repository vectors<br/>selected code entity UUIDs"| MILVUS
 
     ROUTER -->|"explicit escalation"| CLOUD_GUARD
     CODEX -.->|"approved scoped package"| CLOUD_GUARD

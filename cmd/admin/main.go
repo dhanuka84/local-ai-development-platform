@@ -69,7 +69,11 @@ func run(ctx context.Context, args []string) error {
 		if err != nil {
 			return err
 		}
-		fmt.Printf("queued %d approved knowledge items and %d repository relations for indexing\n", knowledgeCount, relationCount)
+		codeEntityCount, err := repository.RequeueCodeEntities(ctx)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("queued %d approved knowledge items, %d repository relations, and %d code entities for indexing\n", knowledgeCount, relationCount, codeEntityCount)
 		return nil
 	case "approve", "reject":
 		if len(args) != 3 {

@@ -71,6 +71,9 @@
             "knowledge_candidates_list",
             "repository_graph_get",
             "repository_relation_search",
+            "code_symbol_search",
+            "code_graph_get",
+            "code_repository_index",
             "repository_relation_upsert",
             "generation_capture",
             "review_record",
@@ -78,7 +81,9 @@
           ]
         },
         codex: {
-          agents: ["developer", "maintenance", "cloud-review"],
+          // Cloud review receives only the context explicitly delegated by the
+          // developer; it cannot query the unrestricted local MCP graph.
+          agents: ["developer", "maintenance"],
           defaultToolsApprovalMode: "writes"
         }
       }

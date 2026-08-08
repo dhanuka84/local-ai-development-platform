@@ -89,6 +89,19 @@ func (w *Worker) process(ctx context.Context, event domain.OutboxEvent) error {
 			return fmt.Errorf("expected one embedding, got %d", len(embeddings))
 		}
 		return w.vectors.UpsertRelation(ctx, relation, embeddings[0])
+	case "code_entity.upsert":
+		entity, err := w.repository.GetCodeEntity(ctx, event.AggregateID)
+		if err != nil {
+			return err
+		}
+		embeddings, err := w.embedder.Embed(ctx, []string{entity.RetrievalText()})
+		if err != nil {
+			return err
+		}
+		if len(embeddings) != 1 {
+			return fmt.Errorf("expected one embedding, got %d", len(embeddings))
+		}
+		return w.vectors.UpsertCodeEntity(ctx, entity, embeddings[0])
 	default:
 		return fmt.Errorf("unsupported outbox topic %q", event.Topic)
 	}

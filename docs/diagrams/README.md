@@ -10,12 +10,14 @@ This directory contains the editable Mermaid sources and rendered images for the
 | Enterprise distributed architecture | `hybrid-ai-enterprise-architecture.mmd` | `hybrid-ai-enterprise-architecture.png` | `hybrid-ai-enterprise-architecture.svg` |
 | Local-to-enterprise evolution | `hybrid-ai-local-to-enterprise-evolution.mmd` | `hybrid-ai-local-to-enterprise-evolution.png` | `hybrid-ai-local-to-enterprise-evolution.svg` |
 
-The SVG files are recommended for documentation and presentations because they remain readable at any zoom level. The PNG files are high-resolution raster exports rendered at approximately 11K–13K pixels wide.
+The SVG files are recommended for documentation and presentations because they remain readable at any zoom level. The PNG files are high-resolution raster exports rendered at approximately 11K–14K pixels wide.
 
 ## Architecture conventions
 
 - PostgreSQL is the authoritative runtime system of record for workflow, graph relationships, provenance, audit, and indexing state.
 - Git repository nodes and typed, evidence-backed relationships are authoritative in PostgreSQL and semantically projected into Milvus.
+- Revisioned code entities and every exact code edge are authoritative in PostgreSQL. Only selected first-party entity summaries are projected into Milvus, using the same stable PostgreSQL UUID.
+- OpenClaw orchestrates analysis; deterministic compiler-aware analyzers produce graph evidence. LLM interpretations follow the candidate review workflow.
 - Git is the human-reviewable source for approved patterns, ADRs, policies, and runbooks.
 - Object or content-addressed storage holds large immutable artifacts and evidence.
 - Milvus is a derived vector and hybrid-search index that can be rebuilt from authoritative sources.

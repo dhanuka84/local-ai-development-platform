@@ -15,3 +15,11 @@ DATABASE_URL = "postgres://hybrid:CHANGE_ME@127.0.0.1:5432/hybrid?sslmode=disabl
 OLLAMA_URL = "http://127.0.0.1:11434"
 MILVUS_ADDRESS = "127.0.0.1:19530"
 ARTIFACTS_PATH = "/ABSOLUTE/PATH/data/artifacts"
+CODEGRAPH_ENABLED = "true"
+CODEGRAPH_ALLOWED_ROOTS = "/ABSOLUTE/PATH"
+CODEGRAPH_MAX_FILES = "5000"
+CODEGRAPH_MAX_ENTITIES = "200000"
+CODEGRAPH_MAX_RELATIONS = "1000000"
+
+[mcp_servers.hybrid_knowledge_local.tools.code_repository_index]
+approval_mode = "prompt"

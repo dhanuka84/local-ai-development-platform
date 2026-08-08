@@ -6,7 +6,8 @@ The repository implements:
 
 - A Go MCP server over Streamable HTTP or STDIO.
 - PostgreSQL for durable workflow state, provenance, review gates, Git-repository graphs, and a transactional outbox.
-- Milvus for derived semantic indexes of approved knowledge and repository relationships.
+- A headless, compiler-aware Go analyzer for revisioned symbols, calls, references, implementations, imports, and tests.
+- Milvus for derived semantic indexes of approved knowledge, repository relationships, and selected code symbols.
 - Ollama for local embeddings and local coding inference.
 - Immutable SHA-256 prompt/output artifacts.
 - An asynchronous indexing worker and administrative CLI.
@@ -22,6 +23,8 @@ Every generation is captured as a pending candidate with the original problem, r
 
 Git-repository relationships use the same rule. Typed, evidence-backed edges are stored canonically in PostgreSQL and projected into Milvus so agents can use both exact graph traversal and semantic relationship search.
 
+Source-code graphs follow a stricter dual-store rule: PostgreSQL owns every exact, revision-scoped entity and edge. Selected first-party symbols are embedded in Milvus under the same stable PostgreSQL entity UUID. A semantic hit is always hydrated from the active SQL snapshot before the agent traverses calls, references, implementations, imports, or tests.
+
 ## Technology choices
 
 | Concern | Choice | Reason |
@@ -32,6 +35,7 @@ Git-repository relationships use the same rule. Typed, evidence-backed edges are
 | Local inference | Ollama | Native OpenClaw integration and local `/api/embed`. |
 | Local coding on GBX100/GB10 | `qwen3.6:35b` | Current open-weight agentic coding model with ample memory headroom on 128 GB. |
 | Local embeddings | `embeddinggemma` | Small local embedding model; 768 dimensions by default. |
+| Code analysis | Go packages, AST, and type information | Deterministic build-aware evidence without an LLM or editor bridge. |
 | Cloud architecture review | `moonshot/kimi-k3` | Explicit, sanitized review subagent. |
 | Independent code review | Codex/ChatGPT | MCP-connected review and reusable feedback capture. |
 
@@ -47,6 +51,8 @@ Prerequisites: Docker Compose v2, Git, and approximately 16 GB free RAM for the 
    cp .env.example .env
    openssl rand -hex 32
    ```
+
+   `CODEGRAPH_HOST_ROOT` selects the one host directory mounted read-only at `/workspace` for analysis. Use an absolute path to analyze another repository.
 
 2. Start the stack. Use `up-gpu` on the GBX100/GB10 host:
 
@@ -127,7 +133,7 @@ Current official references: [Kimi K3 in OpenClaw](https://platform.kimi.ai/docs
 The usual software-development loop is:
 
 ```text
-knowledge_search + repository_graph_get
+knowledge_search + repository_graph_get + code_symbol_search
   -> local implementation and validation
   -> generation_capture (pending)
   -> optional Kimi/Codex review_record (may revise pending content)
@@ -151,6 +157,9 @@ Available tools:
 | `repository_relation_upsert` | Store a typed, approved Git-repository edge and queue its vector projection. |
 | `repository_graph_get` | Traverse exact SQL relationships to depth 1–5. |
 | `repository_relation_search` | Semantically search relationship evidence in Milvus. |
+| `code_repository_index` | Analyze an allowlisted local Go repository and atomically publish its SQL graph snapshot. |
+| `code_symbol_search` | Discover selected symbols through Milvus, then hydrate the active PostgreSQL entity. |
+| `code_graph_get` | Traverse the exact active SQL graph around a symbol to depth 1–5. |
 
 Supported repository edge types are `depends_on`, `provides_api_to`, `deploys_with`, `shares_contract`, `fork_of`, `upstream_of`, `successor_of`, `contains`, and `related_to`.
 
@@ -158,6 +167,7 @@ Supported repository edge types are `depends_on`, `provides_api_to`, `deploys_wi
 
 ```text
 cmd/                 gateway, indexing worker, and admin CLI
+components/codegraph reusable graph contract and native Go analyzer (MPL-2.0)
 internal/            domain, services, PostgreSQL, Milvus, Ollama, MCP, HTTP
 migrations/          embedded transactional SQL migrations
 deploy/compose/      complete local stack and NVIDIA GPU overlay
@@ -173,6 +183,8 @@ make check
 make build
 docker compose --env-file .env.example -f deploy/compose/compose.yaml config --quiet
 ```
+
+Native and STDIO code analysis requires Git and the Go toolchain. The local Compose gateway uses the `gateway-analyzer` image and a read-only `/workspace` mount. The production gateway target remains distroless; enterprise deployments should run analyzers in isolated queued workers.
 
 The module uses the official MCP Go SDK `v1.7.0`, which supports MCP protocol `2026-07-28`, and the Milvus Go client `v2.6.5`. Milvus Standalone is pinned to `v2.6.21`, matching the official 2.6 deployment line. Review dependency and image updates through CI rather than following floating `latest` tags.
 
@@ -200,4 +212,4 @@ See [enterprise-deployment.md](docs/enterprise-deployment.md) and the [enterpris
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+The platform is MIT-licensed except for files under `components/codegraph`, which are MPL-2.0 as documented in that component's `LICENSE` and `NOTICE`. See [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

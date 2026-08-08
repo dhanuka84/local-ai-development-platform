@@ -1,6 +1,9 @@
 package domain
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 const (
 	CandidatePending  = "pending"
@@ -129,4 +132,76 @@ type RepositoryRelation struct {
 func (r RepositoryRelation) RetrievalText() string {
 	return "Repository relationship: " + r.From.Name + " (" + r.From.CanonicalURL + ") " +
 		r.RelationType + " " + r.To.Name + " (" + r.To.CanonicalURL + "). Evidence: " + r.Evidence
+}
+
+type CodeAnalysis struct {
+	ID              string             `json:"id"`
+	ProjectID       string             `json:"project_id"`
+	Repository      SoftwareRepository `json:"repository"`
+	Revision        string             `json:"revision"`
+	Analyzer        string             `json:"analyzer"`
+	AnalyzerVersion string             `json:"analyzer_version"`
+	RequestedBy     string             `json:"requested_by"`
+	EntityCount     int                `json:"entity_count"`
+	RelationCount   int                `json:"relation_count"`
+	StartedAt       time.Time          `json:"started_at"`
+	CompletedAt     time.Time          `json:"completed_at"`
+}
+
+type CodeLocation struct {
+	FilePath    string `json:"file_path,omitempty"`
+	StartLine   int    `json:"start_line,omitempty"`
+	StartColumn int    `json:"start_column,omitempty"`
+	EndLine     int    `json:"end_line,omitempty"`
+	EndColumn   int    `json:"end_column,omitempty"`
+}
+
+type CodeEntity struct {
+	ID            string            `json:"id"`
+	ProjectID     string            `json:"project_id"`
+	RepositoryID  string            `json:"repository_id"`
+	AnalysisRunID string            `json:"analysis_run_id"`
+	Revision      string            `json:"revision"`
+	StableKey     string            `json:"stable_key"`
+	Language      string            `json:"language"`
+	Kind          string            `json:"kind"`
+	Name          string            `json:"name"`
+	QualifiedName string            `json:"qualified_name"`
+	Signature     string            `json:"signature,omitempty"`
+	ContentHash   string            `json:"content_hash,omitempty"`
+	Location      CodeLocation      `json:"location"`
+	Metadata      map[string]string `json:"metadata,omitempty"`
+	Score         float32           `json:"score,omitempty"`
+}
+
+func (e CodeEntity) RetrievalText() string {
+	text := "Code entity: " + e.QualifiedName + "\nLanguage: " + e.Language + "\nKind: " + e.Kind
+	if e.Signature != "" {
+		text += "\nSignature: " + e.Signature
+	}
+	if e.Location.FilePath != "" {
+		text += "\nSource: " + e.Location.FilePath
+	}
+	if documentation := strings.TrimSpace(e.Metadata["documentation"]); documentation != "" {
+		text += "\nDocumentation: " + documentation
+	}
+	return text
+}
+
+type CodeRelation struct {
+	ID            string            `json:"id"`
+	AnalysisRunID string            `json:"analysis_run_id"`
+	SourceID      string            `json:"source_id"`
+	TargetID      string            `json:"target_id"`
+	RelationType  string            `json:"relation_type"`
+	Evidence      string            `json:"evidence,omitempty"`
+	Confidence    float32           `json:"confidence"`
+	Location      CodeLocation      `json:"location"`
+	Metadata      map[string]string `json:"metadata,omitempty"`
+}
+
+type CodeGraph struct {
+	Analysis  CodeAnalysis   `json:"analysis"`
+	Entities  []CodeEntity   `json:"entities"`
+	Relations []CodeRelation `json:"relations"`
 }

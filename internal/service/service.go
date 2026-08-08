@@ -4,8 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
+	"github.com/dhanuka84/hybrid-ai-platform/components/codegraph"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/domain"
 )
 
@@ -18,6 +21,15 @@ type Service struct {
 	vectors         domain.VectorStore
 	lexicalFallback bool
 	autoApprove     bool
+	codeAnalyzer    codegraph.Analyzer
+	codeRoots       []string
+	codeLimits      CodeGraphLimits
+}
+
+type CodeGraphLimits struct {
+	MaxFiles     int
+	MaxEntities  int
+	MaxRelations int
 }
 
 func New(repository domain.Repository, artifacts domain.ArtifactStore, embedder domain.Embedder, vectors domain.VectorStore, lexicalFallback, autoApprove bool) *Service {
@@ -25,6 +37,183 @@ func New(repository domain.Repository, artifacts domain.ArtifactStore, embedder 
 		repository: repository, artifacts: artifacts, embedder: embedder, vectors: vectors,
 		lexicalFallback: lexicalFallback, autoApprove: autoApprove,
 	}
+}
+
+func (s *Service) CodeGraphAnalysisEnabled() bool {
+	return s != nil && s.codeAnalyzer != nil
+}
+
+// ConfigureCodeGraph enables repository analysis and resolves the allowlist up
+// front. Symlink resolution is repeated for each requested repository so a
+// later symlink swap cannot escape an allowed root.
+func (s *Service) ConfigureCodeGraph(analyzer codegraph.Analyzer, allowedRoots []string, limits CodeGraphLimits) error {
+	if analyzer == nil {
+		return errors.New("code graph analyzer is required")
+	}
+	if limits.MaxFiles < 1 || limits.MaxEntities < 1 || limits.MaxRelations < 1 {
+		return errors.New("code graph limits must be positive")
+	}
+	resolved := make([]string, 0, len(allowedRoots))
+	for _, root := range allowedRoots {
+		root = strings.TrimSpace(root)
+		if root == "" {
+			continue
+		}
+		absolute, err := filepath.Abs(root)
+		if err != nil {
+			return fmt.Errorf("resolve allowed code root %q: %w", root, err)
+		}
+		absolute, err = filepath.EvalSymlinks(absolute)
+		if err != nil {
+			return fmt.Errorf("resolve allowed code root %q: %w", root, err)
+		}
+		info, err := os.Stat(absolute)
+		if err != nil || !info.IsDir() {
+			return fmt.Errorf("allowed code root %q is not a directory", root)
+		}
+		resolved = append(resolved, filepath.Clean(absolute))
+	}
+	if len(resolved) == 0 {
+		return errors.New("at least one allowed code root is required")
+	}
+	s.codeAnalyzer = analyzer
+	s.codeRoots = resolved
+	s.codeLimits = limits
+	return nil
+}
+
+type CodeIndexInput struct {
+	ProjectID      string
+	Repository     domain.SoftwareRepository
+	RepositoryPath string
+	Revision       string
+	AllowDirty     bool
+	RequestedBy    string
+}
+
+func (s *Service) IndexCodeRepository(ctx context.Context, input CodeIndexInput) (domain.CodeAnalysis, error) {
+	input.ProjectID = strings.TrimSpace(input.ProjectID)
+	input.Repository.Name = strings.TrimSpace(input.Repository.Name)
+	input.Repository.CanonicalURL = strings.TrimSpace(input.Repository.CanonicalURL)
+	input.Repository.DefaultBranch = strings.TrimSpace(input.Repository.DefaultBranch)
+	input.Revision = strings.TrimSpace(input.Revision)
+	input.RequestedBy = strings.TrimSpace(input.RequestedBy)
+	if input.ProjectID == "" || input.Repository.Name == "" || input.Repository.CanonicalURL == "" ||
+		strings.TrimSpace(input.RepositoryPath) == "" || input.RequestedBy == "" {
+		return domain.CodeAnalysis{}, fmt.Errorf("%w: project_id, repository name and canonical_url, repository_path, and requested_by are required", ErrInvalidInput)
+	}
+	if s.codeAnalyzer == nil {
+		return domain.CodeAnalysis{}, errors.New("code graph analyzer is not configured")
+	}
+	path, err := s.allowedRepositoryPath(input.RepositoryPath)
+	if err != nil {
+		return domain.CodeAnalysis{}, err
+	}
+	snapshot, err := s.codeAnalyzer.Analyze(ctx, codegraph.Request{
+		RepositoryPath: path,
+		Revision:       input.Revision,
+		AllowDirty:     input.AllowDirty,
+		MaxFiles:       s.codeLimits.MaxFiles,
+		MaxEntities:    s.codeLimits.MaxEntities,
+		MaxRelations:   s.codeLimits.MaxRelations,
+	})
+	if err != nil {
+		return domain.CodeAnalysis{}, fmt.Errorf("analyze repository: %w", err)
+	}
+	return s.repository.StoreCodeGraph(ctx, input.ProjectID, input.Repository, input.RequestedBy, snapshot)
+}
+
+func (s *Service) allowedRepositoryPath(input string) (string, error) {
+	absolute, err := filepath.Abs(strings.TrimSpace(input))
+	if err != nil {
+		return "", fmt.Errorf("%w: resolve repository path: %v", ErrInvalidInput, err)
+	}
+	resolved, err := filepath.EvalSymlinks(absolute)
+	if err != nil {
+		return "", fmt.Errorf("%w: resolve repository path: %v", ErrInvalidInput, err)
+	}
+	info, err := os.Stat(resolved)
+	if err != nil || !info.IsDir() {
+		return "", fmt.Errorf("%w: repository_path is not a directory", ErrInvalidInput)
+	}
+	for _, root := range s.codeRoots {
+		relative, err := filepath.Rel(root, resolved)
+		if err == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+			return filepath.Clean(resolved), nil
+		}
+	}
+	return "", fmt.Errorf("%w: repository_path is outside CODEGRAPH_ALLOWED_ROOTS", ErrInvalidInput)
+}
+
+func (s *Service) SearchCodeEntities(ctx context.Context, projectID, repositoryID, query string, limit int) ([]domain.CodeEntity, string, error) {
+	projectID, repositoryID, query = strings.TrimSpace(projectID), strings.TrimSpace(repositoryID), strings.TrimSpace(query)
+	if projectID == "" || query == "" {
+		return nil, "", fmt.Errorf("%w: project_id and query are required", ErrInvalidInput)
+	}
+	if limit < 1 {
+		limit = 10
+	}
+	if limit > 50 {
+		limit = 50
+	}
+	embeddings, embedErr := s.embedder.Embed(ctx, []string{query})
+	if embedErr == nil && len(embeddings) == 1 {
+		candidateLimit := limit * 5
+		if candidateLimit > 100 {
+			candidateLimit = 100
+		}
+		vectorHits, searchErr := s.vectors.SearchCodeEntities(ctx, projectID, repositoryID, embeddings[0], candidateLimit)
+		if searchErr == nil {
+			ids := make([]string, 0, len(vectorHits))
+			for _, hit := range vectorHits {
+				ids = append(ids, hit.ID)
+			}
+			entities, hydrateErr := s.repository.GetCodeEntitiesMany(ctx, ids)
+			if hydrateErr == nil {
+				byID := make(map[string]domain.CodeEntity, len(entities))
+				for _, entity := range entities {
+					byID[entity.ID] = entity
+				}
+				result := make([]domain.CodeEntity, 0, limit)
+				for _, hit := range vectorHits {
+					entity, ok := byID[hit.ID]
+					if !ok || (repositoryID != "" && entity.RepositoryID != repositoryID) {
+						continue
+					}
+					entity.Score = hit.Score
+					result = append(result, entity)
+					if len(result) == limit {
+						break
+					}
+				}
+				if len(result) > 0 {
+					return result, "milvus", nil
+				}
+			}
+		}
+	}
+	if !s.lexicalFallback {
+		if embedErr != nil {
+			return nil, "", fmt.Errorf("vector search unavailable: %w", embedErr)
+		}
+		return nil, "", errors.New("vector search unavailable")
+	}
+	entities, err := s.repository.SearchCodeEntitiesLexical(ctx, projectID, repositoryID, query, limit)
+	return entities, "postgres-lexical-fallback", err
+}
+
+func (s *Service) CodeGraph(ctx context.Context, projectID, repositoryRoot, symbolRoot string, depth int) (domain.CodeGraph, error) {
+	projectID, repositoryRoot, symbolRoot = strings.TrimSpace(projectID), strings.TrimSpace(repositoryRoot), strings.TrimSpace(symbolRoot)
+	if projectID == "" || repositoryRoot == "" || symbolRoot == "" {
+		return domain.CodeGraph{}, fmt.Errorf("%w: project_id, repository, and symbol are required", ErrInvalidInput)
+	}
+	if depth < 1 {
+		depth = 1
+	}
+	if depth > 5 {
+		depth = 5
+	}
+	return s.repository.GetCodeGraph(ctx, projectID, repositoryRoot, symbolRoot, depth)
 }
 
 type CaptureInput struct {

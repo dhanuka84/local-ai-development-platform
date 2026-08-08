@@ -42,7 +42,13 @@ go run ./cmd/admin milvus-init
 go run ./cmd/admin reindex
 ```
 
-Monitor worker logs until the outbox drains. Reindex includes both approved knowledge and Git-repository relationships.
+Monitor worker logs until the outbox drains. Reindex includes approved knowledge, Git-repository relationships, and selected first-party code entities from every active repository snapshot.
+
+## Analyze a repository
+
+Set `CODEGRAPH_HOST_ROOT` in `.env` to the host repository or parent directory exposed read-only to the Compose gateway, then restart the gateway. Invoke `code_repository_index` through Codex/OpenClaw with `repository_path=/workspace` (or a child path) and an explicit write approval. Supply the expected commit SHA whenever possible and leave `allow_dirty=false` for reproducible snapshots.
+
+For native STDIO operation, set `CODEGRAPH_ALLOWED_ROOTS` to an OS path-list of permitted roots. Git and the matching Go toolchain must be installed. If dependency disclosure is prohibited, pre-populate the Go module cache or vendor dependencies and run the analyzer environment with `GOPROXY=off`.
 
 ## Backup
 
@@ -76,6 +82,9 @@ Milvus backup is optional when PostgreSQL and the embedding model/version are pr
 | OpenClaw emits raw tool JSON | Ollama configured with `/v1` | Use native `baseUrl: http://host:11434` and `api: ollama`. |
 | Codex cannot authenticate | Token env not exported to Codex process | Export `HYBRID_AI_MCP_TOKEN`; do not put the token in TOML. |
 | Repository graph is empty | Root does not exactly match UUID/URL/name | Use the canonical URL returned by relation upsert. |
+| Code analysis path is rejected | Path is outside the resolved allowlist or its bind mount | Update `CODEGRAPH_HOST_ROOT`/`CODEGRAPH_ALLOWED_ROOTS`; never expose a broad filesystem root. |
+| Code analysis reports package errors | Required Go version or modules are unavailable | Use the repository's supported Go toolchain and populate its module cache/vendor tree. |
+| Symbol search uses lexical fallback | Symbol vectors are queued or Ollama/Milvus is down | Inspect `code_entity.upsert` events and worker logs; SQL graph traversal remains authoritative. |
 
 ## Upgrade policy
 

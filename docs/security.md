@@ -19,12 +19,13 @@ Maintenance is fail-closed local: the OpenClaw `maintenance` agent uses an `olla
 - HTTP MCP requires a bearer token; unauthenticated mode is restricted to `APP_ENV=local`.
 - Tokens come from environment variables and are not stored in example configuration.
 - Origin protection, body limits, server timeouts, and constant-time token comparison are enabled.
-- Containers for the Go services are static and run as non-root.
+- Worker/admin and production gateway images are static and non-root. The local analyzer-enabled gateway is non-root but includes Git and Go because `go/packages` needs the toolchain.
 - Artifacts use SHA-256 addressing, atomic publication, and mode `0600`.
-- SQL constraints enforce workflow states, relation types, confidence bounds, and no self-edges.
+- SQL constraints enforce workflow states, relation types, confidence bounds, and no self-edges between repository records; recursive code calls remain valid graph facts.
 - Only approved knowledge is vectorized and returned.
 - MCP tool hints and Codex approval settings distinguish reads from writes.
 - PostgreSQL outbox transactions prevent an approval without a durable indexing request.
+- Code analysis resolves symlinks, enforces explicit filesystem roots and size caps, checks revisions, and rejects dirty worktrees by default.
 
 ## Production requirements
 
@@ -49,6 +50,9 @@ Before internet or enterprise exposure, add:
 | Stale/deleted vector result | PostgreSQL hydration and approved-status check. |
 | Agent self-publishes its output | Write-tool prompts and accountable actor; organizational policy must enforce actor identity at the gateway. |
 | Repository graph poisoning | Evidence required, constrained edge vocabulary, prompted upsert, SQL authority. |
+| Repository prompt injection changes graph truth | Compiler-aware extraction is authoritative; OpenClaw/LLM interpretations are stored only as reviewable knowledge candidates. |
+| Analyzer reads unrelated host files | Read-only narrow bind mount plus canonical-path allowlist; never mount a home directory or filesystem root. |
+| Malicious or oversized repository exhausts resources | File/entity/relation caps locally; enterprise analyzers require sandbox CPU, memory, process, network, and deadline controls. |
 | Token disclosure in Git | Environment references, `.env` ignored, examples contain placeholders only. |
 | DNS rebinding/cross-origin local attack | SDK localhost protection plus Go cross-origin protection. |
 | Worker crash loses indexing | Durable outbox, reclaimable locks, retries, idempotent Milvus upsert. |

@@ -56,6 +56,7 @@ flowchart LR
             RELAY["Transactional outbox relay"]:::service
             BUS["Durable event / job bus<br/>partitioned by tenant and workload"]:::event
             WORKERS["Sandboxed agent workers<br/>repository tools · build · test"]:::worker
+            ANALYZERS["Sandboxed analyzer workers<br/>compiler-aware · incremental · bounded<br/>partitioned by tenant/repository"]:::worker
             CAPTURE["Capture and redaction workers<br/>normalize · classify · hash"]:::worker
             INDEXER["Embedding and indexing workers<br/>chunk · embed · revisioned upsert"]:::worker
             EVAL["Evaluation workers<br/>retrieval quality · regression · safety"]:::worker
@@ -63,10 +64,10 @@ flowchart LR
 
         subgraph RETRIEVAL["KNOWLEDGE AND RETRIEVAL SERVICES"]
             direction LR
-            QUERY["Knowledge + repository query service<br/>hybrid retrieve → ACL → exact graph → rerank"]:::service
+            QUERY["Knowledge + graph query service<br/>semantic entity discovery → ACL<br/>active SQL graph → rerank"]:::service
             RERANK["Private reranking service"]:::model
             SYNC["Edge knowledge sync<br/>signed deltas · policy-filtered collections"]:::service
-            REPO["Knowledge + repository graph service<br/>authoritative records · typed edges · provenance · artifact refs"]:::service
+            REPO["Knowledge + graph service<br/>stable entity IDs · repository + code edges<br/>active revisions · provenance"]:::service
         end
 
         subgraph INFERENCE["INFERENCE PLANE"]
@@ -81,14 +82,14 @@ flowchart LR
         subgraph RECORD["AUTHORITATIVE DATA AND KNOWLEDGE PLANE"]
             direction LR
             PGBOUNCER["PgBouncer<br/>write/read pools"]:::database
-            PGHA[("PostgreSQL HA<br/>primary + replicas<br/>workflow · typed Git repository graph<br/>provenance · audit · outbox")]:::database
+            PGHA[("PostgreSQL HA<br/><b>graph truth</b><br/>repository + revisioned code graph<br/>workflow · provenance · audit · outbox")]:::database
             GIT[("Enterprise Git<br/>product source + approved knowledge<br/>patterns · ADRs · policies · runbooks")]:::knowledge
             OBJECT[("Versioned object storage<br/>artifacts · evidence · exports · WAL/PITR")]:::storage
         end
 
         subgraph VECTOR["DISTRIBUTED MILVUS RETRIEVAL PLANE"]
             direction LR
-            MPROXY["Milvus proxies<br/>knowledge + repository-relation semantic index"]:::vector
+            MPROXY["Milvus proxies<br/><b>semantic discovery</b><br/>knowledge + repository evidence<br/>selected code entities by stable SQL UUID"]:::vector
             MCOORD["Coordinator HA"]:::vector
             MQUERY["Query nodes<br/>independent read scaling"]:::vector
             MDATA["Streaming + data nodes<br/>ingestion scaling"]:::vector
@@ -154,14 +155,17 @@ flowchart LR
     PGHA -->|"committed outbox"| RELAY
     RELAY --> BUS
     BUS --> WORKERS
+    BUS --> ANALYZERS
     BUS --> CAPTURE
     BUS --> INDEXER
     BUS --> EVAL
     WORKERS -->|"run state + evidence refs"| REPO
+    ANALYZERS -->|"read revisioned source"| GIT
+    ANALYZERS -->|"deterministic graph snapshot"| REPO
     CAPTURE -->|"normalized candidates"| REPO
     EVAL -->|"quality and safety results"| REPO
     REVIEW -->|"decision + approved revision"| REPO
-    REPO -->|"approved knowledge + repository relations"| INDEXER
+    REPO -->|"approved knowledge + repository relations<br/>selected active code entities"| INDEXER
     INDEXER --> PRIVATE_EMBED
     INDEXER --> MPROXY
 

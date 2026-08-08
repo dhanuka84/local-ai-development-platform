@@ -142,6 +142,59 @@ func (s *Store) SearchRelations(ctx context.Context, projectID string, embedding
 	return result, nil
 }
 
+func (s *Store) UpsertCodeEntity(ctx context.Context, codeEntity domain.CodeEntity, embedding []float32) error {
+	if len(embedding) != s.dimension {
+		return fmt.Errorf("embedding dimension %d does not match configured dimension %d", len(embedding), s.dimension)
+	}
+	_, err := s.client.Upsert(ctx, milvusclient.NewColumnBasedInsertOption(s.collection).
+		WithVarcharColumn("id", []string{codeEntity.ID}).
+		WithVarcharColumn("project_id", []string{codeEntity.ProjectID}).
+		WithVarcharColumn("repository_id", []string{codeEntity.RepositoryID}).
+		WithVarcharColumn("document_type", []string{"code_entity"}).
+		WithFloatVectorColumn("embedding", s.dimension, [][]float32{embedding}))
+	if err != nil {
+		return fmt.Errorf("upsert Milvus code entity %s: %w", codeEntity.ID, err)
+	}
+	return nil
+}
+
+func (s *Store) SearchCodeEntities(ctx context.Context, projectID, repositoryID string, embedding []float32, limit int) ([]domain.VectorHit, error) {
+	if len(embedding) != s.dimension {
+		return nil, fmt.Errorf("embedding dimension %d does not match configured dimension %d", len(embedding), s.dimension)
+	}
+	option := milvusclient.NewSearchOption(
+		s.collection, limit, []entity.Vector{entity.FloatVector(embedding)},
+	).WithANNSField("embedding").WithFilter("project_id == {project_id} && document_type == 'code_entity'").WithTemplateParam("project_id", projectID)
+	if repositoryID != "" {
+		option = option.WithFilter("project_id == {project_id} && repository_id == {repository_id} && document_type == 'code_entity'").
+			WithTemplateParam("repository_id", repositoryID)
+	}
+	sets, err := s.client.Search(ctx, option)
+	if err != nil {
+		return nil, fmt.Errorf("search Milvus code entities: %w", err)
+	}
+	if len(sets) == 0 {
+		return []domain.VectorHit{}, nil
+	}
+	set := sets[0]
+	if set.Err != nil {
+		return nil, set.Err
+	}
+	result := make([]domain.VectorHit, 0, set.Len())
+	for i := 0; i < set.Len(); i++ {
+		id, err := set.IDs.GetAsString(i)
+		if err != nil {
+			return nil, err
+		}
+		score := float32(0)
+		if i < len(set.Scores) {
+			score = set.Scores[i]
+		}
+		result = append(result, domain.VectorHit{ID: id, Score: score})
+	}
+	return result, nil
+}
+
 func (s *Store) Ping(ctx context.Context) error {
 	_, err := s.client.HasCollection(ctx, milvusclient.NewHasCollectionOption(s.collection))
 	return err

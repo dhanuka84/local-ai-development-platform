@@ -4,13 +4,28 @@ import (
 	"context"
 	"testing"
 
+	"github.com/dhanuka84/hybrid-ai-platform/components/codegraph"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/service"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
+type noopAnalyzer struct{}
+
+func (noopAnalyzer) Name() string    { return "noop" }
+func (noopAnalyzer) Version() string { return "1" }
+func (noopAnalyzer) Analyze(context.Context, codegraph.Request) (codegraph.Snapshot, error) {
+	return codegraph.Snapshot{}, nil
+}
+
 func TestServerPublishesValidatedToolSchemasAndSafetyHints(t *testing.T) {
 	ctx := context.Background()
-	server := New(&service.Service{})
+	svc := &service.Service{}
+	if err := svc.ConfigureCodeGraph(noopAnalyzer{}, []string{t.TempDir()}, service.CodeGraphLimits{
+		MaxFiles: 1, MaxEntities: 1, MaxRelations: 1,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	server := New(svc)
 	client := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "1.0.0"}, nil)
 	serverTransport, clientTransport := mcp.NewInMemoryTransports()
 	serverSession, err := server.Connect(ctx, serverTransport, nil)
@@ -28,8 +43,8 @@ func TestServerPublishesValidatedToolSchemasAndSafetyHints(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(result.Tools) != 10 {
-		t.Fatalf("tool count = %d, want 10", len(result.Tools))
+	if len(result.Tools) != 13 {
+		t.Fatalf("tool count = %d, want 13", len(result.Tools))
 	}
 	tools := make(map[string]*mcp.Tool, len(result.Tools))
 	for _, tool := range result.Tools {
@@ -43,5 +58,11 @@ func TestServerPublishesValidatedToolSchemasAndSafetyHints(t *testing.T) {
 	}
 	if tools["repository_relation_upsert"].Annotations.ReadOnlyHint {
 		t.Fatal("repository_relation_upsert is incorrectly marked read-only")
+	}
+	if tools["code_repository_index"].Annotations.ReadOnlyHint {
+		t.Fatal("code_repository_index is incorrectly marked read-only")
+	}
+	if !tools["code_graph_get"].Annotations.ReadOnlyHint {
+		t.Fatal("code_graph_get is not marked read-only")
 	}
 }

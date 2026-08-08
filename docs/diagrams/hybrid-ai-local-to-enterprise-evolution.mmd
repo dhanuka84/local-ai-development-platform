@@ -24,13 +24,16 @@ flowchart LR
         direction TB
         LCLIENT["Codex + IDE + OpenClaw"]:::local
         LMCP["One MCP gateway"]:::local
+        LANALYZER["Headless code analyzer<br/>compiler-aware · synchronous"]:::local
         LAGENT["Local agent and workers"]:::local
         LMODEL["Ollama<br/>coding · embeddings · reranking"]:::local
-        LPG[("Single PostgreSQL<br/>workflow · typed Git repository graph · outbox")]:::localData
-        LMILVUS[("Milvus Standalone<br/>knowledge + repository-relation vectors")]:::localData
+        LPG[("Single PostgreSQL<br/><b>graph truth</b><br/>repository + revisioned code graph · outbox")]:::localData
+        LMILVUS[("Milvus Standalone<br/><b>semantic discovery</b><br/>knowledge + selected code entity UUIDs")]:::localData
         LSTORE[("Product/knowledge Git + local artifact store")]:::localData
 
         LCLIENT --> LMCP
+        LMCP --> LANALYZER
+        LANALYZER --> LPG
         LMCP --> LAGENT
         LAGENT --> LMODEL
         LAGENT --> LPG
@@ -47,16 +50,17 @@ flowchart LR
         C5["ModelProvider interface<br/>local · private · cloud adapters"]:::contract
         C6["Canonical rebuild sources<br/>PostgreSQL graph + Git + object artifacts"]:::contract
         C7["Policy context<br/>identity · purpose · residency · disclosure"]:::contract
+        C8["Stable code entity IDs<br/>Milvus primary key = PostgreSQL UUID<br/>SQL hydration before traversal"]:::contract
     end
 
     subgraph ENTERPRISE["ENTERPRISE PROFILE · DISTRIBUTED"]
         direction TB
         ECLIENT["Workstations + CI/CD + edge sites"]:::enterprise
         EMCP["Stateless MCP/API gateway replicas"]:::enterprise
-        EAGENT["Durable workflows + event bus<br/>sandboxed worker pools"]:::enterprise
+        EAGENT["Durable workflows + event bus<br/>sandboxed agent + analyzer worker pools"]:::enterprise
         EMODEL["Private GPU inference cluster<br/>policy-gated Kimi/OpenAI review"]:::enterprise
-        EPG[("PostgreSQL HA<br/>workflow + repository graph · multi-zone + DR")]:::enterpriseData
-        EMILVUS[("Milvus Distributed<br/>knowledge + relation search · scaled query + ingestion")]:::enterpriseData
+        EPG[("PostgreSQL HA<br/>workflow + repository/code graph truth<br/>partitioned · multi-zone + DR")]:::enterpriseData
+        EMILVUS[("Milvus Distributed<br/>knowledge + code entity discovery<br/>scaled query + ingestion")]:::enterpriseData
         ESTORE[("Enterprise Git + versioned object storage<br/>regional replication")]:::enterpriseData
 
         ECLIENT --> EMCP
@@ -74,6 +78,7 @@ flowchart LR
     LMODEL ==>|"provider boundary"| C5
     LSTORE ==>|"rebuildability"| C6
     LCLIENT ==>|"request context"| C7
+    LANALYZER ==>|"stable graph identity"| C8
 
     C1 ==>|"horizontal gateway scaling"| EMCP
     C2 ==>|"tenant-aware enterprise records"| EPG
@@ -82,6 +87,8 @@ flowchart LR
     C5 ==>|"central routing and quotas"| EMODEL
     C6 ==>|"object-backed recovery"| ESTORE
     C7 ==>|"OIDC · RLS · tenant isolation"| ECLIENT
+    C8 ==>|"active-revision hydration"| EPG
+    C8 ==>|"stable UUID projection"| EMILVUS
 
     NOTE["Milvus migration rule<br/><b>Standalone cannot be upgraded online to Distributed.</b><br/>Create cluster → bulk reindex → validate → dual-write → cut over."]:::warning
     C4 -.-> NOTE

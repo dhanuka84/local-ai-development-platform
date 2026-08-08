@@ -11,6 +11,8 @@ Before applying it:
 5. Add OIDC-aware ingress, egress NetworkPolicies, TLS, observability, and tenant authorization.
 6. Run migration and Milvus-init Jobs as controlled release hooks before rolling Deployments.
 
+The base keeps `CODEGRAPH_ENABLED=false`: enterprise gateways are query-only and do not mount repositories or contain a Go toolchain. Deploy the durable analysis-job API and sandboxed analyzer worker pool described in the enterprise guide before enabling repository indexing at enterprise scale.
+
 Render without applying:
 
 ```bash

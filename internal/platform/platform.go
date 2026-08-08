@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	golanganalyzer "github.com/dhanuka84/hybrid-ai-platform/components/codegraph/golang"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/artifacts"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/config"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/milvus"
@@ -30,10 +31,20 @@ func Open(ctx context.Context, cfg config.Config) (*Platform, error) {
 	}
 	embedder := ollama.New(cfg.OllamaURL, cfg.EmbeddingModel)
 	artifactStore := artifacts.NewLocalStore(cfg.ArtifactsPath)
+	svc := service.New(repository, artifactStore, embedder, vectors, cfg.SearchFallback, cfg.AutoApproveLocal)
+	if cfg.CodeGraphEnabled {
+		if err := svc.ConfigureCodeGraph(golanganalyzer.New(), cfg.CodeGraphAllowedRoots, service.CodeGraphLimits{
+			MaxFiles: cfg.CodeGraphMaxFiles, MaxEntities: cfg.CodeGraphMaxEntities, MaxRelations: cfg.CodeGraphMaxRelations,
+		}); err != nil {
+			_ = vectors.Close(ctx)
+			repository.Close()
+			return nil, fmt.Errorf("configure code graph: %w", err)
+		}
+	}
 	return &Platform{
 		Repository: repository,
 		Vectors:    vectors,
-		Service:    service.New(repository, artifactStore, embedder, vectors, cfg.SearchFallback, cfg.AutoApproveLocal),
+		Service:    svc,
 	}, nil
 }
 

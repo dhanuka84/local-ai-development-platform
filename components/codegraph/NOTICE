@@ -1,0 +1,17 @@
+Code graph component
+====================
+
+This component adapts selected graph-domain and incremental-analysis concepts
+from:
+
+  Code-to-Knowledge-Graph
+  Copyright its contributors
+  https://github.com/Bevel-Software/code-to-knowledge-graph
+  Source revision reviewed: 6fa59b03caa6635e66bb3f1372450d0846063953
+
+The upstream project is licensed under the Mozilla Public License 2.0.
+No VS Code extension, Neo4j integration, ANTLR grammar, or UI code is included.
+The Go analyzer and platform integration were substantially redesigned for a
+headless, revisioned PostgreSQL/Milvus architecture.
+
+SPDX-License-Identifier: MPL-2.0

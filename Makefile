@@ -7,10 +7,10 @@ help:
 	@awk 'BEGIN {FS = ":.*##"} /^[a-zA-Z0-9_-]+:.*##/ {printf "%-20s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 fmt: ## Format Go sources
-	gofmt -w cmd internal migrations
+	gofmt -w cmd components internal migrations
 
 check: ## Run formatting, vet, and unit tests
-	test -z "$$(gofmt -l cmd internal migrations)"
+	test -z "$$(gofmt -l cmd components internal migrations)"
 	go vet ./...
 	go test -race ./...
 
