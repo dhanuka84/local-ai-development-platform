@@ -3,7 +3,7 @@ module github.com/dhanuka84/hybrid-ai-platform
 go 1.25.8
 
 require (
-	github.com/jackc/pgx/v5 v5.7.6
+	github.com/jackc/pgx/v5 v5.10.0
 	github.com/milvus-io/milvus/client/v2 v2.6.5
 	github.com/modelcontextprotocol/go-sdk v1.7.0
 	golang.org/x/tools v0.48.0
