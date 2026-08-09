@@ -12,6 +12,10 @@ default_tools_approval_mode = "writes"
 [mcp_servers.hybrid_knowledge.tools.knowledge_candidate_decide]
 approval_mode = "prompt"
 
+# Relationship writes change the authoritative product graph.
+[mcp_servers.hybrid_knowledge.tools.repository_relation_upsert]
+approval_mode = "prompt"
+
 # Indexing reads an allowlisted local repository and writes a new SQL snapshot.
 [mcp_servers.hybrid_knowledge.tools.code_repository_index]
 approval_mode = "prompt"

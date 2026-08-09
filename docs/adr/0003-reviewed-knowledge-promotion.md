@@ -5,7 +5,11 @@
 
 ## Decision
 
-Capture model outputs as pending candidates. Permit model/human review to annotate or revise pending candidates, but require a separate accountable approval before indexing and retrieval.
+Capture model outputs as pending candidates. Preserve exact reviewer output and
+the disclosed-context manifest as immutable artifacts referenced by the review
+record. Permit model/human review to annotate or revise pending candidates, but
+require local validation and a separate accountable approval before indexing
+and retrieval.
 
 ## Rationale
 
@@ -15,5 +19,6 @@ Cloud-model quality does not make output authoritative. Capturing raw responses 
 
 - Local agents retrieve only approved records.
 - Review and approval are distinct MCP operations.
+- Raw review evidence remains auditable but is not embedded automatically.
 - Revision of approved records requires a future new-version workflow; the current service only revises pending records.
 - Auto-approval exists for isolated experiments but defaults off and must not be enabled in shared production.

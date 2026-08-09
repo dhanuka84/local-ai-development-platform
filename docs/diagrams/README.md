@@ -1,16 +1,23 @@
 # Hybrid AI Platform Diagrams
 
-This directory contains the editable Mermaid sources and rendered images for the local and enterprise deployment profiles.
+This directory contains the editable Mermaid sources and rendered images for
+the local, review-learning, and enterprise deployment profiles.
 
 ## Deliverables
 
 | View | Mermaid source | PNG | SVG |
 |---|---|---|---|
+| Quick review-learning explainer | [generation prompt](hybrid-ai-review-learning-explainer.prompt.md) | `hybrid-ai-review-learning-explainer.png` | Not applicable |
 | Local GBX100 architecture | `hybrid-ai-local-architecture.mmd` | `hybrid-ai-local-architecture.png` | `hybrid-ai-local-architecture.svg` |
+| Remote review and local learning loop | `hybrid-ai-review-learning-loop.mmd` | `hybrid-ai-review-learning-loop.png` | `hybrid-ai-review-learning-loop.svg` |
 | Enterprise distributed architecture | `hybrid-ai-enterprise-architecture.mmd` | `hybrid-ai-enterprise-architecture.png` | `hybrid-ai-enterprise-architecture.svg` |
 | Local-to-enterprise evolution | `hybrid-ai-local-to-enterprise-evolution.mmd` | `hybrid-ai-local-to-enterprise-evolution.png` | `hybrid-ai-local-to-enterprise-evolution.svg` |
 
-The SVG files are recommended for documentation and presentations because they remain readable at any zoom level. The PNG files are high-resolution raster exports rendered at approximately 11K–14K pixels wide.
+The SVG files are recommended for detailed documentation and presentations
+because they remain readable at any zoom level. Mermaid PNGs are
+high-resolution raster exports rendered at approximately 8K–14K pixels on
+their long edge. The compact generated explainer is intended for README and
+overview-slide use; use the review-learning SVG when unlimited zoom is needed.
 
 ## Architecture conventions
 
@@ -51,5 +58,11 @@ npx -y @mermaid-js/mermaid-cli \
 ```
 
 For a diagram whose natural Mermaid layout is narrower, increase `-s` to `4` to produce a comparable 12K-class export.
+
+The review-learning diagram has a dedicated reproducible target:
+
+```bash
+make diagram-review-loop
+```
 
 If Chrome is installed elsewhere, update `executablePath` in `puppeteer-config.json` before rendering.

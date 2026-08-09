@@ -155,17 +155,22 @@ func (a *API) listCandidates(ctx context.Context, _ *mcp.CallToolRequest, input 
 }
 
 type reviewInput struct {
-	KnowledgeID     string `json:"knowledge_id" jsonschema:"candidate UUID; required"`
-	Reviewer        string `json:"reviewer" jsonschema:"reviewing user or agent identity; required"`
-	Provider        string `json:"provider,omitempty" jsonschema:"review provider"`
-	Model           string `json:"model,omitempty" jsonschema:"review model identifier"`
-	Verdict         string `json:"verdict" jsonschema:"one of approve, reject, revise, comment; required"`
-	Comments        string `json:"comments,omitempty" jsonschema:"review rationale and findings"`
-	ImprovedContent string `json:"improved_content,omitempty" jsonschema:"suggested improved response or code"`
+	KnowledgeID        string   `json:"knowledge_id" jsonschema:"candidate UUID; required"`
+	Reviewer           string   `json:"reviewer" jsonschema:"reviewing user or agent identity; required"`
+	Provider           string   `json:"provider,omitempty" jsonschema:"review provider"`
+	Model              string   `json:"model,omitempty" jsonschema:"review model identifier"`
+	Verdict            string   `json:"verdict" jsonschema:"one of approve, reject, revise, comment; required"`
+	Comments           string   `json:"comments,omitempty" jsonschema:"review rationale and findings"`
+	ImprovedContent    string   `json:"improved_content,omitempty" jsonschema:"suggested improved response or code"`
+	ValidationEvidence []string `json:"validation_evidence,omitempty" jsonschema:"fresh local checks for improved_content; required for revise"`
+	RawOutput          string   `json:"raw_output,omitempty" jsonschema:"exact unmodified reviewer response; comments are used when omitted"`
+	ContextManifest    string   `json:"context_manifest,omitempty" jsonschema:"sanitized JSON manifest of context disclosed to the reviewer"`
 }
 type reviewOutput struct {
-	Recorded bool   `json:"recorded"`
-	Message  string `json:"message"`
+	Recorded                bool             `json:"recorded"`
+	ReviewArtifact          *domain.Artifact `json:"review_artifact,omitempty"`
+	ContextManifestArtifact *domain.Artifact `json:"context_manifest_artifact,omitempty"`
+	Message                 string           `json:"message"`
 }
 
 func (a *API) review(ctx context.Context, _ *mcp.CallToolRequest, input reviewInput) (*mcp.CallToolResult, reviewOutput, error) {
@@ -173,11 +178,19 @@ func (a *API) review(ctx context.Context, _ *mcp.CallToolRequest, input reviewIn
 	if verdict != "approve" && verdict != "reject" && verdict != "revise" && verdict != "comment" {
 		return nil, reviewOutput{}, fmt.Errorf("verdict must be approve, reject, revise, or comment")
 	}
-	err := a.service.RecordReview(ctx, domain.ReviewRecord{
+	review, err := a.service.RecordReview(ctx, domain.ReviewRecord{
 		KnowledgeID: input.KnowledgeID, Reviewer: input.Reviewer, Provider: input.Provider,
 		Model: input.Model, Verdict: verdict, Comments: input.Comments, ImprovedContent: input.ImprovedContent,
+		ValidationEvidence: input.ValidationEvidence, RawOutput: input.RawOutput, ContextManifest: input.ContextManifest,
 	})
-	return nil, reviewOutput{Recorded: err == nil, Message: "Review recorded; use knowledge_candidate_decide for the approval gate."}, err
+	output := reviewOutput{Recorded: err == nil, Message: "Review and immutable evidence recorded; use knowledge_candidate_decide for the approval gate."}
+	if review.ReviewArtifact.SHA256 != "" {
+		output.ReviewArtifact = &review.ReviewArtifact
+	}
+	if review.ContextManifestArtifact.SHA256 != "" {
+		output.ContextManifestArtifact = &review.ContextManifestArtifact
+	}
+	return nil, output, err
 }
 
 type decideInput struct {

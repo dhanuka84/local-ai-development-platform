@@ -14,6 +14,7 @@ import (
 
 type fakeRepository struct {
 	recorded       domain.GenerationCapture
+	recordedReview domain.ReviewRecord
 	items          []domain.KnowledgeItem
 	lexical        []domain.SearchHit
 	relations      []domain.RepositoryRelation
@@ -45,7 +46,10 @@ func (f *fakeRepository) ApproveCandidate(context.Context, string, string) (doma
 func (f *fakeRepository) RejectCandidate(context.Context, string, string) (domain.KnowledgeItem, error) {
 	return domain.KnowledgeItem{}, nil
 }
-func (f *fakeRepository) RecordReview(context.Context, domain.ReviewRecord) error { return nil }
+func (f *fakeRepository) RecordReview(_ context.Context, review domain.ReviewRecord) error {
+	f.recordedReview = review
+	return nil
+}
 func (f *fakeRepository) ClaimOutbox(context.Context, int) ([]domain.OutboxEvent, error) {
 	return nil, nil
 }
@@ -155,6 +159,54 @@ func TestCapturePreservesReusableProcedure(t *testing.T) {
 	}
 	if got := repository.recorded.Tags; len(got) != 2 || got[0] != "go" || got[1] != "mcp" {
 		t.Fatalf("tags = %#v", got)
+	}
+}
+
+func TestRecordReviewStoresImmutableEvidence(t *testing.T) {
+	repository := &fakeRepository{}
+	artifacts := &fakeArtifacts{}
+	svc := New(repository, artifacts, &fakeEmbedder{}, &fakeVectors{}, true, false)
+
+	review, err := svc.RecordReview(context.Background(), domain.ReviewRecord{
+		KnowledgeID: " candidate ", Reviewer: " codex ", Provider: " openai ", Model: " reviewer-model ",
+		Verdict: " REVISE ", Comments: "summary", RawOutput: "exact remote output",
+		ContextManifest: `{"revision":"abc123","paths":["internal/service/service.go"]}`,
+		ImprovedContent: "validated improvement", ValidationEvidence: []string{" go test ./internal/service passed "},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if artifacts.count != 2 || review.ReviewArtifact.SHA256 != "exact remote output" {
+		t.Fatalf("review=%#v artifact count=%d", review, artifacts.count)
+	}
+	if repository.recordedReview.Verdict != "revise" || repository.recordedReview.KnowledgeID != "candidate" {
+		t.Fatalf("recorded review=%#v", repository.recordedReview)
+	}
+	if repository.recordedReview.ContextManifestArtifact.SHA256 == "" {
+		t.Fatal("context manifest artifact was not recorded")
+	}
+	if got := repository.recordedReview.ValidationEvidence; len(got) != 1 || got[0] != "go test ./internal/service passed" {
+		t.Fatalf("validation evidence=%#v", got)
+	}
+}
+
+func TestRecordReviewRejectsInvalidContextManifest(t *testing.T) {
+	svc := New(&fakeRepository{}, &fakeArtifacts{}, &fakeEmbedder{}, &fakeVectors{}, true, false)
+	_, err := svc.RecordReview(context.Background(), domain.ReviewRecord{
+		KnowledgeID: "candidate", Reviewer: "kimi", Verdict: "comment", ContextManifest: "not-json",
+	})
+	if !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("invalid manifest error = %v", err)
+	}
+}
+
+func TestRecordReviewRequiresFreshEvidenceForRevision(t *testing.T) {
+	svc := New(&fakeRepository{}, &fakeArtifacts{}, &fakeEmbedder{}, &fakeVectors{}, true, false)
+	_, err := svc.RecordReview(context.Background(), domain.ReviewRecord{
+		KnowledgeID: "candidate", Reviewer: "codex", Verdict: "revise", ImprovedContent: "cloud suggestion",
+	})
+	if !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("missing revision evidence error = %v", err)
 	}
 }
 

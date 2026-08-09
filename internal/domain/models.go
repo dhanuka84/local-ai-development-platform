@@ -33,10 +33,10 @@ type GenerationCapture struct {
 }
 
 type Artifact struct {
-	SHA256    string
-	URI       string
-	MediaType string
-	SizeBytes int64
+	SHA256    string `json:"sha256"`
+	URI       string `json:"uri"`
+	MediaType string `json:"media_type"`
+	SizeBytes int64  `json:"size_bytes"`
 }
 
 type KnowledgeItem struct {
@@ -86,15 +86,20 @@ type VectorHit struct {
 }
 
 type ReviewRecord struct {
-	ID              string
-	KnowledgeID     string
-	Reviewer        string
-	Provider        string
-	Model           string
-	Verdict         string
-	Comments        string
-	ImprovedContent string
-	CreatedAt       time.Time
+	ID                      string
+	KnowledgeID             string
+	Reviewer                string
+	Provider                string
+	Model                   string
+	Verdict                 string
+	Comments                string
+	ImprovedContent         string
+	ValidationEvidence      []string
+	RawOutput               string
+	ContextManifest         string
+	ReviewArtifact          Artifact
+	ContextManifestArtifact Artifact
+	CreatedAt               time.Time
 }
 
 type OutboxEvent struct {

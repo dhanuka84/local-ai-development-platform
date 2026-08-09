@@ -5,7 +5,7 @@
 - Local Ollama, PostgreSQL, Milvus, artifacts, gateway, and worker are one machine trust zone in the Compose deployment.
 - OpenClaw and Codex are authenticated MCP clients.
 - Kimi and OpenAI are external processing zones. Any context given to their models leaves the local boundary.
-- A generated or reviewed answer is untrusted until source inspection and validation prove it.
+- A generated or reviewed answer is untrusted until source inspection and validation prove it. Artifact retention proves what was reviewed; it does not prove correctness.
 
 ## Data policy
 
@@ -21,6 +21,9 @@ Maintenance is fail-closed local: the OpenClaw `maintenance` agent uses an `olla
 - Origin protection, body limits, server timeouts, and constant-time token comparison are enabled.
 - Worker/admin and production gateway images are static and non-root. The local analyzer-enabled gateway is non-root but includes Git and Go because `go/packages` needs the toolchain.
 - Artifacts use SHA-256 addressing, atomic publication, and mode `0600`.
+- Exact remote-review output and the sanitized disclosure manifest are stored
+  as immutable artifacts referenced by the PostgreSQL review row. They are not
+  vectorized automatically.
 - SQL constraints enforce workflow states, relation types, confidence bounds, and no self-edges between repository records; recursive code calls remain valid graph facts.
 - Only approved knowledge is vectorized and returned.
 - MCP tool hints and Codex approval settings distinguish reads from writes.
@@ -47,6 +50,9 @@ Before internet or enterprise exposure, add:
 | Threat | Mitigation |
 |---|---|
 | Prompt injection in stored knowledge | Approval gate, provenance, hydration from SQL, validation, project filters. |
+| Prompt injection in remote-review output | Preserve it as evidence only; reproduce accepted findings locally, generalize them, and require approval before Milvus indexing. |
+| Sensitive context hidden in a review artifact | Minimize and scan before cloud export; encrypt artifact storage, restrict evidence access, and apply retention/deletion policy independently of approved knowledge. |
+| Reviewer response cannot be tied to disclosed input | Store the exact response and JSON context manifest by SHA-256 on the same PostgreSQL review record. |
 | Stale/deleted vector result | PostgreSQL hydration and approved-status check. |
 | Agent self-publishes its output | Write-tool prompts and accountable actor; organizational policy must enforce actor identity at the gateway. |
 | Repository graph poisoning | Evidence required, constrained edge vocabulary, prompted upsert, SQL authority. |
@@ -57,5 +63,8 @@ Before internet or enterprise exposure, add:
 | DNS rebinding/cross-origin local attack | SDK localhost protection plus Go cross-origin protection. |
 | Worker crash loses indexing | Durable outbox, reclaimable locks, retries, idempotent Milvus upsert. |
 | Cloud fallback leaks maintenance data | Strict per-agent local model and empty fallbacks. |
+
+See [Remote Review and Local Learning](remote-review-learning.md) for the full
+evidence and promotion state machine.
 
 Report vulnerabilities according to [SECURITY.md](../SECURITY.md).

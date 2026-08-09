@@ -5,9 +5,15 @@
 **Target:** ASUS Ascent GX10 / NVIDIA GB10, 128 GB unified memory  
 **Companion architecture:** [Hybrid OpenClaw, Ollama, Kimi, Codex, and MCP Architecture](./hybrid-openclaw-ollama-kimi-architecture.md)
 
-> This document records the earlier Node.js/pgvector option and is retained for decision history. Do not use it as the deployment guide. The executable repository implements the decisions in [ADR-0001](./adr/0001-go-for-the-mcp-data-plane.md), [ADR-0002](./adr/0002-postgresql-and-milvus.md), and the [implementation guide](./implementation-guide.md).
+> This is an archived alternative, retained only for decision history. Do not
+> use its Node.js, pgvector, model, version, command, or deployment choices for
+> this repository. The executable system uses Go, PostgreSQL, and Milvus as
+> described by [ADR-0001](./adr/0001-go-for-the-mcp-data-plane.md),
+> [ADR-0002](./adr/0002-postgresql-and-milvus.md), the
+> [implementation guide](./implementation-guide.md), and the
+> [remote-review learning contract](./remote-review-learning.md).
 
-## 1. Recommendation
+## 1. Historical recommendation
 
 Use a local-first, single-host production architecture built from:
 
@@ -25,7 +31,11 @@ Use a local-first, single-host production architecture built from:
 - Prometheus-compatible metrics, structured journald logs, and Grafana for operations.
 - SOPS with age, systemd credentials, Gitleaks, and OS/network isolation for security.
 
-This is the recommended production stack. An MVP can replace PostgreSQL with SQLite WAL, but production should move to PostgreSQL before multiple clients, capture workers, promotion workflows, and concurrent indexing are enabled.
+This was the draft recommendation before the Go/PostgreSQL/Milvus decision. It
+is not the current production stack. SQLite remains suitable for a single-user
+prototype, but this repository starts with PostgreSQL because multiple MCP
+clients, review transitions, graph integrity, and outbox publication require a
+shared transactional authority.
 
 ## 2. Stack summary
 

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -334,16 +335,57 @@ func (s *Service) Reject(ctx context.Context, id, actor string) (domain.Knowledg
 	return s.repository.RejectCandidate(ctx, strings.TrimSpace(id), strings.TrimSpace(actor))
 }
 
-func (s *Service) RecordReview(ctx context.Context, review domain.ReviewRecord) error {
-	if strings.TrimSpace(review.KnowledgeID) == "" || strings.TrimSpace(review.Reviewer) == "" || strings.TrimSpace(review.Verdict) == "" {
-		return fmt.Errorf("%w: knowledge_id, reviewer, and verdict are required", ErrInvalidInput)
+func (s *Service) RecordReview(ctx context.Context, review domain.ReviewRecord) (domain.ReviewRecord, error) {
+	review.KnowledgeID = strings.TrimSpace(review.KnowledgeID)
+	review.Reviewer = strings.TrimSpace(review.Reviewer)
+	review.Provider = strings.TrimSpace(review.Provider)
+	review.Model = strings.TrimSpace(review.Model)
+	review.Verdict = strings.ToLower(strings.TrimSpace(review.Verdict))
+	review.ValidationEvidence = cleanList(review.ValidationEvidence)
+	if review.KnowledgeID == "" || review.Reviewer == "" || review.Verdict == "" {
+		return domain.ReviewRecord{}, fmt.Errorf("%w: knowledge_id, reviewer, and verdict are required", ErrInvalidInput)
+	}
+	switch review.Verdict {
+	case "approve", "reject", "comment":
+		if strings.TrimSpace(review.ImprovedContent) != "" {
+			return domain.ReviewRecord{}, fmt.Errorf("%w: improved_content is valid only with a revise verdict", ErrInvalidInput)
+		}
+	case "revise":
+		review.ImprovedContent = strings.TrimSpace(review.ImprovedContent)
+		if review.ImprovedContent == "" || len(review.ValidationEvidence) == 0 {
+			return domain.ReviewRecord{}, fmt.Errorf("%w: revise requires improved_content and fresh local validation_evidence", ErrInvalidInput)
+		}
+	default:
+		return domain.ReviewRecord{}, fmt.Errorf("%w: verdict must be approve, reject, revise, or comment", ErrInvalidInput)
+	}
+	if review.ContextManifest != "" && !json.Valid([]byte(review.ContextManifest)) {
+		return domain.ReviewRecord{}, fmt.Errorf("%w: context_manifest must be valid JSON", ErrInvalidInput)
 	}
 	var err error
 	review.ID, err = domain.NewID()
 	if err != nil {
-		return err
+		return domain.ReviewRecord{}, err
 	}
-	return s.repository.RecordReview(ctx, review)
+	rawOutput := review.RawOutput
+	if rawOutput == "" {
+		rawOutput = review.Comments
+	}
+	if rawOutput != "" {
+		review.ReviewArtifact, err = s.artifacts.Put(ctx, []byte(rawOutput), "text/markdown; charset=utf-8")
+		if err != nil {
+			return domain.ReviewRecord{}, fmt.Errorf("store review artifact: %w", err)
+		}
+	}
+	if review.ContextManifest != "" {
+		review.ContextManifestArtifact, err = s.artifacts.Put(ctx, []byte(review.ContextManifest), "application/json")
+		if err != nil {
+			return domain.ReviewRecord{}, fmt.Errorf("store context manifest artifact: %w", err)
+		}
+	}
+	if err := s.repository.RecordReview(ctx, review); err != nil {
+		return domain.ReviewRecord{}, err
+	}
+	return review, nil
 }
 
 func (s *Service) Dependencies(ctx context.Context) map[string]string {

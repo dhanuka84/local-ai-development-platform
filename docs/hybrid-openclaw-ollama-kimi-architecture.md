@@ -8,7 +8,12 @@
 
 **Companion:** [Recommended Technology Stack](./hybrid-ai-platform-tech-stack.md)
 
-> The trust model and local/cloud separation in this document remain useful, but its earlier model and storage choices are superseded by the runnable Go/PostgreSQL/Milvus implementation described in [implementation-guide.md](./implementation-guide.md). The diagrams under [diagrams](./diagrams/) remain the canonical visual overview.
+> This is an archived design record, not an implementation or operations
+> guide. Its trust-model discussion remains useful, but model names, commands,
+> schemas, and the earlier memory design may be stale. Use the runnable
+> [implementation guide](./implementation-guide.md), [operations runbook](./operations.md),
+> and [remote-review learning contract](./remote-review-learning.md). The
+> diagrams under [diagrams](./diagrams/) are the canonical visual overview.
 
 ## 1. Executive summary
 

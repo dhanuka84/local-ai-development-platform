@@ -29,7 +29,7 @@ flowchart LR
         LMODEL["Ollama<br/>coding · embeddings · reranking"]:::local
         LPG[("Single PostgreSQL<br/><b>graph truth</b><br/>repository + revisioned code graph · outbox")]:::localData
         LMILVUS[("Milvus Standalone<br/><b>semantic discovery</b><br/>knowledge + selected code entity UUIDs")]:::localData
-        LSTORE[("Product/knowledge Git + local artifact store")]:::localData
+        LSTORE[("Product/knowledge Git + local artifact store<br/>raw reviews · disclosure manifests")]:::localData
 
         LCLIENT --> LMCP
         LMCP --> LANALYZER
@@ -48,7 +48,7 @@ flowchart LR
         C3["PostgreSQL transaction + outbox<br/>idempotent event processing"]:::contract
         C4["VectorIndex interface<br/>Milvus hidden behind retrieval service"]:::contract
         C5["ModelProvider interface<br/>local · private · cloud adapters"]:::contract
-        C6["Canonical rebuild sources<br/>PostgreSQL graph + Git + object artifacts"]:::contract
+        C6["Canonical rebuild sources<br/>PostgreSQL graph + Git + object artifacts<br/>review evidence linked by SHA-256"]:::contract
         C7["Policy context<br/>identity · purpose · residency · disclosure"]:::contract
         C8["Stable code entity IDs<br/>Milvus primary key = PostgreSQL UUID<br/>SQL hydration before traversal"]:::contract
     end
@@ -61,7 +61,7 @@ flowchart LR
         EMODEL["Private GPU inference cluster<br/>policy-gated Kimi/OpenAI review"]:::enterprise
         EPG[("PostgreSQL HA<br/>workflow + repository/code graph truth<br/>partitioned · multi-zone + DR")]:::enterpriseData
         EMILVUS[("Milvus Distributed<br/>knowledge + code entity discovery<br/>scaled query + ingestion")]:::enterpriseData
-        ESTORE[("Enterprise Git + versioned object storage<br/>regional replication")]:::enterpriseData
+        ESTORE[("Enterprise Git + versioned object storage<br/>review evidence · regional replication")]:::enterpriseData
 
         ECLIENT --> EMCP
         EMCP --> EAGENT

@@ -5,3 +5,4 @@
 - [0003 — Reviewed knowledge promotion](0003-reviewed-knowledge-promotion.md)
 - [0004 — Dual repository graph representation](0004-repository-graph.md)
 - [0005 — Revisioned code graph and isolated MPL analyzer](0005-code-graph-analyzer.md)
+- [0006 — Bounded local execution with advisory cloud review](0006-bounded-local-execution-and-cloud-review.md)

@@ -46,7 +46,7 @@ flowchart LR
             ROUTER["Model router<br/>task + policy + classification"]:::service
             RETRIEVAL["Knowledge retrieval<br/>hybrid search · ACL · graph expansion · rerank"]:::service
             CAPTURE["Capture worker<br/>normalize · redact · hash · extract patterns"]:::service
-            REVIEW["Review and promotion<br/>candidate → validate → approve"]:::service
+            REVIEW["Review and promotion<br/>raw evidence → reproduce → candidate → approve"]:::service
             INDEXER["Knowledge indexer<br/>chunk · embed · idempotent upsert"]:::service
             ANALYZER["Deterministic code analyzer<br/>Go packages · AST · types<br/>allowlisted source · revision caps"]:::service
             REPO["Knowledge + graph service<br/>transactions · repository + exact code edges<br/>stable entity IDs · provenance"]:::service
@@ -64,7 +64,7 @@ flowchart LR
             PG[("PostgreSQL<br/><b>graph truth</b><br/>workflow · provenance · outbox<br/>revisioned code entities + exact edges")]:::database
             MILVUS[("Milvus Standalone<br/><b>semantic discovery</b><br/>approved patterns · repository evidence<br/>selected code entities by stable SQL UUID")]:::vector
             GIT[("Git repositories<br/><b>product source + approved knowledge</b><br/>revisions · patterns · ADRs · runbooks")]:::knowledge
-            ARTIFACTS[("Content-addressed artifacts<br/>prompts · outputs · patches · evidence")]:::storage
+            ARTIFACTS[("Content-addressed artifacts<br/>prompts · outputs · patches<br/>raw reviews · disclosure manifests · evidence")]:::storage
             SPOOL[("Protected local spool<br/>non-blocking capture buffer")]:::storage
         end
 
@@ -122,7 +122,8 @@ flowchart LR
     CODEX -.->|"approved scoped package"| CLOUD_GUARD
     CLOUD_GUARD -->|"architecture package"| KIMI
     CLOUD_GUARD -->|"code review package"| OPENAI
-    CLOUD_GUARD -->|"advisory findings"| REVIEW
+    KIMI -->|"advisory response"| REVIEW
+    OPENAI -->|"advisory response"| REVIEW
     SECRETS --> CLOUD_GUARD
 
     MCP -.-> OBS

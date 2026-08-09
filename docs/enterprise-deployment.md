@@ -10,6 +10,8 @@ The enterprise deployment changes scale and identity, not semantics:
 - Knowledge and repository relations require provenance and approval.
 - Maintenance remains local/private with no cloud fallback.
 - Cloud review is explicit, minimized, and audited.
+- Exact reviewer output and disclosed-context manifests are immutable evidence;
+  only approved generalized improvements enter semantic retrieval.
 - MCP is the typed client boundary.
 
 ![Enterprise architecture](diagrams/hybrid-ai-enterprise-architecture.png)
@@ -28,6 +30,7 @@ The enterprise deployment changes scale and identity, not semantics:
 | PostgreSQL outbox polling | Keep polling initially; add CDC to Kafka/NATS only after measured need. |
 | One Ollama daemon | Private GPU inference pool with model routing and quotas. |
 | Local Kimi/OpenAI credentials | Central egress broker, DLP, per-project policy, cost limits. |
+| Local content-addressed review evidence | Encrypted, versioned object storage with tenant keys, retention policy, legal hold where required, and PostgreSQL references. |
 
 ## Deployment topology
 
@@ -57,8 +60,17 @@ Writes are strongly consistent in PostgreSQL. Milvus indexing is eventual. Track
 - Embedding latency and dimension errors.
 - Candidate approval/rejection/revision rates.
 - Cloud review volume, exported bytes, latency, and cost.
+- Review artifact/manifest completeness and orphan-object cleanup lag.
+- Finding dispositions, local reproduction pass rate, and approved-lesson retrieval quality.
 
 The gateway can continue exact PostgreSQL retrieval during a vector outage. Repository and code semantic discovery are unavailable, but exact graph traversal from a known repository or symbol remains available.
+
+Cloud review should pass through a dedicated disclosure broker. It derives the
+tenant and purpose from workload identity, applies DLP and provider policy,
+issues a short-lived review capability, records the immutable context manifest,
+and sends only the approved package. Reviewer output returns to the evidence
+pipeline, not directly to Milvus. The end-to-end contract remains the one in
+[Remote Review and Local Learning](remote-review-learning.md).
 
 ## Delivery phases
 

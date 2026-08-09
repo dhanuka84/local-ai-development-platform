@@ -246,16 +246,27 @@ func (r *Repository) RecordReview(ctx context.Context, review domain.ReviewRecor
 		return err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
+	for _, artifact := range []domain.Artifact{review.ReviewArtifact, review.ContextManifestArtifact} {
+		if artifact.SHA256 == "" {
+			continue
+		}
+		if _, err := tx.Exec(ctx, `INSERT INTO artifacts(sha256,uri,media_type,size_bytes)
+            VALUES($1,$2,$3,$4) ON CONFLICT (sha256) DO NOTHING`, artifact.SHA256, artifact.URI, artifact.MediaType, artifact.SizeBytes); err != nil {
+			return fmt.Errorf("record review artifact: %w", err)
+		}
+	}
 	if _, err := tx.Exec(ctx, `INSERT INTO review_records(
-		id,knowledge_id,reviewer,provider,model,verdict,comments,improved_content
-	  ) VALUES($1,$2,$3,$4,$5,$6,$7,$8)`, review.ID, review.KnowledgeID, review.Reviewer,
-		review.Provider, review.Model, review.Verdict, review.Comments, review.ImprovedContent); err != nil {
+		id,knowledge_id,reviewer,provider,model,verdict,comments,improved_content,
+		review_artifact_sha256,context_manifest_artifact_sha256
+	  ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,NULLIF($9,''),NULLIF($10,''))`, review.ID, review.KnowledgeID, review.Reviewer,
+		review.Provider, review.Model, review.Verdict, review.Comments, review.ImprovedContent,
+		review.ReviewArtifact.SHA256, review.ContextManifestArtifact.SHA256); err != nil {
 		return err
 	}
 	if review.Verdict == "revise" && review.ImprovedContent != "" {
 		result, err := tx.Exec(ctx, `UPDATE knowledge_items
-			SET content=$2,version=version+1
-			WHERE id::text=$1 AND status='pending'`, review.KnowledgeID, review.ImprovedContent)
+			SET content=$2,validation_evidence=$3,version=version+1
+			WHERE id::text=$1 AND status='pending'`, review.KnowledgeID, review.ImprovedContent, nonNilStrings(review.ValidationEvidence))
 		if err != nil {
 			return err
 		}

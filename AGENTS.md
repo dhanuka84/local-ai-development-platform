@@ -6,5 +6,7 @@
 - Never approve knowledge merely because a model generated or reviewed it. Approval requires an accountable actor and relevant validation evidence.
 - After a useful, validated outcome, offer to record it with `generation_capture`. Include ordered procedure, validation evidence, repository revision, provider, and model.
 - Maintenance tasks must use local models only. Do not invoke cloud review or introduce a cloud fallback.
+- For an OpenClaw-delegated patch, require a `hybrid-ai/work-packet/v1` contract and pass `workpacket-verify` before accepting the patch. Remote review is advisory and happens only after local verification.
+- Capture exact Codex/Kimi output and the disclosed-context manifest as immutable evidence. Keep proposed improvements pending; embed only locally validated, generalized, explicitly approved knowledge.
 - Never send secrets, credentials, personal data, production dumps, or unrestricted repository content to Kimi, OpenAI, or another cloud provider.
 - Run `make check` before handing off repository changes.

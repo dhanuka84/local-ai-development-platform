@@ -1,0 +1,98 @@
+---
+title: Local First · Cloud Reviewed · Reused Locally
+---
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "fontFamily": "Inter, ui-sans-serif, system-ui, sans-serif",
+    "fontSize": "18px",
+    "primaryTextColor": "#162033",
+    "lineColor": "#526178",
+    "edgeLabelBackground": "#ffffff"
+  },
+  "flowchart": {
+    "defaultRenderer": "elk",
+    "curve": "basis",
+    "htmlLabels": true,
+    "nodeSpacing": 48,
+    "rankSpacing": 62
+  }
+}}%%
+flowchart LR
+
+    TASK["Software task"]:::user --> ROUTER["OpenClaw<br/><b>classify · route · minimize</b>"]:::control
+    TASK --> CODEXCLI["Optional Codex CLI work session<br/><b>implement · review · validate</b><br/>cloud disclosure policy applies"]:::client
+
+    subgraph BUILD["1 · LOCAL DEVELOPMENT"]
+        direction TB
+        RETRIEVE["MCP retrieval<br/>approved lessons · repository graph · code graph"]:::gateway
+        LOCAL["Ollama local worker<br/><b>implement</b>"]:::local
+        VERIFY["Work-packet verifier<br/>scope · patch · tests · rollback"]:::verify
+        RETRIEVE --> LOCAL --> VERIFY
+    end
+
+    subgraph REVIEW["2 · EXPLICIT REMOTE REVIEW"]
+        direction TB
+        PACKAGE["Sanitized review package<br/>diff/snippets · checks · context manifest"]:::security
+        CODEX["Codex<br/>code + diff review"]:::cloud
+        KIMI["Kimi<br/>architecture + optimization"]:::cloud
+        EVIDENCE["MCP review_record<br/>provenance · verdict · findings"]:::gateway
+        PACKAGE --> CODEX --> EVIDENCE
+        PACKAGE --> KIMI --> EVIDENCE
+    end
+
+    subgraph LEARN["3 · VALIDATE, APPROVE, AND LEARN"]
+        direction TB
+        PG[("PostgreSQL<br/><b>review + knowledge truth</b><br/>pending candidate · stable ID · outbox")]:::database
+        REPRODUCE["Local acceptance loop<br/>reproduce · retest · generalize"]:::local
+        APPROVE{"Accountable<br/>approval?"}:::decision
+        OUTBOX["Transactional outbox<br/>knowledge.upsert"]:::service
+        EMBED["Ollama embeddings"]:::local
+        MILVUS[("Milvus<br/><b>approved semantic discovery</b><br/>PostgreSQL UUID")]:::vector
+        PG --> REPRODUCE --> APPROVE
+        APPROVE -->|"approve"| OUTBOX --> EMBED --> MILVUS
+    end
+
+    subgraph LOCALONLY["4 · LOCAL-ONLY REUSE"]
+        direction TB
+        FUTURE["Similar future development task<br/>retrieve · adapt · revalidate"]:::local
+        MAINT["Maintenance<br/>Ollama · no fallback · no cloud credentials"]:::maintenance
+        MVERIFY["Local checks + operator gate"]:::verify
+        MAINT --> MVERIFY
+    end
+
+    ROUTER -->|"development"| RETRIEVE
+    CODEXCLI -->|"MCP retrieval"| RETRIEVE
+    CODEXCLI -->|"generation_capture · pending"| PG
+    VERIFY -->|"verified + review requested"| PACKAGE
+    EVIDENCE --> PG
+    EVIDENCE --> ARTIFACT["Immutable artifact evidence<br/>raw output + manifest · SHA-256"]:::artifact
+    APPROVE -->|"reject / revise"| HOLD["Remain pending<br/>or reject"]:::note
+    MILVUS -.->|"approved lessons only"| FUTURE
+    MILVUS -.->|"approved lessons only"| MAINT
+    ROUTER -->|"maintenance"| MAINT
+
+    NOTE["Raw review is evidence.<br/><b>Only validated + generalized + approved improvements are embedded.</b>"]:::note
+    ARTIFACT -.-> NOTE
+    MILVUS -.-> NOTE
+
+    classDef user fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e,stroke-width:2px;
+    classDef client fill:#ede9fe,stroke:#7c3aed,color:#3b0764,stroke-width:2px;
+    classDef control fill:#e0e7ff,stroke:#4f46e5,color:#312e81,stroke-width:3px;
+    classDef gateway fill:#dbeafe,stroke:#2563eb,color:#172554,stroke-width:2px;
+    classDef local fill:#dcfce7,stroke:#16a34a,color:#14532d,stroke-width:2px;
+    classDef maintenance fill:#ecfccb,stroke:#4d7c0f,color:#365314,stroke-width:3px;
+    classDef verify fill:#fef3c7,stroke:#d97706,color:#78350f,stroke-width:2px;
+    classDef security fill:#fee2e2,stroke:#dc2626,color:#7f1d1d,stroke-width:2px;
+    classDef cloud fill:#ffedd5,stroke:#ea580c,color:#7c2d12,stroke-width:2px;
+    classDef artifact fill:#f3e8ff,stroke:#9333ea,color:#581c87,stroke-width:2px;
+    classDef database fill:#dbeafe,stroke:#1d4ed8,color:#172554,stroke-width:3px;
+    classDef vector fill:#cffafe,stroke:#0891b2,color:#164e63,stroke-width:3px;
+    classDef decision fill:#fff7ed,stroke:#c2410c,color:#7c2d12,stroke-width:2px;
+    classDef service fill:#f1f5f9,stroke:#475569,color:#172033,stroke-width:2px;
+    classDef note fill:#ffffff,stroke:#64748b,color:#334155,stroke-width:2px,stroke-dasharray: 6 4;
+
+    style BUILD fill:#f0fdf4,stroke:#22c55e,stroke-width:2px
+    style REVIEW fill:#fff7ed,stroke:#f97316,stroke-width:2px
+    style LEARN fill:#eff6ff,stroke:#3b82f6,stroke-width:2px
+    style LOCALONLY fill:#f7fee7,stroke:#65a30d,stroke-width:2px

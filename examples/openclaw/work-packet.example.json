@@ -1,0 +1,37 @@
+{
+  "schema_version": "hybrid-ai/work-packet/v1",
+  "id": "example-parser-change",
+  "goal": "Improve parser error handling and add regression tests.",
+  "workspace": "/absolute/path/to/repository",
+  "base_revision": "HEAD",
+  "mode": "patch",
+  "task_class": "development",
+  "data_classification": "internal",
+  "categories": ["parser"],
+  "local_only": false,
+  "cloud_review": true,
+  "cloud_provider": "codex",
+  "destructive": false,
+  "allowed_files": [
+    "internal/parser/**",
+    "tests/parser/**"
+  ],
+  "forbidden_files": [
+    "config/production/**"
+  ],
+  "rollback": [
+    "Revert the candidate commit or discard the candidate patch."
+  ],
+  "checks": [
+    {
+      "name": "parser unit tests",
+      "argv": ["go", "test", "./internal/parser", "./tests/parser"],
+      "timeout_seconds": 300
+    }
+  ],
+  "limits": {
+    "max_changed_files": 8,
+    "max_diff_lines": 500,
+    "max_patch_bytes": 1048576
+  }
+}

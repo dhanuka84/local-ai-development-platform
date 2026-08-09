@@ -48,17 +48,29 @@ func TestRepositoryWorkflowIntegration(t *testing.T) {
 		t.Fatalf("candidate = %#v", candidate)
 	}
 	reviewID, _ := domain.NewID()
+	reviewArtifact := domain.Artifact{SHA256: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", URI: "file:///review", MediaType: "text/markdown", SizeBytes: 9}
+	manifestArtifact := domain.Artifact{SHA256: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", URI: "file:///manifest", MediaType: "application/json", SizeBytes: 10}
 	if err := repository.RecordReview(ctx, domain.ReviewRecord{
 		ID: reviewID, KnowledgeID: candidate.ID, Reviewer: "codex", Provider: "openai", Model: "review-model",
 		Verdict: "revise", Comments: "make validation explicit", ImprovedContent: "reviewed solution",
+		ValidationEvidence: []string{"go test ./... passed after revision"},
+		ReviewArtifact:     reviewArtifact, ContextManifestArtifact: manifestArtifact,
 	}); err != nil {
 		t.Fatal(err)
+	}
+	var reviewArtifactSHA, manifestArtifactSHA string
+	if err := repository.Pool().QueryRow(ctx, `SELECT review_artifact_sha256,context_manifest_artifact_sha256
+		FROM review_records WHERE id=$1`, reviewID).Scan(&reviewArtifactSHA, &manifestArtifactSHA); err != nil {
+		t.Fatal(err)
+	}
+	if reviewArtifactSHA != reviewArtifact.SHA256 || manifestArtifactSHA != manifestArtifact.SHA256 {
+		t.Fatalf("review artifact refs = %q, %q", reviewArtifactSHA, manifestArtifactSHA)
 	}
 	revised, err := repository.GetKnowledge(ctx, candidate.ID, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if revised.Content != "reviewed solution" || revised.Version != 2 {
+	if revised.Content != "reviewed solution" || revised.Version != 2 || len(revised.ValidationEvidence) != 1 || revised.ValidationEvidence[0] != "go test ./... passed after revision" {
 		t.Fatalf("revised candidate = %#v", revised)
 	}
 	approved, err := repository.ApproveCandidate(ctx, candidate.ID, "owner")

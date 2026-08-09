@@ -48,7 +48,7 @@ flowchart LR
             OPENCLAW["OpenClaw agent coordinators<br/>development · review · maintenance profiles"]:::control
             WORKFLOW["Durable workflow service<br/>state machine · timeout · retry · idempotency"]:::control
             MODEL_GW["Model gateway<br/>routing · quota · cost · fallback policy"]:::control
-            REVIEW["Review and knowledge promotion<br/>candidate · evidence · approval · publish"]:::service
+            REVIEW["Review and knowledge promotion<br/>raw evidence · reproduce · candidate · approval"]:::service
         end
 
         subgraph ASYNC["EVENT AND WORKER PLANE"]
@@ -84,7 +84,7 @@ flowchart LR
             PGBOUNCER["PgBouncer<br/>write/read pools"]:::database
             PGHA[("PostgreSQL HA<br/><b>graph truth</b><br/>repository + revisioned code graph<br/>workflow · provenance · audit · outbox")]:::database
             GIT[("Enterprise Git<br/>product source + approved knowledge<br/>patterns · ADRs · policies · runbooks")]:::knowledge
-            OBJECT[("Versioned object storage<br/>artifacts · evidence · exports · WAL/PITR")]:::storage
+            OBJECT[("Versioned object storage<br/>raw reviews · disclosure manifests<br/>artifacts · evidence · exports · WAL/PITR")]:::storage
         end
 
         subgraph VECTOR["DISTRIBUTED MILVUS RETRIEVAL PLANE"]
@@ -138,6 +138,8 @@ flowchart LR
     MODEL_GW -->|"approved cloud request"| EXPORT
     EXPORT --> KIMI
     EXPORT --> OPENAI
+    KIMI -->|"advisory response"| REVIEW
+    OPENAI -->|"advisory response"| REVIEW
 
     MCP --> QUERY
     OPENCLAW --> QUERY

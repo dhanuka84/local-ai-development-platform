@@ -14,18 +14,64 @@ This is the canonical technical description of the code in this repository. It c
 | PostgreSQL adapter | `internal/postgres` | Transactions, workflow state, full-text fallback, graph traversal, outbox. |
 | Milvus adapter | `internal/milvus` | Derived vector collection for knowledge, repository relationships, and selected code entities. |
 | Ollama adapter | `internal/ollama` | Batched local embeddings through `/api/embed`. |
-| Artifact store | `internal/artifacts` | Immutable content-addressed prompt/output blobs. |
+| Artifact store | `internal/artifacts` | Immutable content-addressed prompt, output, raw-review, and context-manifest blobs. |
 | Index worker | `cmd/worker` | Claims outbox events, embeds authoritative records, updates Milvus. |
 | Admin CLI | `cmd/admin` | Migrations, collection initialization, dependency checks, decisions, reindex. |
+| Work-packet verifier | `cmd/workpacket`, `components/workpacket` | OpenClaw execution contract, deterministic risk/disclosure policy, isolated-clone patch verification. |
 
 The domain package contains interfaces, so local implementations can be replaced independently without changing MCP contracts.
+
+The work-packet verifier is intentionally outside the MCP knowledge service.
+OpenClaw remains the execution control plane; the verifier does not invoke a
+model, route a provider, approve knowledge, or write PostgreSQL/Milvus.
+
+## Bounded local execution and remote review
+
+For delegated patch work, OpenClaw creates a `hybrid-ai/work-packet/v1`
+document before asking the local Ollama worker to generate a patch. Evaluate it
+before execution:
+
+```bash
+make workpacket-evaluate PACKET=/path/to/work-packet.json
+```
+
+After the local worker returns a unified Git patch, validate the patch in a
+disposable clone:
+
+```bash
+make workpacket-verify \
+  PACKET=/path/to/work-packet.json \
+  PATCH=/path/to/candidate.patch
+```
+
+Checks are exact argv arrays and are not executed through a shell. The verifier
+uses a minimal environment without cloud API keys, applies the patch to the
+declared base revision, enforces file/size limits, rejects binary patches, runs
+bounded checks, and detects check-time patch mutation. The source checkout is
+not modified.
+
+This is local safety isolation, not a hostile-code sandbox. Run the verifier in
+an egress-denied container/VM with CPU, memory, process, and filesystem limits
+when repositories or validation commands are not fully trusted.
+
+For development packets that request remote review, OpenClaw sends only a
+sanitized context package after local verification. `review_record` captures
+Codex/Kimi findings and stores the exact response plus context manifest as
+immutable artifacts. Accepted recommendations are reproduced locally and
+captured as a pending candidate. Only an accountable approval queues embedding
+into Milvus. Maintenance packets cannot request cloud review.
+
+See the [remote-review learning design](remote-review-learning.md), the
+[capability evaluation](cost-routing-evaluation.md), the
+[example packet](../examples/openclaw/work-packet.example.json), and
+[ADR-0006](adr/0006-bounded-local-execution-and-cloud-review.md).
 
 ## Data ownership
 
 ```text
 Git source repositories     authoritative product source
 PostgreSQL                  authoritative workflow, provenance, graph, approvals
-Artifact CAS                authoritative immutable prompt/output bytes by SHA-256
+Artifact CAS                authoritative immutable prompt/output/review bytes by SHA-256
 Milvus                      disposable semantic projection
 OpenClaw/Codex sessions     transient agent context, never canonical knowledge
 ```
@@ -44,7 +90,15 @@ Milvus IDs are PostgreSQL UUIDs. Search first returns vector IDs and scores; the
 
 Prompt and response bytes are written to the local content-addressed store before the database transaction. PostgreSQL stores their hashes and locations. It creates a pending knowledge candidate that includes the problem, procedure, response, and validation evidence.
 
-`review_record` stores reviewer/provider/model provenance. A `revise` verdict with `improved_content` replaces the content of a pending candidate and increments its version; it cannot mutate approved knowledge. `knowledge_candidate_decide` is the explicit gate. Approval, its audit review row, and the `knowledge.upsert` outbox event commit in one transaction.
+`review_record` stores reviewer/provider/model provenance. Its `raw_output`
+(falling back to `comments`) and JSON `context_manifest` are stored as
+content-addressed artifacts, while PostgreSQL stores their SHA-256 references.
+A `revise` verdict requires `improved_content` and fresh local
+`validation_evidence`; it replaces both fields on a pending candidate and
+increments its version. It cannot mutate approved knowledge.
+Raw review artifacts are never sent to Milvus. `knowledge_candidate_decide` is
+the explicit gate. Approval, its audit review row, and the `knowledge.upsert`
+outbox event commit in one transaction.
 
 The worker claims outbox rows using `FOR UPDATE SKIP LOCKED`. Failed events retain the error and use bounded incremental backoff. A lock older than five minutes is reclaimable after a crashed worker. Milvus can be dropped and rebuilt with `admin reindex`.
 
