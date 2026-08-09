@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/dhanuka84/hybrid-ai-platform/internal/config"
@@ -24,7 +25,7 @@ func main() {
 
 func run(ctx context.Context, args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: admin <migrate|milvus-init|doctor|reindex|approve|reject> [arguments]")
+		return errors.New("usage: admin <migrate|milvus-init|doctor|reindex|candidates|get|approve|reject> [arguments]")
 	}
 	cfg, err := config.LoadCLI()
 	if err != nil {
@@ -75,6 +76,48 @@ func run(ctx context.Context, args []string) error {
 		}
 		fmt.Printf("queued %d approved knowledge items, %d repository relations, and %d code entities for indexing\n", knowledgeCount, relationCount, codeEntityCount)
 		return nil
+	case "candidates":
+		if len(args) > 3 {
+			return errors.New("usage: admin candidates [project-id] [limit]")
+		}
+		projectID := ""
+		limit := 25
+		if len(args) >= 2 {
+			projectID = args[1]
+		}
+		if len(args) == 3 {
+			limit, err = strconv.Atoi(args[2])
+			if err != nil || limit < 1 || limit > 100 {
+				return errors.New("candidate limit must be an integer from 1 to 100")
+			}
+		}
+		repository, err := openRepository(ctx, cfg)
+		if err != nil {
+			return err
+		}
+		defer repository.Close()
+		items, err := repository.ListCandidates(ctx, projectID, limit)
+		if err != nil {
+			return err
+		}
+		return json.NewEncoder(os.Stdout).Encode(struct {
+			Count int         `json:"count"`
+			Items interface{} `json:"items"`
+		}{Count: len(items), Items: items})
+	case "get":
+		if len(args) != 2 {
+			return errors.New("usage: admin get <knowledge-id>")
+		}
+		repository, err := openRepository(ctx, cfg)
+		if err != nil {
+			return err
+		}
+		defer repository.Close()
+		item, err := repository.GetKnowledge(ctx, args[1], true)
+		if err != nil {
+			return err
+		}
+		return json.NewEncoder(os.Stdout).Encode(item)
 	case "approve", "reject":
 		if len(args) != 3 {
 			return fmt.Errorf("usage: admin %s <knowledge-id> <actor>", args[0])

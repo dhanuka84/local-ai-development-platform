@@ -2,11 +2,84 @@ SHELL := /bin/sh
 COMPOSE := docker compose --env-file .env -f deploy/compose/compose.yaml
 MCP_BASE_URL ?= http://127.0.0.1:8080
 MCP_URL := $(MCP_BASE_URL)/mcp
+PROJECT ?=
+LIMIT ?= 25
+ID ?=
+ACTOR ?=
 
-.PHONY: help env-init mcp-preflight preflight fmt check test build migrate milvus-init doctor reindex up up-gpu down logs mcp-start mcp-start-gpu mcp-status mcp-logs mcp-stop codex-login codex-check codex codex-repo workpacket-build workpacket-evaluate workpacket-verify diagram-review-loop pull-local-model clean
+.PHONY: help help-operations help-development help-qa help-product-owner env-init mcp-preflight preflight fmt check test build migrate milvus-init doctor reindex candidate-list candidate-get candidate-approve candidate-reject up up-gpu down logs mcp-start mcp-start-gpu mcp-status mcp-logs mcp-stop codex-login codex-check codex codex-repo workpacket-build workpacket-evaluate workpacket-verify diagram-review-loop pull-local-model clean ops-start ops-start-gpu ops-status ops-logs ops-stop ops-doctor ops-reindex dev-session dev-session-repo dev-policy-check dev-patch-verify dev-check qa-session qa-session-repo qa-patch-verify qa-check qa-candidates qa-candidate-get po-candidates po-candidate-get po-approve po-reject
 
-help:
+help: ## Show all commands plus role-specific workflow guides
+	@printf '%s\n' \
+		'Role workflows:' \
+		'  make help-operations' \
+		'  make help-development' \
+		'  make help-qa' \
+		'  make help-product-owner' \
+		'' \
+		'All commands:'
 	@awk 'BEGIN {FS = ":.*##"} /^[a-zA-Z0-9_-]+:.*##/ {printf "%-20s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+
+help-operations: ## Show the Operations workflow and commands
+	@printf '%s\n' \
+		'OPERATIONS' \
+		'One-time setup:' \
+		'  1. make env-init' \
+		'  2. Review .env and CODEGRAPH_HOST_ROOT' \
+		'  3. make mcp-preflight' \
+		'  4. make ops-start-gpu       # or: make ops-start' \
+		'  5. make pull-local-model' \
+		'' \
+		'Each platform session:' \
+		'  1. make ops-start-gpu       # or: make ops-start' \
+		'  2. make ops-status' \
+		'  3. make ops-logs             # optional, blocking' \
+		'  4. make ops-stop' \
+		'' \
+		'Administration:' \
+		'  make migrate | make milvus-init | make ops-doctor | make ops-reindex'
+
+help-development: ## Show the Development workflow and commands
+	@printf '%s\n' \
+		'DEVELOPMENT' \
+		'One-time setup:' \
+		'  1. make codex-login' \
+		'  2. make preflight' \
+		'' \
+		'Each development task:' \
+		'  1. make dev-session' \
+		'     or: make dev-session-repo REPO=/absolute/path' \
+		'  2. Search approved knowledge and repository/code graphs through MCP' \
+		'  3. make dev-policy-check PACKET=/path/work-packet.json' \
+		'  4. Implement locally or through Codex' \
+		'  5. make dev-patch-verify PACKET=... PATCH=...' \
+		'  6. make dev-check' \
+		'  7. Use generation_capture; hand candidate ID to QA'
+
+help-qa: ## Show the QA workflow and commands
+	@printf '%s\n' \
+		'QA' \
+		'Each validation task:' \
+		'  1. make qa-candidates PROJECT=<project> LIMIT=25' \
+		'  2. make qa-candidate-get ID=<candidate-uuid>' \
+		'  3. make qa-session-repo REPO=/absolute/path' \
+		'  4. make qa-patch-verify PACKET=... PATCH=...' \
+		'  5. make qa-check' \
+		'  6. Record independent findings with review_record through MCP' \
+		'  7. Hand technically validated candidate ID to Product Owner' \
+		'' \
+		'Note: role separation is procedural locally; MCP RBAC is enterprise work.'
+
+help-product-owner: ## Show the Product Owner workflow and commands
+	@printf '%s\n' \
+		'PRODUCT OWNER' \
+		'Each knowledge decision:' \
+		'  1. make po-candidates PROJECT=<project> LIMIT=25' \
+		'  2. make po-candidate-get ID=<candidate-uuid>' \
+		'  3. Confirm QA evidence, applicability, and business acceptance' \
+		'  4. make po-approve ID=<candidate-uuid> ACTOR=<identity>' \
+		'     or: make po-reject ID=<candidate-uuid> ACTOR=<identity>' \
+		'  5. Operations monitors outbox/index completion'
 
 env-init: ## Create .env with random local secrets; never overwrites an existing file
 	@command -v openssl >/dev/null 2>&1 || { echo "openssl is required" >&2; exit 1; }
@@ -60,17 +133,36 @@ build: ## Build all binaries into ./bin
 	go build -o bin/admin ./cmd/admin
 	go build -o bin/workpacket ./cmd/workpacket
 
-migrate: ## Apply PostgreSQL migrations using local Go
-	go run ./cmd/admin migrate
+migrate: mcp-preflight ## Apply PostgreSQL migrations through the Compose admin image
+	$(COMPOSE) run --rm migrate migrate
 
-milvus-init: ## Create the Milvus collection using local Go
-	go run ./cmd/admin milvus-init
+milvus-init: mcp-preflight ## Create the Milvus collection through the Compose admin image
+	$(COMPOSE) run --rm milvus-init milvus-init
 
-doctor: ## Test all configured dependencies using local Go
-	go run ./cmd/admin doctor
+doctor: mcp-preflight ## Test PostgreSQL, Ollama, and Milvus from the Compose network
+	$(COMPOSE) run --rm migrate doctor
 
-reindex: ## Requeue approved knowledge for Milvus indexing
-	go run ./cmd/admin reindex
+reindex: mcp-preflight ## Requeue approved knowledge for Milvus indexing
+	$(COMPOSE) run --rm migrate reindex
+
+candidate-list: mcp-preflight ## List pending candidates; optional PROJECT and LIMIT=25
+	@case "$(LIMIT)" in ''|*[!0-9]*) echo "LIMIT must be an integer from 1 to 100" >&2; exit 1;; esac
+	@test "$(LIMIT)" -ge 1 -a "$(LIMIT)" -le 100 || { echo "LIMIT must be from 1 to 100" >&2; exit 1; }
+	$(COMPOSE) run --rm migrate candidates "$(PROJECT)" "$(LIMIT)"
+
+candidate-get: mcp-preflight ## Fetch one candidate including pending content; requires ID
+	@test -n "$(ID)" || { echo "usage: make candidate-get ID=<candidate-uuid>" >&2; exit 1; }
+	$(COMPOSE) run --rm migrate get "$(ID)"
+
+candidate-approve: mcp-preflight ## Approve a QA-validated candidate; requires ID and ACTOR
+	@test -n "$(ID)" || { echo "ID is required" >&2; exit 1; }
+	@test -n "$(ACTOR)" || { echo "usage: make candidate-approve ID=<uuid> ACTOR=<accountable-identity>" >&2; exit 1; }
+	$(COMPOSE) run --rm migrate approve "$(ID)" "$(ACTOR)"
+
+candidate-reject: mcp-preflight ## Reject a candidate; requires ID and ACTOR
+	@test -n "$(ID)" || { echo "ID is required" >&2; exit 1; }
+	@test -n "$(ACTOR)" || { echo "usage: make candidate-reject ID=<uuid> ACTOR=<accountable-identity>" >&2; exit 1; }
+	$(COMPOSE) run --rm migrate reject "$(ID)" "$(ACTOR)"
 
 up: ## Start the local CPU stack
 	$(COMPOSE) up --build -d
@@ -158,3 +250,36 @@ pull-local-model: ## Pull the recommended GBX100 coding model
 
 clean: ## Remove build/test output only; persistent service data is retained
 	rm -rf bin coverage.out
+
+# Operations aliases. These expose role intent while retaining one canonical
+# implementation target for each action.
+ops-start: mcp-start ## [Operations] Start the CPU platform
+ops-start-gpu: mcp-start-gpu ## [Operations] Start the NVIDIA GPU platform
+ops-status: mcp-status ## [Operations] Check platform health and readiness
+ops-logs: mcp-logs ## [Operations] Follow gateway and worker logs
+ops-stop: mcp-stop ## [Operations] Stop the platform and retain data
+ops-doctor: doctor ## [Operations] Test PostgreSQL, Ollama, and Milvus
+ops-reindex: reindex ## [Operations] Requeue approved semantic projections
+
+# Development aliases.
+dev-session: codex ## [Development] Start Codex with the local MCP server
+dev-session-repo: codex-repo ## [Development] Start Codex in REPO with local MCP
+dev-policy-check: workpacket-evaluate ## [Development] Evaluate PACKET policy
+dev-patch-verify: workpacket-verify ## [Development] Verify PATCH using PACKET
+dev-check: check ## [Development] Run formatting, vet, and race tests
+
+# QA aliases. QA records its decision with review_record through MCP; these
+# commands do not perform final knowledge approval.
+qa-session: codex ## [QA] Start an MCP-connected Codex validation session
+qa-session-repo: codex-repo ## [QA] Start validation in REPO
+qa-patch-verify: workpacket-verify ## [QA] Independently verify PATCH using PACKET
+qa-check: check ## [QA] Run the repository verification suite
+qa-candidates: candidate-list ## [QA] List pending candidates
+qa-candidate-get: candidate-get ## [QA] Read one pending candidate
+
+# Product Owner aliases. Final decisions remain explicit and require the
+# accountable actor identity on every invocation.
+po-candidates: candidate-list ## [Product Owner] List pending candidates
+po-candidate-get: candidate-get ## [Product Owner] Read one pending candidate
+po-approve: candidate-approve ## [Product Owner] Approve ID as ACTOR
+po-reject: candidate-reject ## [Product Owner] Reject ID as ACTOR

@@ -16,7 +16,7 @@ This is the canonical technical description of the code in this repository. It c
 | Ollama adapter | `internal/ollama` | Batched local embeddings through `/api/embed`. |
 | Artifact store | `internal/artifacts` | Immutable content-addressed prompt, output, raw-review, and context-manifest blobs. |
 | Index worker | `cmd/worker` | Claims outbox events, embeds authoritative records, updates Milvus. |
-| Admin CLI | `cmd/admin` | Migrations, collection initialization, dependency checks, decisions, reindex. |
+| Admin CLI | `cmd/admin` | Migrations, collection initialization, dependency checks, candidate reads/decisions, and reindex. |
 | Work-packet verifier | `cmd/workpacket`, `components/workpacket` | OpenClaw execution contract, deterministic risk/disclosure policy, isolated-clone patch verification. |
 
 The domain package contains interfaces, so local implementations can be replaced independently without changing MCP contracts.

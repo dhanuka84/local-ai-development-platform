@@ -1,5 +1,9 @@
 # Operations Runbook
 
+Role-specific commands and the Development → QA → Product Owner handoff are
+defined in [Role Workflows and Make Commands](role-workflows.md). Use
+`make help-operations` for the concise Operations sequence.
+
 ## Operating model and authentication boundaries
 
 Codex CLI, the local MCP gateway, Ollama, and Kimi use independent authentication paths. A credential for one boundary must never be reused for another.
@@ -178,8 +182,9 @@ Do not use `docker compose down -v` unless deletion of all local database, vecto
 Agents can use MCP with an approval prompt. Operators can also use the local CLI:
 
 ```bash
-go run ./cmd/admin approve <candidate-uuid> <actor>
-go run ./cmd/admin reject <candidate-uuid> <actor>
+make po-candidate-get ID=<candidate-uuid>
+make po-approve ID=<candidate-uuid> ACTOR=<accountable-identity>
+# or: make po-reject ID=<candidate-uuid> ACTOR=<accountable-identity>
 ```
 
 Approval queues indexing. Search may not return the item until the worker completes the event.
@@ -239,8 +244,8 @@ Operationally verify a review learning cycle by checking:
 Milvus is derived. After restoring or replacing it:
 
 ```bash
-go run ./cmd/admin milvus-init
-go run ./cmd/admin reindex
+make milvus-init
+make ops-reindex
 ```
 
 Monitor worker logs until the outbox drains. Reindex includes approved knowledge, Git-repository relationships, and selected first-party code entities from every active repository snapshot.

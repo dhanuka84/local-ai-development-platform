@@ -81,6 +81,21 @@ Prerequisites: Docker Compose v2, Git, and approximately 16 GB free RAM for the 
 
 All published ports bind to `127.0.0.1`. Do not expose PostgreSQL, Milvus, Ollama, or the MCP endpoint directly to an untrusted network.
 
+## Role-based commands
+
+The same canonical Make targets are grouped into four operating workflows:
+
+```bash
+make help-operations
+make help-development
+make help-qa
+make help-product-owner
+```
+
+Role-prefixed aliases such as `ops-start-gpu`, `dev-session-repo`,
+`qa-candidates`, and `po-approve` expose who owns an action without duplicating
+its implementation. Follow the complete [role workflows and handoffs](docs/role-workflows.md).
+
 ## Connect Codex
 
 The current Codex configuration supports local STDIO and Streamable HTTP MCP servers. Codex can use a stored ChatGPT sign-in, so this workflow does not require `OPENAI_API_KEY`. The local MCP bearer token is a separate, non-billable secret used only between Codex and the gateway. Merge [examples/codex/config.toml](examples/codex/config.toml) into `~/.codex/config.toml` or use this repository's project-scoped `.codex/config.toml`, then export the token:
@@ -263,6 +278,7 @@ See [enterprise-deployment.md](docs/enterprise-deployment.md) and the [enterpris
 
 - [Implementation guide](docs/implementation-guide.md)
 - [Remote review and local learning](docs/remote-review-learning.md)
+- [Role workflows and Make commands](docs/role-workflows.md)
 - [Routing capability and benchmark scorecard](docs/cost-routing-evaluation.md)
 - [Operations runbook](docs/operations.md)
 - [Security model](docs/security.md)
