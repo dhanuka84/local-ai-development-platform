@@ -20,6 +20,25 @@ chat systems, and fixed-format documents that cannot display SVG. Mermaid PNGs
 are rendered at high resolution. The editable `.mmd` file remains the source
 for each Mermaid diagram.
 
+## Flow numbering and colors
+
+The arrows use color and short step numbers to make each path easier to follow.
+
+- Runtime architecture: blue `1` request, purple `2` orchestration, orange `3`
+  local execution, magenta `3C` optional cloud review, amber `4` evidence,
+  emerald `5` approval and commit, green `6` indexing, and cyan `7` retrieval
+  and reuse.
+- Review-learning loop: green `1` local work, magenta `2` remote review,
+  indigo `3` validation and learning, and cyan `4` local reuse.
+- Local-to-enterprise evolution: green `1` local profile, purple `2` stable
+  contracts, blue `3` enterprise scale-out, and dashed red `3M` Milvus
+  migration.
+- OpenClaw automation: blue `1` request, purple `2` orchestration, orange `3`
+  execution, red `4` authorization, emerald persistence, and green `5`
+  approved learning.
+- Gray arrows are supporting operational paths. Dashed red arrows are hard
+  controls, migration warnings, or disaster-recovery paths.
+
 ## Architecture conventions
 
 - PostgreSQL is the authoritative runtime system of record for workflow, graph relationships, provenance, audit, and indexing state.

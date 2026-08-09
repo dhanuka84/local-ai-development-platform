@@ -1,7 +1,7 @@
 ---
 title: OpenClaw Agentic Automation — Local-First Execution with Human Governance
 ---
-%%{init: {"theme": "base", "themeVariables": {"fontFamily": "Inter, Arial, sans-serif", "fontSize": "20px", "primaryTextColor": "#172033", "lineColor": "#334155", "edgeLabelBackground": "#ffffff"}, "themeCSS": ".edge-thickness-normal { stroke-width: 3px !important; }"}}%%
+%%{init: {"theme": "base", "themeVariables": {"fontFamily": "Inter, Arial, sans-serif", "fontSize": "20px", "primaryTextColor": "#172033", "lineColor": "#334155", "edgeLabelBackground": "#ffffff"}, "themeCSS": ".edge-thickness-normal { stroke-width: 4px !important; } .marker path { fill: context-stroke !important; stroke: context-stroke !important; } #my-svg-1-HUMAN-GATES, #my-svg-1-TRIGGER-CONTROLLER { stroke: #2563eb !important; } #my-svg-1-CONTROLLER-TASKFLOW, #my-svg-1-TASKFLOW-CHECKPOINT, #my-svg-1-GATES-CHECKPOINT { stroke: #7c3aed !important; } #my-svg-1-CONTROLLER-LOCAL, #my-svg-1-LOCAL-ROUTE, #my-svg-1-ROUTE-CALLS, #my-svg-1-CHECKPOINT-CALLS { stroke: #ea580c !important; } #my-svg-1-CALLS-MCP, #my-svg-1-POLICIES-CERBOS, #my-svg-1-CERBOS-MCP { stroke: #dc2626 !important; } #my-svg-1-MCP-POSTGRES, #my-svg-1-MCP-ARTIFACTS { stroke: #047857 !important; } #my-svg-1-POSTGRES-OUTBOX, #my-svg-1-OUTBOX-EMBEDDING, #my-svg-1-EMBEDDING-MILVUS { stroke: #65a30d !important; }"}}%%
 block
   columns 1
 
@@ -63,7 +63,7 @@ block
     space
     EMBEDDING["Local Ollama<br/>embedding"]
     space
-    OUTBOX["Idempotent<br/>outbox worker"]
+    OUTBOX["5 · APPROVED LEARNING<br/>Idempotent outbox worker"]
   end
 
   HUMAN --> GATES

@@ -20,7 +20,7 @@ title: Local-to-Enterprise Evolution — Stable Contracts and Scale-Out Boundari
 }}%%
 flowchart LR
 
-    subgraph LOCAL["LOCAL PROFILE · ONE GBX100"]
+    subgraph LOCAL["1 · LOCAL PROFILE · ONE GBX100"]
         direction TB
         LCLIENT["Codex + IDE + OpenClaw"]:::local
         LMCP["One MCP gateway"]:::local
@@ -31,17 +31,17 @@ flowchart LR
         LMILVUS[("Milvus Standalone<br/><b>semantic discovery</b><br/>knowledge + selected code entity UUIDs")]:::localData
         LSTORE[("Product/knowledge Git + local artifact store<br/>raw reviews · disclosure manifests")]:::localData
 
-        LCLIENT --> LMCP
-        LMCP --> LANALYZER
-        LANALYZER --> LPG
-        LMCP --> LAGENT
-        LAGENT --> LMODEL
-        LAGENT --> LPG
-        LAGENT --> LMILVUS
-        LAGENT --> LSTORE
+        LCLIENT evolution1_client@--> LMCP
+        LMCP evolution1_analyzer@--> LANALYZER
+        LANALYZER evolution1_graph@--> LPG
+        LMCP evolution1_agent@--> LAGENT
+        LAGENT evolution1_model@--> LMODEL
+        LAGENT evolution1_postgres@--> LPG
+        LAGENT evolution1_milvus@--> LMILVUS
+        LAGENT evolution1_store@--> LSTORE
     end
 
-    subgraph CONTRACTS["STABLE PLATFORM CONTRACTS"]
+    subgraph CONTRACTS["2 · STABLE PLATFORM CONTRACTS"]
         direction TB
         C1["MCP tool schemas<br/>versioned and backward compatible"]:::contract
         C2["Knowledge IDs + revisions<br/>tenant · project · classification"]:::contract
@@ -53,7 +53,7 @@ flowchart LR
         C8["Stable code entity IDs<br/>Milvus primary key = PostgreSQL UUID<br/>SQL hydration before traversal"]:::contract
     end
 
-    subgraph ENTERPRISE["ENTERPRISE PROFILE · DISTRIBUTED"]
+    subgraph ENTERPRISE["3 · ENTERPRISE PROFILE · DISTRIBUTED"]
         direction TB
         ECLIENT["Workstations + CI/CD + edge sites"]:::enterprise
         EMCP["Stateless MCP/API gateway replicas"]:::enterprise
@@ -63,36 +63,46 @@ flowchart LR
         EMILVUS[("Milvus Distributed<br/>knowledge + code entity discovery<br/>scaled query + ingestion")]:::enterpriseData
         ESTORE[("Enterprise Git + versioned object storage<br/>review evidence · regional replication")]:::enterpriseData
 
-        ECLIENT --> EMCP
-        EMCP --> EAGENT
-        EAGENT --> EMODEL
-        EAGENT --> EPG
-        EAGENT --> EMILVUS
-        EAGENT --> ESTORE
+        ECLIENT evolution4_client@--> EMCP
+        EMCP evolution4_agent@--> EAGENT
+        EAGENT evolution4_model@--> EMODEL
+        EAGENT evolution4_postgres@--> EPG
+        EAGENT evolution4_milvus@--> EMILVUS
+        EAGENT evolution4_store@--> ESTORE
     end
 
-    LMCP ==>|"same MCP contracts"| C1
-    LPG ==>|"schema + IDs"| C2
-    LPG ==>|"reliable change stream"| C3
-    LMILVUS ==>|"adapter boundary"| C4
-    LMODEL ==>|"provider boundary"| C5
-    LSTORE ==>|"rebuildability"| C6
-    LCLIENT ==>|"request context"| C7
-    LANALYZER ==>|"stable graph identity"| C8
+    LMCP evolution2_mcp@==>|"same MCP contracts"| C1
+    LPG evolution2_ids@==>|"schema + IDs"| C2
+    LPG evolution2_outbox@==>|"reliable change stream"| C3
+    LMILVUS evolution2_vector@==>|"adapter boundary"| C4
+    LMODEL evolution2_model@==>|"provider boundary"| C5
+    LSTORE evolution2_rebuild@==>|"rebuildability"| C6
+    LCLIENT evolution2_context@==>|"request context"| C7
+    LANALYZER evolution2_identity@==>|"stable graph identity"| C8
 
-    C1 ==>|"horizontal gateway scaling"| EMCP
-    C2 ==>|"tenant-aware enterprise records"| EPG
-    C3 ==>|"outbox relay → event bus"| EAGENT
-    C4 ==>|"backfill + validate + cutover"| EMILVUS
-    C5 ==>|"central routing and quotas"| EMODEL
-    C6 ==>|"object-backed recovery"| ESTORE
-    C7 ==>|"OIDC · RLS · tenant isolation"| ECLIENT
-    C8 ==>|"active-revision hydration"| EPG
-    C8 ==>|"stable UUID projection"| EMILVUS
+    C1 evolution3_mcp@==>|"horizontal gateway scaling"| EMCP
+    C2 evolution3_records@==>|"tenant-aware enterprise records"| EPG
+    C3 evolution3_events@==>|"outbox relay → event bus"| EAGENT
+    C4 evolution3_vector@==>|"backfill + validate + cutover"| EMILVUS
+    C5 evolution3_model@==>|"central routing and quotas"| EMODEL
+    C6 evolution3_recovery@==>|"object-backed recovery"| ESTORE
+    C7 evolution3_identity@==>|"OIDC · RLS · tenant isolation"| ECLIENT
+    C8 evolution3_hydration@==>|"active-revision hydration"| EPG
+    C8 evolution3_projection@==>|"stable UUID projection"| EMILVUS
 
-    NOTE["Milvus migration rule<br/><b>Standalone cannot be upgraded online to Distributed.</b><br/>Create cluster → bulk reindex → validate → dual-write → cut over."]:::warning
-    C4 -.-> NOTE
-    NOTE -.-> EMILVUS
+    NOTE["3M · Milvus migration rule<br/><b>Standalone cannot be upgraded online to Distributed.</b><br/>Create cluster → bulk reindex → validate → dual-write → cut over."]:::warning
+    C4 evolution3m_note@-.-> NOTE
+    NOTE evolution3m_cutover@-.-> EMILVUS
+
+    classDef evolutionFlow1 fill:none,stroke:#15803d,color:#14532d,stroke-width:3px;
+    classDef evolutionFlow2 fill:none,stroke:#7c3aed,color:#581c87,stroke-width:4px;
+    classDef evolutionFlow3 fill:none,stroke:#2563eb,color:#1e3a8a,stroke-width:4px;
+    classDef evolutionMigration fill:none,stroke:#dc2626,color:#7f1d1d,stroke-width:3px,stroke-dasharray:7 5;
+
+    class evolution1_client,evolution1_analyzer,evolution1_graph,evolution1_agent,evolution1_model,evolution1_postgres,evolution1_milvus,evolution1_store evolutionFlow1;
+    class evolution2_mcp,evolution2_ids,evolution2_outbox,evolution2_vector,evolution2_model,evolution2_rebuild,evolution2_context,evolution2_identity evolutionFlow2;
+    class evolution3_mcp,evolution3_records,evolution3_events,evolution3_vector,evolution3_model,evolution3_recovery,evolution3_identity,evolution3_hydration,evolution3_projection,evolution4_client,evolution4_agent,evolution4_model,evolution4_postgres,evolution4_milvus,evolution4_store evolutionFlow3;
+    class evolution3m_note,evolution3m_cutover evolutionMigration;
 
     classDef local fill:#dcfce7,stroke:#16a34a,color:#14532d,stroke-width:1.5px;
     classDef localData fill:#d1fae5,stroke:#059669,color:#064e3b,stroke-width:2px;

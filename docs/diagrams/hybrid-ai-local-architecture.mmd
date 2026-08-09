@@ -82,56 +82,78 @@ flowchart LR
         OPENAI["OpenAI<br/>Codex code and diff review"]:::cloud
     end
 
-    ENGINEER --> OPENCLAW_DEV
-    ENGINEER --> CODEX
-    ADMIN --> MCP
-    CODEX <-->|"scoped MCP tools"| MCP
-    OPENCLAW_DEV <-->|"agent tools"| MCP
-    OPENCLAW_MAINT <-->|"restricted tools"| MCP
+    ENGINEER local1_engineer@-->|"1 · REQUEST"| OPENCLAW_DEV
+    ENGINEER local1_codex@--> CODEX
+    ADMIN local1_admin@--> MCP
+    CODEX local1_codex_mcp@<-->|"scoped MCP tools"| MCP
+    OPENCLAW_DEV local1_dev_mcp@<-->|"agent tools"| MCP
+    OPENCLAW_MAINT local1_maint_mcp@<-->|"restricted tools"| MCP
 
-    OPENCLAW_DEV --> ROUTER
-    OPENCLAW_MAINT -->|"maintenance requests"| ROUTER
-    ROUTER -->|"normal development"| CODER
-    ROUTER -->|"maintenance: mandatory"| CODER
-    OPENCLAW_MAINT -.->|"hard control"| EGRESS_DENY
+    OPENCLAW_DEV local2_dev_router@-->|"2 · ORCHESTRATE"| ROUTER
+    OPENCLAW_MAINT local2_maint_router@-->|"maintenance requests"| ROUTER
+    ROUTER local3_development@-->|"3 · LOCAL EXECUTION"| CODER
+    ROUTER local3_maintenance@-->|"maintenance: mandatory"| CODER
+    OPENCLAW_MAINT local_guard_egress@-.->|"hard control"| EGRESS_DENY
 
-    MCP --> RETRIEVAL
-    MCP -->|"approved index request"| ANALYZER
-    ANALYZER -->|"read-only revision"| GIT
-    ANALYZER -->|"complete deterministic snapshot"| REPO
-    RETRIEVAL -->|"semantic + lexical candidates"| MILVUS
-    RETRIEVAL -->|"authoritative records · exact repository graph"| REPO
-    RETRIEVAL --> RERANK
-    RERANK --> RETRIEVAL
+    MCP local7_retrieval@-->|"7 · RETRIEVE / REUSE"| RETRIEVAL
+    MCP local4_analyzer@-->|"approved index request"| ANALYZER
+    ANALYZER local4_revision@-->|"read-only revision"| GIT
+    ANALYZER local4_snapshot@-->|"complete deterministic snapshot"| REPO
+    RETRIEVAL local7_milvus@-->|"semantic + lexical candidates"| MILVUS
+    RETRIEVAL local7_repository@-->|"authoritative records · exact repository graph"| REPO
+    RETRIEVAL local7_rerank@--> RERANK
+    RERANK local7_ranked@--> RETRIEVAL
 
-    CODEX -->|"hook event"| SPOOL
-    OPENCLAW_DEV -->|"run envelope"| SPOOL
-    SPOOL --> CAPTURE
-    CAPTURE -->|"candidate + evidence"| REPO
-    CAPTURE -->|"pending candidate"| REVIEW
-    REVIEW -->|"validated decision"| REPO
-    REPO -->|"records + typed repo edges + outbox"| PG
-    REPO -->|"approved knowledge + repository evidence"| GIT
-    REPO -->|"immutable payloads"| ARTIFACTS
-    REPO -->|"index job + approved revision"| INDEXER
-    INDEXER --> EMBED
-    EMBED --> INDEXER
-    INDEXER -->|"knowledge + repository vectors<br/>selected code entity UUIDs"| MILVUS
+    CODEX local4_hook@-->|"hook event"| SPOOL
+    OPENCLAW_DEV local4_envelope@-->|"run envelope"| SPOOL
+    SPOOL local4_capture@-->|"4 · CAPTURE EVIDENCE"| CAPTURE
+    CAPTURE local4_evidence@-->|"candidate + evidence"| REPO
+    CAPTURE local4_review@-->|"pending candidate"| REVIEW
+    REVIEW local5_decision@-->|"5 · APPROVE / COMMIT"| REPO
+    REPO local5_postgres@-->|"records + typed repo edges + outbox"| PG
+    REPO local5_git@-->|"approved knowledge + repository evidence"| GIT
+    REPO local5_artifacts@-->|"immutable payloads"| ARTIFACTS
+    REPO local6_index@-->|"6 · INDEX APPROVED"| INDEXER
+    INDEXER local6_embed_request@--> EMBED
+    EMBED local6_embedding@--> INDEXER
+    INDEXER local6_milvus@-->|"knowledge + repository vectors<br/>selected code entity UUIDs"| MILVUS
 
-    ROUTER -->|"explicit escalation"| CLOUD_GUARD
-    CODEX -.->|"approved scoped package"| CLOUD_GUARD
-    CLOUD_GUARD -->|"architecture package"| KIMI
-    CLOUD_GUARD -->|"code review package"| OPENAI
-    KIMI -->|"advisory response"| REVIEW
-    OPENAI -->|"advisory response"| REVIEW
-    SECRETS --> CLOUD_GUARD
+    ROUTER local3c_escalation@-->|"3C · OPTIONAL CLOUD REVIEW"| CLOUD_GUARD
+    CODEX local3c_package@-.->|"approved scoped package"| CLOUD_GUARD
+    CLOUD_GUARD local3c_kimi@-->|"architecture package"| KIMI
+    CLOUD_GUARD local3c_openai@-->|"code review package"| OPENAI
+    KIMI local3c_kimi_review@-->|"advisory response"| REVIEW
+    OPENAI local3c_openai_review@-->|"advisory response"| REVIEW
+    SECRETS local_support_secrets@--> CLOUD_GUARD
 
-    MCP -.-> OBS
-    ROUTER -.-> OBS
-    REPO -.-> OBS
-    PG --> BACKUP
-    GIT --> BACKUP
-    ARTIFACTS --> BACKUP
+    MCP local_support_mcp_otel@-.-> OBS
+    ROUTER local_support_router_otel@-.-> OBS
+    REPO local_support_repo_otel@-.-> OBS
+    PG local_support_pg_backup@--> BACKUP
+    GIT local_support_git_backup@--> BACKUP
+    ARTIFACTS local_support_artifact_backup@--> BACKUP
+
+    classDef localFlow1 fill:none,stroke:#2563eb,color:#1e3a8a,stroke-width:3px;
+    classDef localFlow2 fill:none,stroke:#7c3aed,color:#581c87,stroke-width:3px;
+    classDef localFlow3 fill:none,stroke:#ea580c,color:#7c2d12,stroke-width:3px;
+    classDef localFlow3c fill:none,stroke:#c026d3,color:#86198f,stroke-width:3px;
+    classDef localFlow4 fill:none,stroke:#b45309,color:#78350f,stroke-width:3px;
+    classDef localFlow5 fill:none,stroke:#047857,color:#064e3b,stroke-width:3px;
+    classDef localFlow6 fill:none,stroke:#65a30d,color:#365314,stroke-width:3px;
+    classDef localFlow7 fill:none,stroke:#0891b2,color:#164e63,stroke-width:3px;
+    classDef localGuardFlow fill:none,stroke:#dc2626,color:#7f1d1d,stroke-width:2.5px,stroke-dasharray:6 4;
+    classDef localSupportFlow fill:none,stroke:#64748b,color:#334155,stroke-width:2px;
+
+    class local1_engineer,local1_codex,local1_admin,local1_codex_mcp,local1_dev_mcp,local1_maint_mcp localFlow1;
+    class local2_dev_router,local2_maint_router localFlow2;
+    class local3_development,local3_maintenance localFlow3;
+    class local3c_escalation,local3c_package,local3c_kimi,local3c_openai,local3c_kimi_review,local3c_openai_review localFlow3c;
+    class local4_analyzer,local4_revision,local4_snapshot,local4_hook,local4_envelope,local4_capture,local4_evidence,local4_review localFlow4;
+    class local5_decision,local5_postgres,local5_git,local5_artifacts localFlow5;
+    class local6_index,local6_embed_request,local6_embedding,local6_milvus localFlow6;
+    class local7_retrieval,local7_milvus,local7_repository,local7_rerank,local7_ranked localFlow7;
+    class local_guard_egress localGuardFlow;
+    class local_support_secrets,local_support_mcp_otel,local_support_router_otel,local_support_repo_otel,local_support_pg_backup,local_support_git_backup,local_support_artifact_backup localSupportFlow;
 
     classDef user fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e,stroke-width:1.5px;
     classDef client fill:#ede9fe,stroke:#7c3aed,color:#3b0764,stroke-width:1.5px;

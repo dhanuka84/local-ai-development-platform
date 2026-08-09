@@ -116,85 +116,107 @@ flowchart LR
         INFERDR["Regional private inference<br/>data-residency policy"]:::dr
     end
 
-    DEV --> WAF
-    EDGE --> WAF
-    CICD --> WAF
-    PORTAL --> WAF
-    IDP -->|"identity + groups"| WAF
-    WAF --> MCP
-    WAF --> API
-    MAINT -->|"local requests only"| EDGE
+    DEV flow1_dev@--> WAF
+    EDGE flow1_edge@--> WAF
+    CICD flow1_cicd@--> WAF
+    PORTAL flow1_portal@--> WAF
+    IDP flow1_identity@-->|"identity + groups"| WAF
+    WAF flow1_mcp@-->|"1 · REQUEST"| MCP
+    WAF flow1_api@--> API
+    MAINT flow1_maintenance@-->|"local requests only"| EDGE
 
-    MCP --> POLICY
-    API --> POLICY
-    POLICY --> OPENCLAW
-    POLICY --> WORKFLOW
-    OPENCLAW --> WORKFLOW
-    WORKFLOW --> MODEL_GW
-    WORKFLOW --> REVIEW
-    WORKFLOW -->|"durable jobs"| BUS
+    MCP flow2_mcp_policy@-->|"2 · AUTHORIZE / ORCHESTRATE"| POLICY
+    API flow2_api_policy@--> POLICY
+    POLICY flow2_openclaw@--> OPENCLAW
+    POLICY flow2_workflow@--> WORKFLOW
+    OPENCLAW flow2_control@--> WORKFLOW
+    WORKFLOW flow3_model@--> MODEL_GW
+    WORKFLOW flow3_review@--> REVIEW
+    WORKFLOW flow3_jobs@-->|"3 · EXECUTE · durable jobs"| BUS
 
-    MODEL_GW -->|"private/default"| PRIVATE_LLM
-    MODEL_GW -->|"approved cloud request"| EXPORT
-    EXPORT --> KIMI
-    EXPORT --> OPENAI
-    KIMI -->|"advisory response"| REVIEW
-    OPENAI -->|"advisory response"| REVIEW
+    MODEL_GW flow3_private@-->|"private/default"| PRIVATE_LLM
+    MODEL_GW flow3c_export@-->|"3C · approved cloud request"| EXPORT
+    EXPORT flow3c_kimi@--> KIMI
+    EXPORT flow3c_openai@--> OPENAI
+    KIMI flow3c_kimi_review@-->|"advisory response"| REVIEW
+    OPENAI flow3c_openai_review@-->|"advisory response"| REVIEW
 
-    MCP --> QUERY
-    OPENCLAW --> QUERY
-    QUERY --> MPROXY
-    QUERY --> REPO
-    QUERY --> RERANK
-    RERANK --> QUERY
-    REPO -->|"approved knowledge"| SYNC
-    SYNC -->|"approved signed knowledge"| EDGE
+    MCP flow7_mcp_query@--> QUERY
+    OPENCLAW flow7_openclaw_query@--> QUERY
+    QUERY flow7_vector@-->|"7 · RETRIEVE / REUSE"| MPROXY
+    QUERY flow7_truth@--> REPO
+    QUERY flow7_rerank@--> RERANK
+    RERANK flow7_ranked@--> QUERY
+    REPO flow7_sync@-->|"approved knowledge"| SYNC
+    SYNC flow7_edge_sync@-->|"approved signed knowledge"| EDGE
 
-    REPO -->|"transactions + outbox"| PGBOUNCER
-    REPO -->|"approved documents"| GIT
-    REPO -->|"artifacts + evidence"| OBJECT
-    PGBOUNCER --> PGHA
-    PGHA -->|"committed outbox"| RELAY
-    RELAY --> BUS
-    BUS --> WORKERS
-    BUS --> ANALYZERS
-    BUS --> CAPTURE
-    BUS --> INDEXER
-    BUS --> EVAL
-    WORKERS -->|"run state + evidence refs"| REPO
-    ANALYZERS -->|"read revisioned source"| GIT
-    ANALYZERS -->|"deterministic graph snapshot"| REPO
-    CAPTURE -->|"normalized candidates"| REPO
-    EVAL -->|"quality and safety results"| REPO
-    REVIEW -->|"decision + approved revision"| REPO
-    REPO -->|"approved knowledge + repository relations<br/>selected active code entities"| INDEXER
-    INDEXER --> PRIVATE_EMBED
-    INDEXER --> MPROXY
+    REPO flow5_transaction@-->|"5 · transaction + outbox"| PGBOUNCER
+    REPO flow5_git@-->|"approved documents"| GIT
+    REPO flow5_object@-->|"artifacts + evidence"| OBJECT
+    PGBOUNCER flow5_postgres@--> PGHA
+    PGHA flow5_outbox@-->|"committed outbox"| RELAY
+    RELAY flow5_bus@--> BUS
+    BUS flow3_workers@--> WORKERS
+    BUS flow3_analyzers@--> ANALYZERS
+    BUS flow3_capture@--> CAPTURE
+    BUS flow6_indexer_job@--> INDEXER
+    BUS flow3_eval@--> EVAL
+    WORKERS flow4_worker_evidence@-->|"4 · run state + evidence refs"| REPO
+    ANALYZERS flow4_source@-->|"read revisioned source"| GIT
+    ANALYZERS flow4_graph@-->|"deterministic graph snapshot"| REPO
+    CAPTURE flow4_candidates@-->|"normalized candidates"| REPO
+    EVAL flow4_results@-->|"quality and safety results"| REPO
+    REVIEW flow5_approval@-->|"5 · decision + approved revision"| REPO
+    REPO flow6_projection@-->|"6 · index approved knowledge + repository relations<br/>selected active code entities"| INDEXER
+    INDEXER flow6_embed@--> PRIVATE_EMBED
+    INDEXER flow6_milvus@--> MPROXY
 
-    MPROXY --> MQUERY
-    MPROXY --> MDATA
-    MCOORD --> MQUERY
-    MCOORD --> MDATA
-    MCOORD --> META
-    MDATA --> MWAL
-    MDATA --> MOBJECT
-    MQUERY --> MOBJECT
+    MPROXY flow6_query_nodes@--> MQUERY
+    MPROXY flow6_data_nodes@--> MDATA
+    MCOORD flow6_coord_query@--> MQUERY
+    MCOORD flow6_coord_data@--> MDATA
+    MCOORD flow6_metadata@--> META
+    MDATA flow6_wal@--> MWAL
+    MDATA flow6_vector_store@--> MOBJECT
+    MQUERY flow6_query_store@--> MOBJECT
 
-    SECRETS --> MCP
-    SECRETS --> MODEL_GW
-    MCP -.-> OTEL
-    WORKFLOW -.-> OTEL
-    QUERY -.-> OTEL
-    MODEL_GW -.-> OTEL
-    OTEL --> MONITOR
-    PGHA -->|"append-only audit"| SIEM
-    GITOPS -.-> MCP
-    GITOPS -.-> API
+    SECRETS support_mcp@--> MCP
+    SECRETS support_model@--> MODEL_GW
+    MCP support_mcp_otel@-.-> OTEL
+    WORKFLOW support_workflow_otel@-.-> OTEL
+    QUERY support_query_otel@-.-> OTEL
+    MODEL_GW support_model_otel@-.-> OTEL
+    OTEL support_monitor@--> MONITOR
+    PGHA support_audit@-->|"append-only audit"| SIEM
+    GITOPS support_gitops_mcp@-.-> MCP
+    GITOPS support_gitops_api@-.-> API
 
-    PGHA -->|"streaming/WAL archive"| PGDR
-    OBJECT -->|"cross-region replication"| OBJDR
-    MOBJECT -->|"snapshot/rebuild source"| MILVUSDR
-    PRIVATE_LLM -.->|"regional deployment profile"| INFERDR
+    PGHA dr_postgres@-->|"streaming/WAL archive"| PGDR
+    OBJECT dr_object@-->|"cross-region replication"| OBJDR
+    MOBJECT dr_milvus@-->|"snapshot/rebuild source"| MILVUSDR
+    PRIVATE_LLM dr_inference@-.->|"regional deployment profile"| INFERDR
+
+    classDef flow1 fill:none,stroke:#2563eb,color:#1e3a8a,stroke-width:3px;
+    classDef flow2 fill:none,stroke:#7c3aed,color:#581c87,stroke-width:3px;
+    classDef flow3 fill:none,stroke:#ea580c,color:#7c2d12,stroke-width:3px;
+    classDef flow3c fill:none,stroke:#c026d3,color:#86198f,stroke-width:3px;
+    classDef flow4 fill:none,stroke:#b45309,color:#78350f,stroke-width:3px;
+    classDef flow5 fill:none,stroke:#047857,color:#064e3b,stroke-width:3px;
+    classDef flow6 fill:none,stroke:#65a30d,color:#365314,stroke-width:3px;
+    classDef flow7 fill:none,stroke:#0891b2,color:#164e63,stroke-width:3px;
+    classDef supportFlow fill:none,stroke:#64748b,color:#334155,stroke-width:2px;
+    classDef drFlow fill:none,stroke:#b91c1c,color:#7f1d1d,stroke-width:2.5px,stroke-dasharray:8 5;
+
+    class flow1_dev,flow1_edge,flow1_cicd,flow1_portal,flow1_identity,flow1_mcp,flow1_api,flow1_maintenance flow1;
+    class flow2_mcp_policy,flow2_api_policy,flow2_openclaw,flow2_workflow,flow2_control flow2;
+    class flow3_model,flow3_review,flow3_jobs,flow3_private,flow3_workers,flow3_analyzers,flow3_capture,flow3_eval flow3;
+    class flow3c_export,flow3c_kimi,flow3c_openai,flow3c_kimi_review,flow3c_openai_review flow3c;
+    class flow4_worker_evidence,flow4_source,flow4_graph,flow4_candidates,flow4_results flow4;
+    class flow5_transaction,flow5_git,flow5_object,flow5_postgres,flow5_outbox,flow5_bus,flow5_approval flow5;
+    class flow6_indexer_job,flow6_projection,flow6_embed,flow6_milvus,flow6_query_nodes,flow6_data_nodes,flow6_coord_query,flow6_coord_data,flow6_metadata,flow6_wal,flow6_vector_store,flow6_query_store flow6;
+    class flow7_mcp_query,flow7_openclaw_query,flow7_vector,flow7_truth,flow7_rerank,flow7_ranked,flow7_sync,flow7_edge_sync flow7;
+    class support_mcp,support_model,support_mcp_otel,support_workflow_otel,support_query_otel,support_model_otel,support_monitor,support_audit,support_gitops_mcp,support_gitops_api supportFlow;
+    class dr_postgres,dr_object,dr_milvus,dr_inference drFlow;
 
     classDef user fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e,stroke-width:1.5px;
     classDef client fill:#ede9fe,stroke:#7c3aed,color:#3b0764,stroke-width:1.5px;

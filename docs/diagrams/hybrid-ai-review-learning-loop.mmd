@@ -20,15 +20,16 @@ title: Local First · Cloud Reviewed · Reused Locally
 }}%%
 flowchart LR
 
-    TASK["Software task"]:::user --> ROUTER["OpenClaw<br/><b>classify · route · minimize</b>"]:::control
-    TASK --> CODEXCLI["Optional Codex CLI work session<br/><b>implement · review · validate</b><br/>cloud disclosure policy applies"]:::client
+    TASK["Software task"]:::user review1_task_router@--> ROUTER["OpenClaw<br/><b>classify · route · minimize</b>"]:::control
+    TASK review1_task_codex@--> CODEXCLI["Optional Codex CLI work session<br/><b>implement · review · validate</b><br/>cloud disclosure policy applies"]:::client
 
     subgraph BUILD["1 · LOCAL DEVELOPMENT"]
         direction TB
         RETRIEVE["MCP retrieval<br/>approved lessons · repository graph · code graph"]:::gateway
         LOCAL["Ollama local worker<br/><b>implement</b>"]:::local
         VERIFY["Work-packet verifier<br/>scope · patch · tests · rollback"]:::verify
-        RETRIEVE --> LOCAL --> VERIFY
+        RETRIEVE review1_implement@--> LOCAL
+        LOCAL review1_verify@--> VERIFY
     end
 
     subgraph REVIEW["2 · EXPLICIT REMOTE REVIEW"]
@@ -37,8 +38,10 @@ flowchart LR
         CODEX["Codex<br/>code + diff review"]:::cloud
         KIMI["Kimi<br/>architecture + optimization"]:::cloud
         EVIDENCE["MCP review_record<br/>provenance · verdict · findings"]:::gateway
-        PACKAGE --> CODEX --> EVIDENCE
-        PACKAGE --> KIMI --> EVIDENCE
+        PACKAGE review2_codex@--> CODEX
+        CODEX review2_codex_evidence@--> EVIDENCE
+        PACKAGE review2_kimi@--> KIMI
+        KIMI review2_kimi_evidence@--> EVIDENCE
     end
 
     subgraph LEARN["3 · VALIDATE, APPROVE, AND LEARN"]
@@ -49,8 +52,11 @@ flowchart LR
         OUTBOX["Transactional outbox<br/>knowledge.upsert"]:::service
         EMBED["Ollama embeddings"]:::local
         MILVUS[("Milvus<br/><b>approved semantic discovery</b><br/>PostgreSQL UUID")]:::vector
-        PG --> REPRODUCE --> APPROVE
-        APPROVE -->|"approve"| OUTBOX --> EMBED --> MILVUS
+        PG review3_reproduce@--> REPRODUCE
+        REPRODUCE review3_approve@--> APPROVE
+        APPROVE review3_outbox@-->|"approve"| OUTBOX
+        OUTBOX review3_embed@--> EMBED
+        EMBED review3_milvus@--> MILVUS
     end
 
     subgraph LOCALONLY["4 · LOCAL-ONLY REUSE"]
@@ -58,23 +64,37 @@ flowchart LR
         FUTURE["Similar future development task<br/>retrieve · adapt · revalidate"]:::local
         MAINT["Maintenance<br/>Ollama · no fallback · no cloud credentials"]:::maintenance
         MVERIFY["Local checks + operator gate"]:::verify
-        MAINT --> MVERIFY
+        MAINT review4_verify@--> MVERIFY
     end
 
-    ROUTER -->|"development"| RETRIEVE
-    CODEXCLI -->|"MCP retrieval"| RETRIEVE
-    CODEXCLI -->|"generation_capture · pending"| PG
-    VERIFY -->|"verified + review requested"| PACKAGE
-    EVIDENCE --> PG
-    EVIDENCE --> ARTIFACT["Immutable artifact evidence<br/>raw output + manifest · SHA-256"]:::artifact
-    APPROVE -->|"reject / revise"| HOLD["Remain pending<br/>or reject"]:::note
-    MILVUS -.->|"approved lessons only"| FUTURE
-    MILVUS -.->|"approved lessons only"| MAINT
-    ROUTER -->|"maintenance"| MAINT
+    ROUTER review1_retrieve@-->|"1 · LOCAL BUILD"| RETRIEVE
+    CODEXCLI review1_codex_retrieve@-->|"MCP retrieval"| RETRIEVE
+    CODEXCLI review3_capture@-->|"generation_capture · pending"| PG
+    VERIFY review2_package@-->|"2 · REMOTE REVIEW"| PACKAGE
+    EVIDENCE review3_evidence@-->|"3 · VALIDATE / LEARN"| PG
+    EVIDENCE review2_artifact@--> ARTIFACT["Immutable artifact evidence<br/>raw output + manifest · SHA-256"]:::artifact
+    APPROVE review_reject@-->|"reject / revise"| HOLD["Remain pending<br/>or reject"]:::note
+    MILVUS review4_future@-.->|"4 · APPROVED REUSE"| FUTURE
+    MILVUS review4_maintenance@-.->|"approved lessons only"| MAINT
+    ROUTER review4_route_maintenance@-->|"maintenance"| MAINT
 
     NOTE["Raw review is evidence.<br/><b>Only validated + generalized + approved improvements are embedded.</b>"]:::note
-    ARTIFACT -.-> NOTE
-    MILVUS -.-> NOTE
+    ARTIFACT review_support_artifact@-.-> NOTE
+    MILVUS review_support_milvus@-.-> NOTE
+
+    classDef reviewFlow1 fill:none,stroke:#15803d,color:#14532d,stroke-width:3px;
+    classDef reviewFlow2 fill:none,stroke:#c026d3,color:#86198f,stroke-width:3px;
+    classDef reviewFlow3 fill:none,stroke:#4f46e5,color:#312e81,stroke-width:3px;
+    classDef reviewFlow4 fill:none,stroke:#0891b2,color:#164e63,stroke-width:3px;
+    classDef reviewRejectFlow fill:none,stroke:#dc2626,color:#7f1d1d,stroke-width:2.5px;
+    classDef reviewSupportFlow fill:none,stroke:#64748b,color:#334155,stroke-width:2px,stroke-dasharray:6 4;
+
+    class review1_task_router,review1_task_codex,review1_implement,review1_verify,review1_retrieve,review1_codex_retrieve reviewFlow1;
+    class review2_codex,review2_codex_evidence,review2_kimi,review2_kimi_evidence,review2_package,review2_artifact reviewFlow2;
+    class review3_reproduce,review3_approve,review3_outbox,review3_embed,review3_milvus,review3_capture,review3_evidence reviewFlow3;
+    class review4_verify,review4_future,review4_maintenance,review4_route_maintenance reviewFlow4;
+    class review_reject reviewRejectFlow;
+    class review_support_artifact,review_support_milvus reviewSupportFlow;
 
     classDef user fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e,stroke-width:2px;
     classDef client fill:#ede9fe,stroke:#7c3aed,color:#3b0764,stroke-width:2px;
