@@ -10,11 +10,8 @@ block
     block:request
       columns 1
       H1["1 · REQUEST AND ACCOUNTABILITY"]
-      space
       TRIGGER["Task trigger<br/><b>manual · Git/CI · webhook · cron</b>"]
-      space
       HUMAN["Authenticated human<br/><b>solo:</b> one developer holds all roles<br/><b>team/regulated:</b> separation by policy"]
-      space
       GATES["Human-only decisions<br/><b>QA · Product Owner · disclosure · Operations</b>"]
     end
 
@@ -23,11 +20,8 @@ block
     block:orchestrate
       columns 1
       H2["2 · OPENCLAW ORCHESTRATION"]
-      space
       CONTROLLER["Workflow-controller plugin<br/><b>prepare · track · stop safely</b>"]
-      space
       TASKFLOW["Durable orchestration<br/><b>Managed Task Flow + Lobster</b><br/>save progress · limit retries · resume safely"]
-      space
       CHECKPOINT["Workflow checkpoint<br/><b>wait for the required human role</b>"]
     end
 
@@ -36,11 +30,8 @@ block
     block:execute
       columns 1
       H3["3 · BOUNDED EXECUTION AND REVIEW"]
-      space
       LOCAL["Local execution lanes<br/><b>Development · independent QA · Maintenance</b><br/>Ollama · isolated worktree · bounded packet"]
-      space
       ROUTE["Policy-selected review path<br/><b>local-only OR sanitized Kimi/Codex review</b>"]
-      space
       CALLS["Authenticated MCP actions<br/><b>controller scope · human role scope · evidence only</b>"]
     end
   end
@@ -52,13 +43,11 @@ block
     CERBOS["4B · CERBOS DECISION<br/><b>ALLOW / DENY</b><br/>contextual policy · call ID"]
     space
     MCP["4C · GO MCP GATEWAY<br/><b>check identity · load context · authorize · validate</b>"]
-    space:5
     SPLIT["Clear responsibilities<br/><b>OpenClaw:</b> chooses the next step<br/><b>Cerbos:</b> decides who may act<br/><b>Go:</b> allows valid state changes<br/><b>PostgreSQL:</b> saves the official record"]
     space
     ARTIFACTS[("Immutable artifacts<br/>patches · manifests · checks · reviews")]
     space
     POSTGRES[("PostgreSQL authority<br/><b>roles · tasks · code graph · official record</b><br/>evidence · versions · approvals · outbox")]
-    space:5
     MILVUS[("Milvus semantic discovery<br/><b>approved items only</b><br/>queried through MCP · stable PostgreSQL IDs")]
     space
     EMBEDDING["Local Ollama<br/>embedding"]

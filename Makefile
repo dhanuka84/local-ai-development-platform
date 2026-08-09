@@ -288,7 +288,7 @@ workpacket-verify: workpacket-build ## Verify PATCH=/path/to/change.patch in an 
 
 diagram-review-loop: ## Render the review-learning Mermaid diagram as SVG and high-resolution PNG
 	npx -y @mermaid-js/mermaid-cli@11.16.0 -p docs/diagrams/puppeteer-config.json -i docs/diagrams/hybrid-ai-review-learning-loop.mmd -o docs/diagrams/hybrid-ai-review-learning-loop.svg -b '#ffffff'
-	npx -y @mermaid-js/mermaid-cli@11.16.0 -p docs/diagrams/puppeteer-config.json -i docs/diagrams/hybrid-ai-review-learning-loop.mmd -o docs/diagrams/hybrid-ai-review-learning-loop.png -b '#ffffff' -w 6400 -s 2
+	npx -y @mermaid-js/mermaid-cli@11.16.0 -p docs/diagrams/puppeteer-config.json -i docs/diagrams/hybrid-ai-review-learning-loop.mmd -o docs/diagrams/hybrid-ai-review-learning-loop.png -b '#ffffff' -w 6400 -s 3
 
 diagram-agentic-workflow: ## Render the OpenClaw/Cerbos workflow as SVG and high-resolution PNG
 	npx -y @mermaid-js/mermaid-cli@11.16.0 -p docs/diagrams/puppeteer-config.json -i docs/diagrams/openclaw-agentic-automation-workflow.mmd -o docs/diagrams/openclaw-agentic-automation-workflow.svg -b '#ffffff'

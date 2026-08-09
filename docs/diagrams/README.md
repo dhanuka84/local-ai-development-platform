@@ -39,6 +39,13 @@ The arrows use color and short step numbers to make each path easier to follow.
 - Gray arrows are supporting operational paths. Dashed red arrows are hard
   controls, migration warnings, or disaster-recovery paths.
 
+The enterprise and local overviews use curved group-to-group arrows for
+cross-plane flows. Components remain visible inside each parallel plane, while
+detailed endpoint behavior is defined in the implementation documents and
+contracts. The review-learning loop uses the same pattern for its numbered
+lifecycle stages. The evolution diagram keeps its detailed one-to-one contract
+mappings because those relationships are the purpose of that view.
+
 ## Architecture conventions
 
 - PostgreSQL is the authoritative runtime system of record for workflow, graph relationships, provenance, audit, and indexing state.
@@ -74,7 +81,7 @@ npx -y @mermaid-js/mermaid-cli \
   -o docs/diagrams/hybrid-ai-local-architecture.png \
   -b '#ffffff' \
   -w 6400 \
-  -s 2
+  -s 3
 ```
 
 For a diagram whose natural Mermaid layout is narrower, increase `-s` to `4` to produce a comparable 12K-class export.
@@ -91,8 +98,9 @@ The OpenClaw/Cerbos automation diagram has a dedicated target:
 make diagram-agentic-workflow
 ```
 
-This diagram uses smaller boxes, wide gutters, and thicker arrows so each flow
-is easy to follow. The SVG stays sharp at any zoom level. The optional PNG is
-7,953 × 4,866 pixels; use the SVG when presenting on a large screen or printing.
+This diagram uses aligned rows, compact spacing, and thicker colored arrows so
+each flow is easy to follow without large empty areas. The SVG stays sharp at
+any zoom level. The optional PNG is 7,953 × 2,916 pixels; use the SVG when
+presenting on a large screen or printing.
 
 If Chrome is installed elsewhere, update `executablePath` in `puppeteer-config.json` before rendering.
