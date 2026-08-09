@@ -1,11 +1,21 @@
 # OpenClaw Agentic Automation Design and Implementation Plan
 
-**Status:** Foundation implemented; autonomous execution phases remain staged  
-**Last updated:** 2026-08-09  
+**Status:** Core foundation implemented; full automatic execution is still planned
+
+**Last updated:** 2026-08-09
+
 **Scope:** Automate the Operations, Development, QA, and Product Owner
 workflows without removing accountable human approval or PostgreSQL authority.
 
-Implemented in this repository now:
+## Plain-English summary
+
+OpenClaw coordinates the steps but does not become the source of truth. The Go
+service checks every workflow change, Cerbos checks permission, and PostgreSQL
+saves the official result. Local agents use Ollama. Codex or Kimi can provide
+an optional cloud review after the context is minimized and policy allows it.
+A human still makes the final knowledge decision.
+
+The foundation is working now:
 
 - PostgreSQL principal, governance, workflow, event, step, and approval schema;
 - authenticated human and workload principals with a four-role solo human by
@@ -17,33 +27,33 @@ Implemented in this repository now:
 - versioned JSON contracts and bounded Development, QA, and maintenance
   Lobster pipelines.
 
-The later-phase classifier, worktree/subagent executor, disclosure packager,
-webhook relay, scheduled Operations programs, and enterprise OIDC/HA controls
-remain rollout work. They must not be represented as already autonomous.
+The automatic classifier, isolated worktree runner, cloud-disclosure packager,
+webhook relay, scheduled Operations jobs, and enterprise identity/high-
+availability controls are still planned. Do not describe those parts as fully
+automatic yet.
 
-## 1. Decision summary
+## 1. Design summary
 
-Build a native OpenClaw workflow-controller plugin around four layers:
+The design uses five parts:
 
-1. **OpenClaw managed Task Flow** tracks each multi-step run, detached agent
-   task, wait, retry, and cancellation.
-2. **Lobster workflows** execute deterministic command pipelines with explicit,
-   resumable approval checkpoints.
-3. **Role-specific OpenClaw agents** perform bounded Development, QA, cloud
-   review, and Operations work in isolated sessions/worktrees.
-4. **Cerbos PDP** evaluates contextual authorization for authenticated human
-   and workload principals using versioned policy-as-code.
-5. **The existing Go MCP/PostgreSQL platform** remains authoritative for
-   identities and role bindings, workflow state, evidence, knowledge,
-   repository/code graphs, and outbox publication.
+1. **OpenClaw Managed Task Flow** remembers progress, waits, retries, and
+   cancellation for each multi-step task.
+2. **Lobster workflows** run fixed command sequences and can pause and resume at
+   approval points.
+3. **Role-specific agents** perform limited Development, QA, cloud-review, and
+   Operations work in isolated sessions or worktrees.
+4. **Cerbos** decides whether an authenticated person or service may act.
+5. **The Go MCP service and PostgreSQL** validate changes and keep the official
+   identities, roles, workflows, evidence, knowledge, graphs, and outbox.
 
-OpenClaw's task database is the orchestration ledger. It is not the product
-workflow or knowledge system of record. Every important transition is mirrored
-to PostgreSQL using an idempotency key and optimistic version.
+OpenClaw's task database helps it coordinate work. It is not the official
+product workflow or knowledge database. Every important change is also written
+to PostgreSQL with retry protection and a version check.
 
-![OpenClaw agentic automation workflow](diagrams/openclaw-agentic-automation-workflow.png)
+![OpenClaw agentic automation workflow](diagrams/openclaw-agentic-automation-workflow.svg)
 
-Editable source: [openclaw-agentic-automation-workflow.mmd](diagrams/openclaw-agentic-automation-workflow.mmd).
+Downloads: [high-resolution PNG](diagrams/openclaw-agentic-automation-workflow.png)
+and [editable Mermaid source](diagrams/openclaw-agentic-automation-workflow.mmd).
 
 ## 2. Why these OpenClaw mechanisms
 

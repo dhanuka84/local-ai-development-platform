@@ -292,7 +292,7 @@ diagram-review-loop: ## Render the review-learning Mermaid diagram as SVG and hi
 
 diagram-agentic-workflow: ## Render the OpenClaw/Cerbos workflow as SVG and high-resolution PNG
 	npx -y @mermaid-js/mermaid-cli@11.16.0 -p docs/diagrams/puppeteer-config.json -i docs/diagrams/openclaw-agentic-automation-workflow.mmd -o docs/diagrams/openclaw-agentic-automation-workflow.svg -b '#ffffff'
-	npx -y @mermaid-js/mermaid-cli@11.16.0 -p docs/diagrams/puppeteer-config.json -i docs/diagrams/openclaw-agentic-automation-workflow.mmd -o docs/diagrams/openclaw-agentic-automation-workflow.png -b '#ffffff' -w 6400 -s 2
+	npx -y @mermaid-js/mermaid-cli@11.16.0 -p docs/diagrams/puppeteer-config.json -i docs/diagrams/openclaw-agentic-automation-workflow.mmd -o docs/diagrams/openclaw-agentic-automation-workflow.png -b '#ffffff' -w 7680 -s 3
 
 pull-local-model: ## Pull the recommended GBX100 coding model
 	docker compose --env-file .env -f deploy/compose/compose.yaml exec ollama ollama pull "$${LOCAL_CHAT_MODEL:-qwen3.6:35b}"

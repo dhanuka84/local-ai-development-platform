@@ -2,30 +2,38 @@
 
 ## Scope
 
-This is the canonical technical description of the code in this repository. It covers the local implementation and the contracts that remain stable when the platform is deployed as an enterprise distributed system.
+This guide explains how the code fits together. It covers the local system and
+the interfaces that stay the same when the system grows into an enterprise
+deployment. See the [plain-English glossary](glossary.md) for terms such as
+artifact, principal, projection, and outbox.
+
+In simple terms, OpenClaw coordinates work, the Go MCP gateway checks and saves
+requests, PostgreSQL holds the official records, Milvus helps find similar
+approved records, and Ollama runs local models and creates embeddings.
 
 ## Components
 
 | Component | Package/binary | Responsibility |
 |---|---|---|
-| MCP gateway | `cmd/gateway` | Typed agent boundary, authentication, health endpoints, Streamable HTTP/STDIO. |
-| Application service | `internal/service` | Validation, capture, retrieval, approval, graph, and fallback policy. |
-| Code graph analyzer | `components/codegraph/golang` | Headless Go module/package/type analysis and deterministic snapshots. |
-| PostgreSQL adapter | `internal/postgres` | Transactions, workflow state, full-text fallback, graph traversal, outbox. |
-| Milvus adapter | `internal/milvus` | Derived vector collection for knowledge, repository relationships, and selected code entities. |
-| Ollama adapter | `internal/ollama` | Batched local embeddings through `/api/embed`. |
-| Artifact store | `internal/artifacts` | Immutable content-addressed prompt, output, raw-review, and context-manifest blobs. |
-| Index worker | `cmd/worker` | Claims outbox events, embeds authoritative records, updates Milvus. |
-| Admin CLI | `cmd/admin` | Migrations, collection initialization, dependency checks, candidate reads/decisions, and reindex. |
-| Work-packet verifier | `cmd/workpacket`, `components/workpacket` | OpenClaw execution contract, deterministic risk/disclosure policy, isolated-clone patch verification. |
-| Authorization | `internal/authorization`, `policies/cerbos` | Fail-closed Cerbos PDP adapter, project/role/human-gate policy, and decision correlation. |
-| Workflow controller | `automation/openclaw-plugin` | OpenClaw managed Task Flow mirror over authenticated MCP; no direct data-store access. |
+| MCP gateway | `cmd/gateway` | Authenticates clients and exposes typed tools over HTTP or STDIO. |
+| Application service | `internal/service` | Checks requests and handles capture, search, approval, and graph operations. |
+| Code graph analyzer | `components/codegraph/golang` | Reads Go code and creates repeatable snapshots of symbols and links. |
+| PostgreSQL adapter | `internal/postgres` | Saves official state, runs safe transactions, traverses graphs, and manages the outbox. |
+| Milvus adapter | `internal/milvus` | Searches approved knowledge, repository links, and selected code symbols by meaning. |
+| Ollama adapter | `internal/ollama` | Creates local embeddings in batches through `/api/embed`. |
+| Artifact store | `internal/artifacts` | Saves exact prompts, outputs, reviews, and context manifests by SHA-256 hash. |
+| Index worker | `cmd/worker` | Reads approved outbox events, creates embeddings, and updates Milvus. |
+| Admin CLI | `cmd/admin` | Runs setup, health checks, candidate decisions, and full reindexing. |
+| Work-packet verifier | `cmd/workpacket`, `components/workpacket` | Checks task policy and validates a patch in a disposable clone. |
+| Authorization | `internal/authorization`, `policies/cerbos` | Asks Cerbos whether an authenticated identity may perform an action. |
+| Workflow controller | `automation/openclaw-plugin` | Mirrors managed OpenClaw tasks through MCP without direct database access. |
 
 The domain package contains interfaces, so local implementations can be replaced independently without changing MCP contracts.
 
-The work-packet verifier is intentionally outside the MCP knowledge service.
-OpenClaw remains the execution control plane; the verifier does not invoke a
-model, route a provider, approve knowledge, or write PostgreSQL/Milvus.
+The work-packet verifier is separate from the MCP knowledge service. OpenClaw
+still controls execution. The verifier only checks policy, patches, and test
+commands. It does not call a model, choose a provider, approve knowledge, or
+write to PostgreSQL or Milvus.
 
 ## Bounded local execution and remote review
 
@@ -46,11 +54,11 @@ make workpacket-verify \
   PATCH=/path/to/candidate.patch
 ```
 
-Checks are exact argv arrays and are not executed through a shell. The verifier
-uses a minimal environment without cloud API keys, applies the patch to the
-declared base revision, enforces file/size limits, rejects binary patches, runs
-bounded checks, and detects check-time patch mutation. The source checkout is
-not modified.
+Checks are stored as exact command-and-argument lists and are not passed to a
+shell. The verifier uses a small environment with no cloud API keys. It applies
+the patch to the declared Git revision, checks file and size limits, rejects
+binary patches, runs time-limited checks, and detects changes made by those
+checks. It does not modify the original checkout.
 
 This is local safety isolation, not a hostile-code sandbox. Run the verifier in
 an egress-denied container/VM with CPU, memory, process, and filesystem limits

@@ -12,13 +12,13 @@ the local, review-learning, and enterprise deployment profiles.
 | Remote review and local learning loop | `hybrid-ai-review-learning-loop.mmd` | `hybrid-ai-review-learning-loop.png` | `hybrid-ai-review-learning-loop.svg` |
 | Enterprise distributed architecture | `hybrid-ai-enterprise-architecture.mmd` | `hybrid-ai-enterprise-architecture.png` | `hybrid-ai-enterprise-architecture.svg` |
 | Local-to-enterprise evolution | `hybrid-ai-local-to-enterprise-evolution.mmd` | `hybrid-ai-local-to-enterprise-evolution.png` | `hybrid-ai-local-to-enterprise-evolution.svg` |
-| OpenClaw agentic automation and Cerbos governance | `openclaw-agentic-automation-workflow.mmd` | `openclaw-agentic-automation-workflow.png` | `openclaw-agentic-automation-workflow.svg` |
+| OpenClaw agentic automation and Cerbos governance | [Mermaid](openclaw-agentic-automation-workflow.mmd) | [PNG](openclaw-agentic-automation-workflow.png) | [SVG](openclaw-agentic-automation-workflow.svg) |
 
-The SVG files are recommended for detailed documentation and presentations
-because they remain readable at any zoom level. Mermaid PNGs are
-high-resolution raster exports rendered at approximately 8K–14K pixels on
-their long edge. The compact generated explainer is intended for README and
-overview-slide use; use the review-learning SVG when unlimited zoom is needed.
+SVG is the main format for documentation and presentations because it remains
+sharp at any zoom level. PNG is an optional compatibility export for tools,
+chat systems, and fixed-format documents that cannot display SVG. Mermaid PNGs
+are rendered at high resolution. The editable `.mmd` file remains the source
+for each Mermaid diagram.
 
 ## Architecture conventions
 
@@ -71,5 +71,9 @@ The OpenClaw/Cerbos automation diagram has a dedicated target:
 ```bash
 make diagram-agentic-workflow
 ```
+
+This diagram uses smaller boxes, wide gutters, and thicker arrows so each flow
+is easy to follow. The SVG stays sharp at any zoom level. The optional PNG is
+7,953 × 4,866 pixels; use the SVG when presenting on a large screen or printing.
 
 If Chrome is installed elsewhere, update `executablePath` in `puppeteer-config.json` before rendering.

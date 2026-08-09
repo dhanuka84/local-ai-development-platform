@@ -1,5 +1,13 @@
 # Enterprise Deployment
 
+## Plain-English summary
+
+The enterprise version keeps the same behavior and data rules. It replaces
+single-machine services with highly available managed or distributed services,
+uses organization identity instead of static tokens, and adds stronger network,
+secret, audit, and recovery controls. PostgreSQL is still the official record,
+and Milvus is still a rebuildable search index.
+
 ## Invariants
 
 The enterprise deployment changes scale and identity, not semantics:

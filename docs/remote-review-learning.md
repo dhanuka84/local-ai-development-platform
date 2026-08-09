@@ -2,13 +2,15 @@
 
 ## Outcome
 
-The platform uses a local model for implementation, Codex and/or Kimi for
-deliberate independent review, and a reviewed knowledge pipeline to make useful
-improvements available to future local-model sessions.
+The normal path uses a local model for implementation. Codex, Kimi, or both may
+provide an explicit independent review when policy allows cloud use. Useful
+improvements can then move through review and approval so future local-model
+sessions can find them.
 
-It does **not** embed raw reviewer output. The exact response is retained as
-immutable evidence. Only a recommendation that has been reproduced locally,
-validated, generalized, and explicitly approved becomes searchable knowledge.
+The platform does **not** put raw reviewer output into Milvus. It saves the exact
+response as evidence. A recommendation becomes searchable knowledge only after
+someone applies it locally, runs checks, rewrites it as a reusable lesson, and
+explicitly approves it.
 
 ![Remote review and local learning explainer](diagrams/hybrid-ai-review-learning-explainer.png)
 

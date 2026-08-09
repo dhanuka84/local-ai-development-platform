@@ -2,8 +2,9 @@
 
 ## Purpose
 
-The Makefile exposes one canonical command for each action and role-prefixed
-aliases that make ownership visible. Start with:
+This guide groups commands by responsibility. The role prefix shows which
+“hat” the user is wearing. It does not require four different employees or
+accounts. Start with:
 
 ```bash
 make help-operations
@@ -12,19 +13,24 @@ make help-qa
 make help-product-owner
 ```
 
-The aliases do not create authorization boundaries. A role describes the
-responsibility being exercised at a workflow gate; it does not require a
-different employee. In the `solo` governance profile, one authenticated person
-may perform Operations, Development, QA, and Product Owner actions in sequence.
-Each action still records its explicit acting role, evidence, and decision.
+The aliases do not grant permission by themselves. In the default `solo`
+profile, one authenticated person may perform Operations, Development, QA, and
+Product Owner actions in sequence. The platform still records the role,
+evidence, and decision for every gate.
 
-The current local profile bootstraps one authenticated human with all four
-roles plus a distinct non-human OpenClaw controller. Acting identity comes from
-the credential, never an MCP `actor` field, and Cerbos evaluates each protected
-action. `team` projects may require different people at selected gates, while
-the `regulated` profile enforces a distinct principal at sensitive gates.
-Executing a true two-person approval from `workflow_approvals` remains in the
-staged approval-API milestone.
+The local profile creates one human identity with all four roles and a separate
+non-human OpenClaw controller. The credential determines the identity; a model
+cannot claim another identity in an MCP field. Cerbos checks every protected
+action. `team` projects may require different people at selected gates, and
+`regulated` projects can require them at sensitive gates. The API for a true
+two-person approval is still planned.
+
+| Role | Plain-English responsibility |
+|---|---|
+| Operations | Keep the platform healthy and protect its data and credentials. |
+| Development | Understand the task, make the change, run checks, and save evidence. |
+| QA | Verify the change independently and record findings. |
+| Product Owner | Decide whether the validated lesson should become reusable knowledge. |
 
 ## Operations
 

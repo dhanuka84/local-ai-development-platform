@@ -1,15 +1,35 @@
 # Security Model
 
+## What this means in practice
+
+- Keep local service ports on `127.0.0.1`.
+- Never put secrets or private customer data in a Codex or Kimi review package.
+- Use the separate human and OpenClaw controller tokens created by
+  `make env-init`.
+- Treat all model output as untrusted until checks and human review pass.
+- Keep maintenance on Ollama with no cloud fallback.
+- Before any internet-facing deployment, add the controls in
+  [Production requirements](#production-requirements).
+
+See the [plain-English glossary](glossary.md) for security and architecture
+terms used below.
+
 ## Trust boundaries
 
 - Local Ollama, PostgreSQL, Milvus, artifacts, gateway, and worker are one machine trust zone in the Compose deployment.
 - OpenClaw and Codex are authenticated MCP clients.
 - Kimi and OpenAI are external processing zones. Any context given to their models leaves the local boundary.
-- A generated or reviewed answer is untrusted until source inspection and validation prove it. Artifact retention proves what was reviewed; it does not prove correctness.
+- A generated or reviewed answer is untrusted until source inspection and
+  validation support it. Saving an artifact proves what was reviewed; it does
+  not prove that the answer is correct.
 
 ## Data policy
 
-Never send secrets, tokens, private keys, credential stores, personal data, production database dumps, raw customer payloads, or unrestricted private repositories to a cloud model. Cloud review packages should contain only the problem, minimal sanitized diff/snippets, relevant approved guidance, validation results, and the precise review question.
+Never send secrets, tokens, private keys, credential stores, personal data,
+production database dumps, raw customer payloads, or unrestricted private
+repositories to a cloud model. A cloud review package should contain only the
+problem, the smallest useful sanitized diff or snippets, relevant approved
+guidance, check results, and a precise review question.
 
 Maintenance is fail-closed local: the OpenClaw `maintenance` agent has a
 one-model per-agent allowlist and empty fallbacks, so stored session overrides

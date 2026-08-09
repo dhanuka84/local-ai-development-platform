@@ -1,18 +1,24 @@
 # Operations Runbook
 
+Use this document to set up, start, verify, and stop the local platform. The
+commands are safe defaults for a single developer. Team and regulated identity
+options are explained after the local setup. For unfamiliar terms, use the
+[plain-English glossary](glossary.md).
+
 Role-specific commands and the Development → QA → Product Owner handoff are
 defined in [Role Workflows and Make Commands](role-workflows.md). Use
 `make help-operations` for the concise Operations sequence.
 
-The [OpenClaw agentic automation plan](openclaw-agentic-automation-plan.md)
-defines the staged automated flow. The local Compose runtime includes Cerbos;
-the Go gateway derives principals from hashed bearer credentials, asks Cerbos
-about protected actions, and records its call/policy correlation on workflow
-events. `make authz-policy-test` compiles all policies and negative fixtures.
+The [OpenClaw automation plan](openclaw-agentic-automation-plan.md) explains
+which automated stages are ready and which are still planned. The local stack
+includes Cerbos. The Go gateway identifies the caller from its bearer token,
+asks Cerbos whether the action is allowed, and records the policy decision with
+the workflow event. `make authz-policy-test` checks both allow and deny cases.
 
 ## Operating model and authentication boundaries
 
-Codex CLI, the local MCP gateway, Ollama, and Kimi use independent authentication paths. A credential for one boundary must never be reused for another.
+Codex CLI, the local MCP gateway, Ollama, and Kimi have separate login and
+security boundaries. Do not reuse one credential for another service.
 
 | Boundary | Credential | Required for this deployment | Billing/data boundary |
 |---|---|---:|---|
@@ -22,17 +28,20 @@ Codex CLI, the local MCP gateway, Ollama, and Kimi use independent authenticatio
 | OpenClaw -> Kimi cloud | Moonshot/Kimi API key | Only for an explicitly selected cloud-review workflow | Moonshot cloud billing and disclosure boundary. Store it through OpenClaw's provider onboarding, not in this repository's `.env`. |
 | OpenClaw -> Ollama | No real cloud credential | Yes for local inference | Local-machine inference. A provider may require a non-secret placeholder such as `OLLAMA_API_KEY=ollama-local`. |
 
-Codex supports ChatGPT sign-in and OpenAI API-key sign-in. This runbook uses ChatGPT sign-in, so `OPENAI_API_KEY` is not required. Codex CLI is nevertheless a cloud-model client: connecting it to a local MCP server does not make Codex inference local. Maintenance workflows governed by the local-only policy must run through OpenClaw and Ollama, without Codex or Kimi.
+This runbook uses ChatGPT sign-in for Codex, so `OPENAI_API_KEY` is not needed.
+Codex still uses a cloud model even though its CLI runs locally and connects to
+the local MCP server. Local-only maintenance must use OpenClaw and Ollama, not
+Codex or Kimi.
 
 See the official [Codex authentication](https://learn.chatgpt.com/docs/auth) and [Codex MCP](https://learn.chatgpt.com/docs/extend/mcp) documentation.
 
 ### Default solo principal and multi-principal override
 
-When `AUTH_PRINCIPALS_JSON` is unset, `AUTH_TOKEN` bootstraps
+When `AUTH_PRINCIPALS_JSON` is not set, `AUTH_TOKEN` creates
 `human:local-developer` with `development`, `qa`, `product_owner`, and
 `operations` roles on `*` projects. `CONTROLLER_AUTH_TOKEN` separately
-bootstraps `agent:openclaw-controller` with only the non-human `controller`
-role. This is the default single-developer setup.
+creates `agent:openclaw-controller` with only the non-human `controller` role.
+This is the default single-developer setup.
 
 For team or regulated deployments, set `AUTH_PRINCIPALS_JSON` to the complete
 credential definition instead. It takes precedence over both legacy token

@@ -1,6 +1,22 @@
 # Hybrid AI Software Engineering Platform
 
-A runnable local-first platform that lets OpenClaw and Codex share reviewed software-engineering knowledge while keeping routine development and all maintenance inference on local Ollama models. Kimi K3 review and Codex cloud work/review are explicit lanes—not silent fallbacks.
+A local-first platform for software development. OpenClaw coordinates the work,
+Ollama runs local models, and the MCP server gives Codex and other agents one
+safe way to use shared knowledge. Codex and Kimi are optional cloud services.
+The platform never sends work to them as a hidden fallback.
+
+## How it works
+
+1. An agent searches approved lessons and the current code graph.
+2. A local Ollama model or Codex works on the task and runs checks.
+3. Codex or Kimi may review a small, sanitized package when policy allows it.
+4. A person reviews the result before it becomes reusable knowledge.
+5. PostgreSQL saves the official record. Milvus makes approved records easy to
+   find by meaning.
+
+Maintenance always uses local Ollama models. A single developer can perform
+the Development, QA, Product Owner, and Operations roles. Larger teams can
+require different people for selected approvals.
 
 The repository implements:
 
@@ -27,22 +43,37 @@ for implementation detail.
 
 ## The key design rule
 
-PostgreSQL is authoritative. Milvus is a rebuildable projection.
+PostgreSQL holds the official records. Milvus is a search index that can be
+rebuilt.
 
-Every generation is captured as a pending candidate with the original problem, reusable procedure, validation evidence, model/repository provenance, and immutable artifacts. Review feedback may revise a pending candidate, but only an explicit approval makes it searchable. PostgreSQL commits the approval and an outbox event atomically; the worker then embeds and upserts the approved item into Milvus.
+- PostgreSQL answers: “What is true, approved, and current?”
+- Milvus answers: “Which approved item is most similar to this question?”
+- Stable PostgreSQL IDs connect every Milvus result to its official record.
 
-Git-repository relationships use the same rule. Typed, evidence-backed edges are stored canonically in PostgreSQL and projected into Milvus so agents can use both exact graph traversal and semantic relationship search.
+Every generated solution starts as a pending candidate. It includes the
+original problem, reusable steps, test evidence, model and repository details,
+and files whose contents are protected by SHA-256 hashes. Review feedback may
+improve a pending candidate. Only an explicit approval makes it searchable.
+PostgreSQL saves the approval and indexing request together. A worker then
+adds the approved item to Milvus.
 
-Source-code graphs follow a stricter dual-store rule: PostgreSQL owns every exact, revision-scoped entity and edge. Selected first-party symbols are embedded in Milvus under the same stable PostgreSQL entity UUID. A semantic hit is always hydrated from the active SQL snapshot before the agent traverses calls, references, implementations, imports, or tests.
+Repository relationships follow the same rule. PostgreSQL stores the exact,
+evidence-backed links. Milvus helps an agent discover related repositories by
+meaning.
+
+For source code, PostgreSQL stores every exact symbol and relationship for a
+specific Git revision. Milvus stores searchable summaries of selected symbols.
+After a Milvus match, the service always loads the current PostgreSQL record
+before following calls, references, implementations, imports, or tests.
 
 ## Technology choices
 
 | Concern | Choice | Reason |
 |---|---|---|
-| MCP and data plane | Go 1.25 | Small static services, good concurrency, Tier-1 official MCP SDK. |
-| Workflow and graph authority | PostgreSQL | Transactions, constraints, recursive queries, auditability, outbox. |
-| Semantic/hybrid index | Milvus | Purpose-built vector scale and a direct standalone-to-distributed path. |
-| Local inference | Ollama | Native OpenClaw integration and local `/api/embed`. |
+| MCP and data plane | Go 1.25 | Small services, good concurrency, and an official MCP SDK. |
+| Workflow and graph authority | PostgreSQL | Safe multi-step writes, strong rules, graph queries, and audit history. |
+| Semantic/hybrid index | Milvus | Vector search that can grow from one machine to a distributed cluster. |
+| Local inference | Ollama | Simple local model serving and local embeddings. |
 | Local coding on GBX100/GB10 | `qwen3.6:35b` | Current open-weight agentic coding model with ample memory headroom on 128 GB. |
 | Local embeddings | `embeddinggemma` | Small local embedding model; 768 dimensions by default. |
 | Code analysis | Go packages, AST, and type information | Deterministic build-aware evidence without an LLM or editor bridge. |
@@ -97,11 +128,11 @@ make help-qa
 make help-product-owner
 ```
 
-Role-prefixed aliases such as `ops-start-gpu`, `dev-session-repo`,
-`qa-candidates`, and `po-approve` expose who owns an action without duplicating
-its implementation. One person may perform all four roles in the `solo`
-governance profile; the role and evidence still change explicitly at every
-gate. Follow the complete [role workflows and handoffs](docs/role-workflows.md).
+Role-prefixed commands such as `ops-start-gpu`, `dev-session-repo`,
+`qa-candidates`, and `po-approve` show which role is responsible. In `solo`
+mode, one person may perform all four roles. The platform still records the
+role and evidence at each approval step. Follow the complete
+[role workflows and handoffs](docs/role-workflows.md).
 
 ## Connect Codex
 
@@ -304,6 +335,7 @@ See [enterprise-deployment.md](docs/enterprise-deployment.md) and the [enterpris
 
 ## Documentation
 
+- [Plain-English glossary](docs/glossary.md)
 - [Implementation guide](docs/implementation-guide.md)
 - [Remote review and local learning](docs/remote-review-learning.md)
 - [Role workflows and Make commands](docs/role-workflows.md)
