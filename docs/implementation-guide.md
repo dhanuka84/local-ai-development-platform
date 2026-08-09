@@ -18,6 +18,8 @@ This is the canonical technical description of the code in this repository. It c
 | Index worker | `cmd/worker` | Claims outbox events, embeds authoritative records, updates Milvus. |
 | Admin CLI | `cmd/admin` | Migrations, collection initialization, dependency checks, candidate reads/decisions, and reindex. |
 | Work-packet verifier | `cmd/workpacket`, `components/workpacket` | OpenClaw execution contract, deterministic risk/disclosure policy, isolated-clone patch verification. |
+| Authorization | `internal/authorization`, `policies/cerbos` | Fail-closed Cerbos PDP adapter, project/role/human-gate policy, and decision correlation. |
+| Workflow controller | `automation/openclaw-plugin` | OpenClaw managed Task Flow mirror over authenticated MCP; no direct data-store access. |
 
 The domain package contains interfaces, so local implementations can be replaced independently without changing MCP contracts.
 
@@ -166,9 +168,9 @@ HTTP endpoints:
 | `GET /healthz` | Process liveness only. |
 | `GET /readyz` | Bounded dependency checks; returns 503 when degraded. |
 
-The HTTP MCP handler is stateless, limits request bodies to 4 MiB, propagates cancellation, uses origin protection, and applies constant-time token comparison. STDIO mode writes protocol bytes only to stdout; logs go to stderr.
+The HTTP MCP handler is stateless, limits request bodies to 4 MiB, propagates cancellation, and uses origin protection. Bearer tokens are SHA-256 hashed and resolved to active PostgreSQL principals; plaintext tokens are not stored. STDIO mode writes protocol bytes only to stdout; logs go to stderr.
 
-Static bearer authentication is intentionally a local deployment mechanism. Enterprise deployments terminate OAuth/OIDC at a trusted gateway and use workload identity internally.
+Static bearer authentication is intentionally a local deployment mechanism. The gateway now sends the authenticated principal and PostgreSQL-hydrated resource context to an internal Cerbos PDP and fails protected actions closed. Enterprise deployments terminate OAuth/OIDC at a trusted gateway and use workload identity internally; see [ADR-0008](adr/0008-cerbos-contextual-authorization.md).
 
 ## Search availability
 
@@ -182,6 +184,10 @@ Configuration is environment-only and validated at startup. Important values:
 |---|---|---|
 | `MCP_TRANSPORT` | `http` | `http` or `stdio`. |
 | `AUTH_MODE` | `token` | `none` is rejected outside local mode. |
+| `AUTH_TOKEN` | none | Local human credential; defaults to Development, QA, Product Owner, and Operations roles. |
+| `CONTROLLER_AUTH_TOKEN` | none | Separate non-human OpenClaw controller credential; must differ from `AUTH_TOKEN`. |
+| `AUTHORIZATION_MODE` | `none` locally, `cerbos` otherwise | Compose sets `cerbos`; `none` is rejected outside local mode. |
+| `CERBOS_ADDRESS` | `127.0.0.1:3593` | Internal PDP address; never publish it to an untrusted network. |
 | `DATABASE_URL` | local PostgreSQL | Required for all durable operations. |
 | `OLLAMA_URL` | `http://127.0.0.1:11434` | Native API base without `/v1`. |
 | `OLLAMA_EMBEDDING_MODEL` | `embeddinggemma` | Must match the configured dimension. |
@@ -211,7 +217,9 @@ Milvus is intentionally versioned by collection name. To change the embedding mo
 ## Known boundaries
 
 - The current local artifact store does not compress blobs; content addressing and permissions are implemented. Enterprise object storage should add encryption, retention, and lifecycle policies.
-- The local MCP token represents one trust domain. Per-user authorization belongs at the enterprise gateway.
+- Local bearer principals and Cerbos authorization are implemented. Enterprise
+  identity federation, token lifecycle administration, and workload identity
+  still belong at the OIDC-aware gateway.
 - Repository relationship discovery is explicit. An automated scanner can propose edges from manifests later, but proposals should still require evidence and approval.
 - The local MCP gateway performs analysis synchronously. Enterprise scale requires queued jobs and sandboxed analyzer workers; OpenClaw should orchestrate those workers, not generate graph facts itself.
 - Removed symbols can leave stale Milvus rows until collection rebuild; active PostgreSQL hydration prevents them from being returned as facts.

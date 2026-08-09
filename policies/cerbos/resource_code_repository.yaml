@@ -1,0 +1,24 @@
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  resource: code_repository
+  version: default
+  rules:
+    - name: project_read
+      actions: ["read"]
+      effect: EFFECT_ALLOW
+      roles: ["controller", "development", "qa", "product_owner", "operations", "repository_analyzer"]
+      condition:
+        match:
+          expr: >-
+            request.principal.attr.project_ids.exists(project_id,
+              project_id == "*" || project_id == request.resource.attr.project_id)
+
+    - name: bounded_index
+      actions: ["index"]
+      effect: EFFECT_ALLOW
+      roles: ["controller", "development", "operations", "repository_analyzer"]
+      condition:
+        match:
+          expr: >-
+            request.principal.attr.project_ids.exists(project_id,
+              project_id == "*" || project_id == request.resource.attr.project_id)

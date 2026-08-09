@@ -16,15 +16,26 @@ import (
 var ErrInvalidInput = errors.New("invalid input")
 
 type Service struct {
-	repository      domain.Repository
-	artifacts       domain.ArtifactStore
-	embedder        domain.Embedder
-	vectors         domain.VectorStore
-	lexicalFallback bool
-	autoApprove     bool
-	codeAnalyzer    codegraph.Analyzer
-	codeRoots       []string
-	codeLimits      CodeGraphLimits
+	repository                 domain.Repository
+	artifacts                  domain.ArtifactStore
+	embedder                   domain.Embedder
+	vectors                    domain.VectorStore
+	lexicalFallback            bool
+	autoApprove                bool
+	codeAnalyzer               codegraph.Analyzer
+	codeRoots                  []string
+	codeLimits                 CodeGraphLimits
+	authorizer                 domain.Authorizer
+	reportAuthorizerDependency bool
+}
+
+func (s *Service) ConfigureAuthorization(authorizer domain.Authorizer, reportDependency bool) error {
+	if authorizer == nil {
+		return errors.New("authorizer is required")
+	}
+	s.authorizer = authorizer
+	s.reportAuthorizerDependency = reportDependency
+	return nil
 }
 
 type CodeGraphLimits struct {
@@ -219,6 +230,8 @@ func (s *Service) CodeGraph(ctx context.Context, projectID, repositoryRoot, symb
 
 type CaptureInput struct {
 	ProjectID          string
+	WorkflowID         string
+	WorkflowStepID     string
 	SessionID          string
 	TaskType           string
 	Prompt             string
@@ -254,7 +267,8 @@ func (s *Service) Capture(ctx context.Context, input CaptureInput) (domain.Knowl
 		return domain.KnowledgeItem{}, err
 	}
 	return s.repository.RecordGeneration(ctx, domain.GenerationCapture{
-		ID: generationID, ProjectID: input.ProjectID, SessionID: strings.TrimSpace(input.SessionID),
+		ID: generationID, ProjectID: input.ProjectID, WorkflowID: strings.TrimSpace(input.WorkflowID),
+		WorkflowStepID: strings.TrimSpace(input.WorkflowStepID), SessionID: strings.TrimSpace(input.SessionID),
 		TaskType: strings.TrimSpace(input.TaskType), Prompt: input.Prompt, Response: input.Response,
 		Summary: strings.TrimSpace(input.Summary), Language: strings.TrimSpace(input.Language),
 		Tags: cleanTags(input.Tags), Provider: strings.TrimSpace(input.Provider), Model: strings.TrimSpace(input.Model),
@@ -337,6 +351,8 @@ func (s *Service) Reject(ctx context.Context, id, actor string) (domain.Knowledg
 
 func (s *Service) RecordReview(ctx context.Context, review domain.ReviewRecord) (domain.ReviewRecord, error) {
 	review.KnowledgeID = strings.TrimSpace(review.KnowledgeID)
+	review.WorkflowID = strings.TrimSpace(review.WorkflowID)
+	review.WorkflowStepID = strings.TrimSpace(review.WorkflowStepID)
 	review.Reviewer = strings.TrimSpace(review.Reviewer)
 	review.Provider = strings.TrimSpace(review.Provider)
 	review.Model = strings.TrimSpace(review.Model)
@@ -398,6 +414,12 @@ func (s *Service) Dependencies(ctx context.Context) map[string]string {
 	}
 	if err := s.vectors.Ping(ctx); err != nil {
 		status["milvus"] = "unavailable"
+	}
+	if s.reportAuthorizerDependency {
+		status["cerbos"] = "ok"
+		if s.authorizer == nil || s.authorizer.Ping(ctx) != nil {
+			status["cerbos"] = "unavailable"
+		}
 	}
 	return status
 }

@@ -1,0 +1,96 @@
+---
+title: OpenClaw Agentic Automation — Solo, Team, and Regulated Governance
+---
+%%{init: {"theme": "base", "flowchart": {"curve": "basis", "htmlLabels": true, "nodeSpacing": 38, "rankSpacing": 54}, "themeVariables": {"fontFamily": "Inter, Arial, sans-serif", "fontSize": "17px", "primaryTextColor": "#172033", "lineColor": "#526178", "clusterBkg": "#f8fafc", "clusterBorder": "#94a3b8"}}}%%
+flowchart TB
+    subgraph INPUT["Triggers and accountable humans"]
+        direction LR
+        TRIG["Manual request · Git/CI webhook · cron"]:::trigger
+        HUMAN["Authenticated human principal(s)<br/><b>solo:</b> one person may hold all roles<br/><b>team/regulated:</b> distinct people when policy requires"]:::human
+        GATES["Explicit human gates<br/>QA · Product Owner · disclosure · Operations"]:::gate
+        HUMAN -->|"select acting role and decide"| GATES
+    end
+
+    subgraph ORCH["OpenClaw orchestration plane"]
+        direction LR
+        CTRL["Hybrid workflow-controller plugin<br/>normalizes triggers · reconciles state"]:::openclaw
+        TF["Managed Task Flow<br/>durable runs · waits · retry · cancel"]:::openclaw
+        LOB["Lobster pipelines<br/>deterministic steps · resume tokens"]:::openclaw
+        CTRL <--> TF
+        CTRL --> LOB
+    end
+
+    TRIG --> CTRL
+    GATES -->|"resume waiting flow"| CTRL
+
+    subgraph EXEC["Bounded execution and review"]
+        direction LR
+        DEV["Development agent / Codex ACP<br/>disposable worktree · bounded packet"]:::agent
+        QA["Independent QA agent<br/>clean clone · replay checks"]:::agent
+        REMOTE["Sanitized cloud reviewers<br/>Kimi · Codex"]:::cloud
+        OPS["Operations monitor<br/>local-only maintenance executor"]:::ops
+        OLLAMA["Local Ollama models"]:::local
+        CLOUD["Cloud model endpoints"]:::cloud
+        DEV --> OLLAMA
+        QA --> OLLAMA
+        OPS -->|"no cloud route"| OLLAMA
+        REMOTE --> CLOUD
+    end
+
+    CTRL --> DEV
+    CTRL --> QA
+    CTRL --> REMOTE
+    CTRL --> OPS
+
+    subgraph ENFORCE["Authentication, authorization, and transactional enforcement"]
+        direction LR
+        MCP["Go MCP gateway — policy enforcement point<br/>authenticate · hydrate trusted context · validate"]:::gateway
+        CERBOS["Cerbos PDP<br/>ALLOW / DENY · call ID<br/>stateless contextual policy"]:::authz
+        POLICIES[("Git policy-as-code<br/>resource policies · tests · pinned bundle")]:::git
+        PG[("PostgreSQL authority<br/>principals · profiles · workflow/graph truth<br/>evidence · versions · approvals · outbox")]:::database
+        ART[("Immutable content-addressed artifacts<br/>patches · manifests · checks · reviews")]:::storage
+
+        POLICIES -->|"compiled policy bundle"| CERBOS
+        MCP -->|"trusted principal + resource + action"| CERBOS
+        CERBOS -->|"decision + correlation"| MCP
+        MCP <-->|"read context · atomic transition"| PG
+        MCP --> ART
+    end
+
+    DEV -->|"role-scoped MCP actions"| MCP
+    QA -->|"role-scoped MCP actions"| MCP
+    REMOTE -->|"evidence only"| MCP
+    OPS -->|"role-scoped MCP actions"| MCP
+    CTRL -->|"controller-scoped MCP actions"| MCP
+
+    subgraph LEARN["Approved knowledge projection"]
+        direction LR
+        OUTBOX["Idempotent outbox worker"]:::worker
+        EMBED["Ollama embedding"]:::local
+        MILVUS[("Milvus semantic discovery<br/>approved items only · stable PostgreSQL IDs")]:::vector
+        OUTBOX --> EMBED --> MILVUS
+    end
+
+    PG -->|"committed approval event"| OUTBOX
+    MILVUS -.->|"candidate IDs; hydrate truth"| MCP
+
+    NOTE["Authorization boundary<br/>OpenClaw decides <i>what step is next</i> · Cerbos decides <i>whether this principal may act</i><br/>Go validates <i>whether the transition is legal</i> · PostgreSQL commits the truth"]:::note
+    CERBOS -.-> NOTE
+    PG -.-> NOTE
+
+    classDef trigger fill:#e0f2fe,stroke:#0284c7,stroke-width:2px,color:#0c4a6e;
+    classDef human fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#78350f;
+    classDef gate fill:#ffedd5,stroke:#ea580c,stroke-width:2px,color:#7c2d12;
+    classDef openclaw fill:#ede9fe,stroke:#7c3aed,stroke-width:2px,color:#3b0764;
+    classDef agent fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#1e3a8a;
+    classDef ops fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#14532d;
+    classDef local fill:#ccfbf1,stroke:#0f766e,stroke-width:2px,color:#134e4a;
+    classDef cloud fill:#fce7f3,stroke:#db2777,stroke-width:2px,color:#831843;
+    classDef gateway fill:#dbeafe,stroke:#1d4ed8,stroke-width:3px,color:#172554;
+    classDef authz fill:#fee2e2,stroke:#dc2626,stroke-width:3px,color:#7f1d1d;
+    classDef database fill:#e0e7ff,stroke:#4338ca,stroke-width:3px,color:#312e81;
+    classDef storage fill:#f3e8ff,stroke:#9333ea,stroke-width:2px,color:#581c87;
+    classDef git fill:#f1f5f9,stroke:#475569,stroke-width:2px,color:#0f172a;
+    classDef worker fill:#ecfccb,stroke:#65a30d,stroke-width:2px,color:#365314;
+    classDef vector fill:#cffafe,stroke:#0891b2,stroke-width:2px,color:#164e63;
+    classDef note fill:#fff7ed,stroke:#c2410c,stroke-width:2px,stroke-dasharray:6 4,color:#7c2d12;

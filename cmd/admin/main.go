@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,7 +10,9 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/dhanuka84/hybrid-ai-platform/internal/authorization"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/config"
+	"github.com/dhanuka84/hybrid-ai-platform/internal/domain"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/milvus"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/ollama"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/postgres"
@@ -119,27 +122,71 @@ func run(ctx context.Context, args []string) error {
 		}
 		return json.NewEncoder(os.Stdout).Encode(item)
 	case "approve", "reject":
-		if len(args) != 3 {
-			return fmt.Errorf("usage: admin %s <knowledge-id> <actor>", args[0])
+		if len(args) != 2 {
+			return fmt.Errorf("usage: admin %s <knowledge-id>", args[0])
 		}
-		repository, err := openRepository(ctx, cfg)
-		if err != nil {
-			return err
-		}
-		defer repository.Close()
-		var item any
-		if args[0] == "approve" {
-			item, err = repository.ApproveCandidate(ctx, args[1], args[2])
-		} else {
-			item, err = repository.RejectCandidate(ctx, args[1], args[2])
-		}
-		if err != nil {
-			return err
-		}
-		return json.NewEncoder(os.Stdout).Encode(item)
+		return decideCandidate(ctx, cfg, args[1], args[0])
 	default:
 		return fmt.Errorf("unknown command %q", args[0])
 	}
+}
+
+func decideCandidate(ctx context.Context, cfg config.Config, id, action string) error {
+	if cfg.AuthToken == "" {
+		return errors.New("AUTH_TOKEN is required for an accountable local candidate decision")
+	}
+	repository, err := openRepository(ctx, cfg)
+	if err != nil {
+		return err
+	}
+	defer repository.Close()
+	tokenHash := sha256.Sum256([]byte(cfg.AuthToken))
+	principal, err := repository.AuthenticatePrincipal(ctx, tokenHash[:])
+	if err != nil {
+		return fmt.Errorf("authenticate Product Owner: %w", err)
+	}
+	candidate, err := repository.GetKnowledge(ctx, id, true)
+	if err != nil {
+		return err
+	}
+	workflowLinked, qaValidated := candidate.WorkflowID != "", false
+	if workflowLinked {
+		workflow, workflowErr := repository.GetWorkflow(ctx, candidate.WorkflowID)
+		if workflowErr != nil {
+			return workflowErr
+		}
+		qaValidated = workflow.QAValidatedBy != "" && workflow.State == "promotion_pending"
+	}
+	var authorizer domain.Authorizer = authorization.Disabled{}
+	if cfg.AuthorizationMode == "cerbos" {
+		authorizer, err = authorization.NewCerbos(cfg.CerbosAddress, cfg.CerbosRequestTimeout)
+		if err != nil {
+			return err
+		}
+	}
+	decision, err := authorizer.Authorize(ctx, domain.AuthorizationRequest{
+		Principal: principal, ResourceKind: "knowledge_candidate", ResourceID: candidate.ID, Action: action,
+		Attributes: map[string]any{
+			"project_id": candidate.ProjectID, "status": candidate.Status,
+			"workflow_linked": workflowLinked, "qa_validated": qaValidated,
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("authorization unavailable: %w", err)
+	}
+	if !decision.Allowed {
+		return fmt.Errorf("Product Owner %q is not authorized to %s candidate %q", principal.ID, action, candidate.ID)
+	}
+	var item domain.KnowledgeItem
+	if action == "approve" {
+		item, err = repository.ApproveCandidate(ctx, candidate.ID, principal.ID)
+	} else {
+		item, err = repository.RejectCandidate(ctx, candidate.ID, principal.ID)
+	}
+	if err != nil {
+		return err
+	}
+	return json.NewEncoder(os.Stdout).Encode(item)
 }
 
 func openRepository(ctx context.Context, cfg config.Config) (*postgres.Repository, error) {
@@ -158,6 +205,16 @@ func doctor(ctx context.Context, cfg config.Config) error {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	status := make(map[string]string)
+	if cfg.AuthorizationMode == "cerbos" {
+		authorizer, err := authorization.NewCerbos(cfg.CerbosAddress, cfg.CerbosRequestTimeout)
+		if err != nil {
+			status["cerbos"] = err.Error()
+		} else if err := authorizer.Ping(ctx); err != nil {
+			status["cerbos"] = err.Error()
+		} else {
+			status["cerbos"] = "ok"
+		}
+	}
 	repository, err := postgres.Open(ctx, cfg.DatabaseURL)
 	if err != nil {
 		status["postgres"] = err.Error()

@@ -6,6 +6,7 @@
 bin/
 coverage.out
 *.test
+node_modules/
 
 # Runtime data
 data/

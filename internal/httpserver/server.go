@@ -1,19 +1,24 @@
 package httpserver
 
 import (
-	"crypto/subtle"
+	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/dhanuka84/hybrid-ai-platform/internal/domain"
+	"github.com/dhanuka84/hybrid-ai-platform/internal/identity"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 type DependencyCheck func(r *http.Request) map[string]string
+type Authenticator interface {
+	AuthenticateToken(context.Context, string) (domain.Principal, error)
+}
 
-func New(address, authMode, token string, mcpServer *mcp.Server, logger *slog.Logger, check DependencyCheck) *http.Server {
+func New(address, authMode string, authenticator Authenticator, localPrincipal domain.Principal, mcpServer *mcp.Server, logger *slog.Logger, check DependencyCheck) *http.Server {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
@@ -34,7 +39,7 @@ func New(address, authMode, token string, mcpServer *mcp.Server, logger *slog.Lo
 		PropagateRequestCancellation: true,
 	})
 	protected := http.NewCrossOriginProtection().Handler(mcpHandler)
-	mux.Handle("/mcp", authenticate(authMode, token, protected))
+	mux.Handle("/mcp", authenticate(authMode, authenticator, localPrincipal, protected))
 	return &http.Server{
 		Addr: address, Handler: requestLog(logger, mux),
 		ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 5 * time.Minute,
@@ -42,18 +47,28 @@ func New(address, authMode, token string, mcpServer *mcp.Server, logger *slog.Lo
 	}
 }
 
-func authenticate(mode, token string, next http.Handler) http.Handler {
+func authenticate(mode string, authenticator Authenticator, localPrincipal domain.Principal, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if mode == "none" {
+			if localPrincipal.ID != "" {
+				r = r.WithContext(identity.WithPrincipal(r.Context(), localPrincipal))
+			}
 			next.ServeHTTP(w, r)
 			return
 		}
-		provided := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
-		if len(provided) != len(token) || subtle.ConstantTimeCompare([]byte(provided), []byte(token)) != 1 {
+		header := r.Header.Get("Authorization")
+		if !strings.HasPrefix(header, "Bearer ") || authenticator == nil {
 			w.Header().Set("WWW-Authenticate", "Bearer")
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 			return
 		}
+		principal, err := authenticator.AuthenticateToken(r.Context(), strings.TrimSpace(strings.TrimPrefix(header, "Bearer ")))
+		if err != nil {
+			w.Header().Set("WWW-Authenticate", "Bearer")
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		r = r.WithContext(identity.WithPrincipal(r.Context(), principal))
 		next.ServeHTTP(w, r)
 	})
 }

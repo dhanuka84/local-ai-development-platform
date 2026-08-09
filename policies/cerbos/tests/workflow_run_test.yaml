@@ -1,0 +1,131 @@
+---
+name: WorkflowRunAuthorization
+description: Workflow creation, reads, and non-human transitions are project and role scoped.
+
+principals:
+  local_developer:
+    id: human:local-developer
+    roles: [development, qa, product_owner, operations]
+    attr:
+      human: true
+      project_ids: ["*"]
+
+  controller:
+    id: agent:controller
+    roles: [controller]
+    attr:
+      human: false
+      project_ids: [project-a]
+
+  wrong_project_controller:
+    id: agent:wrong-controller
+    roles: [controller]
+    attr:
+      human: false
+      project_ids: [project-b]
+
+  qa_agent:
+    id: agent:qa
+    roles: [qa]
+    attr:
+      human: false
+      project_ids: [project-a]
+
+resources:
+  project_a_intake:
+    kind: workflow_run
+    id: workflow-a
+    attr:
+      project_id: project-a
+      current_state: intake
+      event: WORKFLOW_CREATED
+      risk: low
+      data_classification: internal
+
+  project_a_implementing:
+    kind: workflow_run
+    id: workflow-a-implementing
+    attr:
+      project_id: project-a
+      current_state: implementing
+      event: IMPLEMENTATION_COMPLETED
+      risk: low
+      data_classification: internal
+
+  project_a_classifying:
+    kind: workflow_run
+    id: workflow-a-classifying
+    attr:
+      project_id: project-a
+      current_state: intake
+      event: CLASSIFIED
+      risk: low
+      data_classification: internal
+
+  project_a_product_request:
+    kind: workflow_run
+    id: workflow-a-product-request
+    attr:
+      project_id: project-a
+      current_state: qa_validated
+      event: PRODUCT_APPROVAL_REQUESTED
+      risk: low
+      data_classification: internal
+
+tests:
+  - name: Default solo developer can create and read local workflows
+    input:
+      principals: [local_developer]
+      resources: [project_a_intake]
+      actions: [create, read]
+    expected:
+      - principal: local_developer
+        resource: project_a_intake
+        actions:
+          create: EFFECT_ALLOW
+          read: EFFECT_ALLOW
+
+  - name: Project controller can transition its workflow
+    input:
+      principals: [controller, wrong_project_controller]
+      resources: [project_a_implementing]
+      actions: [transition]
+    expected:
+      - principal: controller
+        resource: project_a_implementing
+        actions:
+          transition: EFFECT_ALLOW
+      - principal: wrong_project_controller
+        resource: project_a_implementing
+        actions:
+          transition: EFFECT_DENY
+
+  - name: Default solo developer can coordinate the lifecycle under an explicit acting role
+    input:
+      principals: [local_developer]
+      resources: [project_a_classifying, project_a_implementing, project_a_product_request]
+      actions: [transition]
+    expected:
+      - principal: local_developer
+        resource: project_a_classifying
+        actions:
+          transition: EFFECT_ALLOW
+      - principal: local_developer
+        resource: project_a_implementing
+        actions:
+          transition: EFFECT_ALLOW
+      - principal: local_developer
+        resource: project_a_product_request
+        actions:
+          transition: EFFECT_ALLOW
+
+  - name: QA agent cannot perform ordinary state transitions
+    input:
+      principals: [qa_agent]
+      resources: [project_a_implementing]
+      actions: [transition]
+    expected:
+      - principal: qa_agent
+        resource: project_a_implementing
+        actions:
+          transition: EFFECT_DENY

@@ -4,6 +4,12 @@ Role-specific commands and the Development → QA → Product Owner handoff are
 defined in [Role Workflows and Make Commands](role-workflows.md). Use
 `make help-operations` for the concise Operations sequence.
 
+The [OpenClaw agentic automation plan](openclaw-agentic-automation-plan.md)
+defines the staged automated flow. The local Compose runtime includes Cerbos;
+the Go gateway derives principals from hashed bearer credentials, asks Cerbos
+about protected actions, and records its call/policy correlation on workflow
+events. `make authz-policy-test` compiles all policies and negative fixtures.
+
 ## Operating model and authentication boundaries
 
 Codex CLI, the local MCP gateway, Ollama, and Kimi use independent authentication paths. A credential for one boundary must never be reused for another.
@@ -12,13 +18,32 @@ Codex CLI, the local MCP gateway, Ollama, and Kimi use independent authenticatio
 |---|---|---:|---|
 | Codex CLI -> OpenAI models | ChatGPT sign-in | Yes for the recommended Codex workflow | Uses the signed-in ChatGPT account/workspace entitlements and limits. It does not require OpenAI Platform API-key billing. |
 | Codex CLI -> local MCP gateway | `HYBRID_AI_MCP_TOKEN` in the Codex process | Yes in HTTP mode | Local bearer secret; it must equal the gateway's `AUTH_TOKEN` in `.env`. It is not an OpenAI token and has no model-usage charge. |
-| OpenClaw -> local MCP gateway | MCP bearer token | Yes when OpenClaw uses the gateway | Local authentication only. Use a distinct client identity/token in an enterprise deployment. |
+| OpenClaw -> local MCP gateway | `CONTROLLER_AUTH_TOKEN` | Yes for orchestration | Separate non-human controller identity. It cannot perform QA/Product Owner human gates. |
 | OpenClaw -> Kimi cloud | Moonshot/Kimi API key | Only for an explicitly selected cloud-review workflow | Moonshot cloud billing and disclosure boundary. Store it through OpenClaw's provider onboarding, not in this repository's `.env`. |
 | OpenClaw -> Ollama | No real cloud credential | Yes for local inference | Local-machine inference. A provider may require a non-secret placeholder such as `OLLAMA_API_KEY=ollama-local`. |
 
 Codex supports ChatGPT sign-in and OpenAI API-key sign-in. This runbook uses ChatGPT sign-in, so `OPENAI_API_KEY` is not required. Codex CLI is nevertheless a cloud-model client: connecting it to a local MCP server does not make Codex inference local. Maintenance workflows governed by the local-only policy must run through OpenClaw and Ollama, without Codex or Kimi.
 
 See the official [Codex authentication](https://learn.chatgpt.com/docs/auth) and [Codex MCP](https://learn.chatgpt.com/docs/extend/mcp) documentation.
+
+### Default solo principal and multi-principal override
+
+When `AUTH_PRINCIPALS_JSON` is unset, `AUTH_TOKEN` bootstraps
+`human:local-developer` with `development`, `qa`, `product_owner`, and
+`operations` roles on `*` projects. `CONTROLLER_AUTH_TOKEN` separately
+bootstraps `agent:openclaw-controller` with only the non-human `controller`
+role. This is the default single-developer setup.
+
+For team or regulated deployments, set `AUTH_PRINCIPALS_JSON` to the complete
+credential definition instead. It takes precedence over both legacy token
+bootstraps, so include every required human and workload principal, including
+the controller. Each entry has `id`, `display_name`, `token`, `human`, `roles`,
+and `project_ids`; the controller entry's token must match the separately
+supplied `CONTROLLER_AUTH_TOKEN` used by OpenClaw. Treat the entire JSON value as
+a secret and supply it through the deployment secret manager rather than
+committing it or entering it in shell history. Project governance remains `solo` unless its
+`project_governance_policies` row is explicitly changed to `team` or
+`regulated` through a reviewed administrative migration.
 
 ## First-time workstation setup
 
@@ -30,7 +55,8 @@ Prerequisites are Docker with Compose v2, Git, Codex CLI, and enough memory for 
    make env-init
    ```
 
-   This generates separate random `AUTH_TOKEN` and `POSTGRES_PASSWORD` values,
+   This generates separate random `AUTH_TOKEN`, `CONTROLLER_AUTH_TOKEN`, and
+   `POSTGRES_PASSWORD` values,
    writes `.env` with mode `0600`, sets `CODEGRAPH_HOST_ROOT` to this checkout,
    and never prints the secrets. It refuses to overwrite an existing `.env`.
    Edit `CODEGRAPH_HOST_ROOT` if the analyzer needs a different narrow host
@@ -140,18 +166,33 @@ overrides. The target repository's trusted Codex configuration still applies.
 | `make codex-repo REPO=/abs/path` | Start Codex in another repository with this HTTP MCP server. |
 | `make workpacket-evaluate PACKET=...` | Evaluate classification, risk, disclosure, scope, and limits. |
 | `make workpacket-verify PACKET=... PATCH=...` | Verify a candidate patch and its exact checks in a disposable clone. |
+| `make openclaw-plugin-deps` | Install the controller plugin's pinned dependencies. |
+| `make openclaw-plugin-check` | Type-check/test the plugin, validate its metadata, and audit production dependencies. |
+| `make openclaw-config-check` | Validate the complete example against the pinned OpenClaw schema. |
+| `make openclaw-plugin-install` | Build and install/update the local controller plugin. |
+| `make openclaw-start` | Start the OpenClaw gateway with only the controller credential loaded. |
 | `make pull-local-model` | Pull the configured Ollama coding model. |
 | `make mcp-stop` | Stop the platform while retaining named volumes. |
 
 ## OpenClaw client operation
 
-OpenClaw connects to the same loopback MCP endpoint, but it should have its own client credential in an enterprise deployment. For the single-user local deployment, export the `.env` `AUTH_TOKEN` value as `HYBRID_AI_MCP_TOKEN` in the OpenClaw shell and verify the configured server:
+OpenClaw connects to the same loopback MCP endpoint with the non-human
+`CONTROLLER_AUTH_TOKEN`. Install and validate the controller plugin, then start
+the OpenClaw gateway without printing or manually exporting the token:
 
 ```bash
-openclaw mcp doctor hybridKnowledge --probe
+make openclaw-plugin-deps
+make openclaw-plugin-check
+make openclaw-plugin-install
+make openclaw-start
 ```
 
-Use the `developer` agent for local development with explicit cloud-review escalation. Use the `maintenance` agent for local-only operation; its model allowlist and empty fallbacks must prevent Kimi or Codex use. Configure the Moonshot credential only in the `cloud-review` provider/agent through interactive OpenClaw onboarding. Do not put the Moonshot key in `.env`, Codex configuration, shell history, or the MCP service.
+`make openclaw-start` loads only `CONTROLLER_AUTH_TOKEN` into the OpenClaw
+process. The controller can coordinate state and run bounded work, but it cannot
+perform human QA or Product Owner decisions. Use `make codex` or another local
+human approval surface with `AUTH_TOKEN` at those gates.
+
+Use the `developer` agent for local development with explicit cloud-review escalation. Use the `maintenance` agent for local-only operation; its one-model per-agent catalog and empty fallbacks prevent Kimi or Codex model selection, including stored session overrides. Configure the Moonshot credential only in the `cloud-review` provider/agent through interactive OpenClaw onboarding. Do not put the Moonshot key in `.env`, Codex configuration, shell history, or the MCP service.
 
 ## Normal checks
 
@@ -163,7 +204,8 @@ docker compose --env-file .env -f deploy/compose/compose.yaml ps
 make logs
 ```
 
-`healthz` proves that the gateway process can answer. `readyz` checks PostgreSQL, Ollama, and Milvus with a three-second request budget.
+`healthz` proves that the gateway process can answer. `readyz` checks PostgreSQL,
+Ollama, Milvus, and Cerbos with a three-second request budget.
 
 ## Start and stop
 
@@ -183,11 +225,13 @@ Agents can use MCP with an approval prompt. Operators can also use the local CLI
 
 ```bash
 make po-candidate-get ID=<candidate-uuid>
-make po-approve ID=<candidate-uuid> ACTOR=<accountable-identity>
-# or: make po-reject ID=<candidate-uuid> ACTOR=<accountable-identity>
+make po-approve ID=<candidate-uuid>
+# or: make po-reject ID=<candidate-uuid>
 ```
 
-Approval queues indexing. Search may not return the item until the worker completes the event.
+The CLI authenticates `AUTH_TOKEN`, derives the accountable human identity, and
+asks Cerbos before writing the decision. Approval queues indexing. Search may
+not return the item until the worker completes the event.
 
 ## Local implementation and remote review
 
@@ -269,15 +313,21 @@ Milvus backup is optional when PostgreSQL and the embedding model/version are pr
 
 ## Credential rotation and revocation
 
-For the local MCP bearer token:
+For the local MCP credentials:
 
 1. Stop or quiesce MCP clients.
-2. Generate a new random value and replace `AUTH_TOKEN` in `.env`.
+2. Generate new, different random values for `AUTH_TOKEN` and
+   `CONTROLLER_AUTH_TOKEN` in `.env`.
 3. Recreate the gateway with `make mcp-stop`, followed by `make mcp-start` or `make mcp-start-gpu`.
-4. Restart Codex with `make codex` and refresh the OpenClaw client environment.
-5. Verify `/mcp verbose`, `platform_status`, and `openclaw mcp doctor hybridKnowledge --probe` as applicable.
+4. Restart Codex with `make codex` and OpenClaw with `make openclaw-start`.
+5. Verify `/mcp verbose`, `platform_status`, and
+   `make openclaw-plugin-doctor` as applicable.
 
-The old bearer token becomes invalid after the gateway restarts. Rotate the Moonshot key through its provider controls and OpenClaw onboarding independently. Use `codex logout` to revoke the workstation's stored ChatGPT session; do not delete or replace the local MCP token merely to sign Codex out of OpenAI.
+The old bearer credentials become invalid after the gateway restarts. Rotate
+the Moonshot key through its provider controls and OpenClaw onboarding
+independently. Use `codex logout` to revoke the workstation's stored ChatGPT
+session; do not delete or replace the local MCP token merely to sign Codex out
+of OpenAI.
 
 ## Recovery order
 
@@ -299,7 +349,10 @@ The old bearer token becomes invalid after the gateway restarts. Rotate the Moon
 | Codex fails during startup/resume on `hybrid_knowledge` | The required MCP server is down, unreachable, or rejected its token | Start Terminal 1 first; check `curl http://127.0.0.1:8080/healthz`, then verify the token mapping and gateway logs. |
 | `make codex` reports missing `.env` or `AUTH_TOKEN` | Local configuration is absent or still contains `CHANGE_ME` | Copy `.env.example`, set real secrets, and retry. |
 | `AUTH_TOKEN is required` | HTTP mode without a token | Set a long random token in `.env`; export the matching client variable. |
+| `CONTROLLER_AUTH_TOKEN is required` | OpenClaw controller credential is absent | Run `make env-init` or set a second random token that differs from `AUTH_TOKEN`, recreate the gateway, and restart OpenClaw. |
 | MCP returns unauthorized | `HYBRID_AI_MCP_TOKEN` does not exactly match `.env` `AUTH_TOKEN` | Restart Codex with `make codex`; after rotation, recreate the gateway and restart every client. |
+| OpenClaw MCP calls return unauthorized | Its controller credential is stale or missing | Restart with `make openclaw-start`; do not substitute the human `AUTH_TOKEN`. |
+| OpenClaw is denied at QA/Product Owner gate | Expected human-only policy enforcement | Complete the gate through an authenticated human Codex/local client; do not grant the controller human roles. |
 | Search reports lexical fallback | Ollama or Milvus unavailable | Run `make doctor`; inspect service logs; local exact search remains usable. |
 | Embedding dimension error | Model and `EMBEDDING_DIMENSION` mismatch | Create a versioned collection with the detected dimension and reindex. |
 | Approved item is absent | Outbox lag or worker failure | Inspect worker logs and `outbox_events.last_error`; do not write Milvus manually. |

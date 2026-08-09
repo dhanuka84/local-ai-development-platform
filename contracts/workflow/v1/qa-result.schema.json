@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hybrid-ai.local/contracts/workflow/v1/qa-result.schema.json",
+  "title": "Hybrid QA result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["verdict", "acceptance_results", "command_results", "residual_risks"],
+  "properties": {
+    "verdict": { "enum": ["pass", "fail", "needs_human"] },
+    "acceptance_results": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["criterion", "status", "evidence"],
+        "properties": {
+          "criterion": { "type": "string" },
+          "status": { "enum": ["pass", "fail", "not_tested"] },
+          "evidence": { "type": "string" }
+        }
+      }
+    },
+    "command_results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["argv", "exit_code", "artifact_sha256"],
+        "properties": {
+          "argv": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+          "exit_code": { "type": "integer" },
+          "artifact_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+        }
+      }
+    },
+    "residual_risks": { "type": "array", "items": { "type": "string" }, "maxItems": 100 }
+  }
+}

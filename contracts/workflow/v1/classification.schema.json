@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hybrid-ai.local/contracts/workflow/v1/classification.schema.json",
+  "title": "Hybrid workflow classification",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["task_class", "risk", "data_classification", "acceptance_criteria", "affected_repositories", "needs_clarification"],
+  "properties": {
+    "task_class": { "enum": ["development", "maintenance", "review", "analysis"] },
+    "risk": { "enum": ["low", "medium", "high", "critical"] },
+    "data_classification": { "enum": ["public", "internal", "confidential", "restricted"] },
+    "acceptance_criteria": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1, "maxItems": 50 },
+    "affected_repositories": { "type": "array", "items": { "type": "string" }, "uniqueItems": true, "maxItems": 100 },
+    "needs_clarification": { "type": "boolean" },
+    "clarification_questions": { "type": "array", "items": { "type": "string" }, "maxItems": 10 },
+    "cloud_review_recommended": { "type": "boolean", "default": false }
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "id": "hybrid-workflow-controller",
+  "name": "Hybrid Workflow Controller",
+  "description": "Durably mirror OpenClaw managed Task Flows to the Hybrid AI PostgreSQL workflow authority.",
+  "version": "0.1.0",
+  "activation": {
+    "onStartup": true
+  },
+  "configSchema": {
+    "type": "object",
+    "required": [
+      "mcpUrl",
+      "tokenEnv",
+      "controllerAgentIds"
+    ],
+    "properties": {
+      "mcpUrl": {
+        "type": "string",
+        "description": "Loopback or private Streamable HTTP MCP endpoint."
+      },
+      "tokenEnv": {
+        "type": "string",
+        "description": "Environment variable containing the controller bearer token."
+      },
+      "controllerAgentIds": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "minItems": 1,
+        "uniqueItems": true
+      },
+      "requestTimeoutMs": {
+        "type": "integer",
+        "minimum": 1000,
+        "maximum": 300000,
+        "default": 30000
+      }
+    },
+    "additionalProperties": false
+  },
+  "uiHints": {
+    "mcpUrl": {
+      "label": "Hybrid MCP URL"
+    },
+    "tokenEnv": {
+      "label": "Controller token environment variable"
+    },
+    "controllerAgentIds": {
+      "label": "Allowed controller agents"
+    }
+  },
+  "contracts": {
+    "tools": [
+      "hybrid_workflow_start",
+      "hybrid_workflow_status",
+      "hybrid_workflow_transition",
+      "hybrid_workflow_cancel"
+    ]
+  },
+  "toolMetadata": {
+    "hybrid_workflow_status": {
+      "replaySafe": true
+    }
+  }
+}

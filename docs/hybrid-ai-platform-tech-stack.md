@@ -152,6 +152,9 @@ Required controls:
 - No shell, process, write, or MCP access for the Kimi reviewer.
 - Explicit `allowAgents` from development to the Kimi reviewer only.
 - MCP tool filters and server-side authorization for development tools.
+- Cerbos PDP as the internal contextual authorization decision point; the Go
+  gateway authenticates callers, supplies trusted PostgreSQL context, and
+  enforces fail-closed decisions.
 - Configuration backup and validation before every upgrade.
 
 ### 5.2 Codex

@@ -1,0 +1,27 @@
+---
+server:
+  httpListenAddr: ":3592"
+  grpcListenAddr: ":3593"
+  logRequestPayloads: false
+  cors:
+    disabled: true
+  adminAPI:
+    enabled: false
+
+engine:
+  defaultPolicyVersion: default
+
+storage:
+  driver: disk
+  disk:
+    directory: /policies
+    watchForChanges: true
+
+audit:
+  enabled: true
+  accessLogsEnabled: false
+  decisionLogsEnabled: true
+  backend: local
+  local:
+    storagePath: /var/lib/cerbos/audit
+    retentionPeriod: 168h

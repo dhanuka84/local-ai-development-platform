@@ -1,0 +1,161 @@
+---
+name: DomainAccessAuthorization
+description: Existing MCP knowledge and graph actions use trusted project roles and human decisions.
+
+principals:
+  controller:
+    id: agent:openclaw-controller
+    roles: [controller]
+    attr:
+      human: false
+      project_ids: [project-a]
+
+  solo_developer:
+    id: human:local-developer
+    roles: [development, qa, product_owner, operations]
+    attr:
+      human: true
+      project_ids: ["*"]
+
+  cloud_reviewer:
+    id: agent:cloud-reviewer
+    roles: [cloud_reviewer]
+    attr:
+      human: false
+      project_ids: [project-a]
+
+  wrong_project_owner:
+    id: human:mallory
+    roles: [product_owner]
+    attr:
+      human: true
+      project_ids: [project-b]
+
+resources:
+  pending_candidate:
+    kind: knowledge_candidate
+    id: candidate-a
+    attr:
+      project_id: project-a
+      status: pending
+      workflow_linked: false
+      qa_validated: false
+
+  unvalidated_workflow_candidate:
+    kind: knowledge_candidate
+    id: candidate-workflow
+    attr:
+      project_id: project-a
+      status: pending
+      workflow_linked: true
+      qa_validated: false
+
+  repository_relation:
+    kind: repository_relation
+    id: api-to-web
+    attr:
+      project_id: project-a
+
+  code_repository:
+    kind: code_repository
+    id: api
+    attr:
+      project_id: project-a
+
+tests:
+  - name: Controller can retrieve and capture but cannot impersonate human approval
+    input:
+      principals: [controller]
+      resources: [pending_candidate]
+      actions: [read, capture, review, approve, reject]
+    expected:
+      - principal: controller
+        resource: pending_candidate
+        actions:
+          read: EFFECT_ALLOW
+          capture: EFFECT_ALLOW
+          review: EFFECT_DENY
+          approve: EFFECT_DENY
+          reject: EFFECT_DENY
+
+  - name: Solo developer can explicitly review and make a product decision
+    input:
+      principals: [solo_developer]
+      resources: [pending_candidate]
+      actions: [read, capture, review, approve, reject]
+    expected:
+      - principal: solo_developer
+        resource: pending_candidate
+        actions:
+          read: EFFECT_ALLOW
+          capture: EFFECT_ALLOW
+          review: EFFECT_ALLOW
+          approve: EFFECT_ALLOW
+          reject: EFFECT_ALLOW
+
+  - name: Cloud reviewer can review but cannot approve
+    input:
+      principals: [cloud_reviewer]
+      resources: [pending_candidate]
+      actions: [read, review, approve]
+    expected:
+      - principal: cloud_reviewer
+        resource: pending_candidate
+        actions:
+          read: EFFECT_ALLOW
+          review: EFFECT_ALLOW
+          approve: EFFECT_DENY
+
+  - name: Project boundary applies to product decisions
+    input:
+      principals: [wrong_project_owner]
+      resources: [pending_candidate]
+      actions: [approve]
+    expected:
+      - principal: wrong_project_owner
+        resource: pending_candidate
+        actions:
+          approve: EFFECT_DENY
+
+  - name: Workflow candidate cannot be promoted before QA and product gates
+    input:
+      principals: [solo_developer]
+      resources: [unvalidated_workflow_candidate]
+      actions: [approve, reject]
+    expected:
+      - principal: solo_developer
+        resource: unvalidated_workflow_candidate
+        actions:
+          approve: EFFECT_DENY
+          reject: EFFECT_DENY
+
+  - name: Controller reads graphs and indexes code without approving repository truth
+    input:
+      principals: [controller]
+      resources: [repository_relation, code_repository]
+      actions: [read, upsert, index]
+    expected:
+      - principal: controller
+        resource: repository_relation
+        actions:
+          read: EFFECT_ALLOW
+          upsert: EFFECT_DENY
+          index: EFFECT_DENY
+      - principal: controller
+        resource: code_repository
+        actions:
+          read: EFFECT_ALLOW
+          upsert: EFFECT_DENY
+          index: EFFECT_ALLOW
+
+  - name: Solo product owner may approve repository truth
+    input:
+      principals: [solo_developer]
+      resources: [repository_relation]
+      actions: [read, upsert]
+    expected:
+      - principal: solo_developer
+        resource: repository_relation
+        actions:
+          read: EFFECT_ALLOW
+          upsert: EFFECT_ALLOW

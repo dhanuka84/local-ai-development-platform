@@ -21,7 +21,7 @@ The enterprise deployment changes scale and identity, not semantics:
 | Local | Enterprise |
 |---|---|
 | One gateway container | Stateless gateway replicas, HPA, PodDisruptionBudget. |
-| Static bearer token | OIDC/OAuth at API gateway; workload identity/mTLS internally. |
+| Static bearer token | OIDC/OAuth at API gateway; workload identity/mTLS internally; replicated Cerbos PDPs for contextual authorization. |
 | PostgreSQL container | Managed HA PostgreSQL, multi-AZ, PITR, connection pooler. |
 | Milvus Standalone | Milvus Distributed on Kubernetes or managed Zilliz/Milvus. |
 | Local artifact volume | Encrypted, versioned S3-compatible object storage. |
@@ -40,7 +40,14 @@ The gateway uses the MCP SDK's stateless Streamable HTTP mode, allowing ordinary
 
 ## Multi-tenancy
 
-`project_id` is the current logical namespace. Enterprise deployments should derive it from authenticated authorization, not trust a model-supplied value. Add an authorization layer that maps subject and scopes to permitted projects, then enforce it in repository queries and, if needed, PostgreSQL row-level security. Include tenant/project in Milvus partitioning or scalar filters and in object-store prefixes.
+`project_id` is the current logical namespace. Enterprise deployments should derive it from authenticated authorization, not trust a model-supplied value. The gateway verifies OIDC/workload identity, loads trusted project/resource context, and asks an internal Cerbos PDP whether the action is allowed. PostgreSQL transition rules and, where needed, row-level security remain a second enforcement layer. Include tenant/project in Milvus partitioning or scalar filters and in object-store prefixes.
+
+Run multiple stateless Cerbos PDP replicas behind an internal service. Build,
+test, sign, and promote policy bundles independently of application releases;
+pin each deployment and record the decision call ID/policy version with the
+application audit event. Cerbos Hub is optional for centralized policy
+distribution and decision-log operations—the self-hosted PDP remains in the
+data path. A PDP outage must deny protected mutations rather than bypass policy.
 
 ## Repository and code graphs at scale
 

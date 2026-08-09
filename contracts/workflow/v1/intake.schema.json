@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hybrid-ai.local/contracts/workflow/v1/intake.schema.json",
+  "title": "Hybrid workflow intake",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["project_id", "request", "idempotency_key"],
+  "properties": {
+    "project_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "request": { "type": "string", "minLength": 1, "maxLength": 1048576 },
+    "idempotency_key": { "type": "string", "minLength": 1, "maxLength": 300 },
+    "kind": { "type": "string", "default": "software-development" },
+    "risk": { "enum": ["low", "medium", "high", "critical"], "default": "low" },
+    "data_classification": { "enum": ["public", "internal", "confidential", "restricted"], "default": "internal" },
+    "repository_ids": { "type": "array", "items": { "type": "string" }, "uniqueItems": true, "maxItems": 100 }
+  }
+}

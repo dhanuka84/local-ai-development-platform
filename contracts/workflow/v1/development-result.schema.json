@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hybrid-ai.local/contracts/workflow/v1/development-result.schema.json",
+  "title": "Hybrid development result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["status", "patch_artifact_sha256", "changed_files", "checks_requested", "assumptions", "escalations"],
+  "properties": {
+    "status": { "enum": ["implemented", "failed", "blocked"] },
+    "patch_artifact_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "changed_files": { "type": "array", "items": { "type": "string" }, "uniqueItems": true, "maxItems": 200 },
+    "checks_requested": { "type": "array", "items": { "type": "array", "items": { "type": "string" }, "minItems": 1 }, "maxItems": 50 },
+    "assumptions": { "type": "array", "items": { "type": "string" }, "maxItems": 50 },
+    "escalations": { "type": "array", "items": { "type": "string" }, "maxItems": 50 }
+  }
+}

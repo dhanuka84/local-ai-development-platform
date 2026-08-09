@@ -1,0 +1,44 @@
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  resource: knowledge_candidate
+  version: default
+  variables:
+    local:
+      localProject: >-
+        request.principal.attr.project_ids.exists(project_id,
+          project_id == "*" || project_id == request.resource.attr.project_id)
+  rules:
+    - name: project_read
+      actions: ["read"]
+      effect: EFFECT_ALLOW
+      roles: ["controller", "development", "qa", "product_owner", "operations", "cloud_reviewer"]
+      condition:
+        match:
+          expr: V.localProject
+
+    - name: capture_generation
+      actions: ["capture"]
+      effect: EFFECT_ALLOW
+      roles: ["controller", "development"]
+      condition:
+        match:
+          expr: V.localProject
+
+    - name: record_review
+      actions: ["review"]
+      effect: EFFECT_ALLOW
+      roles: ["development", "qa", "cloud_reviewer"]
+      condition:
+        match:
+          expr: V.localProject
+
+    - name: human_product_decision
+      actions: ["approve", "reject"]
+      effect: EFFECT_ALLOW
+      roles: ["product_owner"]
+      condition:
+        match:
+          expr: >-
+            V.localProject && request.principal.attr.human == true &&
+            request.resource.attr.status == "pending" &&
+            (!request.resource.attr.workflow_linked || request.resource.attr.qa_validated)

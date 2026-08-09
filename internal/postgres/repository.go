@@ -54,11 +54,11 @@ func (r *Repository) RecordGeneration(ctx context.Context, capture domain.Genera
 	}
 	if _, err := tx.Exec(ctx, `INSERT INTO generations(
 		id,project_id,session_id,task_type,provider,model,repository_revision,outcome,procedure,validation_evidence,
-		prompt_artifact_sha256,output_artifact_sha256
-	) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`, capture.ID, capture.ProjectID, capture.SessionID,
+		prompt_artifact_sha256,output_artifact_sha256,workflow_id,workflow_step_id
+	) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NULLIF($13,'')::uuid,NULLIF($14,'')::uuid)`, capture.ID, capture.ProjectID, capture.SessionID,
 		valueOr(capture.TaskType, "software-development"), capture.Provider, capture.Model, capture.RepositoryRevision,
 		valueOr(capture.Outcome, "unknown"), capture.Procedure, capture.ValidationEvidence,
-		capture.PromptArtifact.SHA256, capture.OutputArtifact.SHA256); err != nil {
+		capture.PromptArtifact.SHA256, capture.OutputArtifact.SHA256, capture.WorkflowID, capture.WorkflowStepID); err != nil {
 		return domain.KnowledgeItem{}, fmt.Errorf("record generation: %w", err)
 	}
 
@@ -71,15 +71,16 @@ func (r *Repository) RecordGeneration(ctx context.Context, capture domain.Genera
 	var item domain.KnowledgeItem
 	var approvedAt *time.Time
 	err = tx.QueryRow(ctx, `INSERT INTO knowledge_items(
-		project_id,title,problem,summary,content,procedure,validation_evidence,task_type,language,tags,status,source_generation_id,approved_at,approved_by
-	) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,CASE WHEN $11='approved' THEN now() END,NULLIF($13,''))
+		project_id,title,problem,summary,content,procedure,validation_evidence,task_type,language,tags,status,source_generation_id,approved_at,approved_by,workflow_id,workflow_step_id
+	) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,CASE WHEN $11='approved' THEN now() END,NULLIF($13,''),NULLIF($14,'')::uuid,NULLIF($15,'')::uuid)
 	RETURNING id::text,project_id,title,problem,summary,content,procedure,validation_evidence,task_type,language,tags,status,
-		      source_generation_id::text,version,created_at,approved_at`,
+		      source_generation_id::text,COALESCE(workflow_id::text,''),COALESCE(workflow_step_id::text,''),version,created_at,approved_at`,
 		capture.ProjectID, title, capture.Prompt, capture.Summary, capture.Response, capture.Procedure, capture.ValidationEvidence,
 		valueOr(capture.TaskType, "software-development"), capture.Language, capture.Tags, status, capture.ID, actor,
+		capture.WorkflowID, capture.WorkflowStepID,
 	).Scan(&item.ID, &item.ProjectID, &item.Title, &item.Problem, &item.Summary, &item.Content, &item.Procedure,
 		&item.ValidationEvidence, &item.TaskType, &item.Language, &item.Tags, &item.Status, &item.SourceGenerationID,
-		&item.Version, &item.CreatedAt, &approvedAt)
+		&item.WorkflowID, &item.WorkflowStepID, &item.Version, &item.CreatedAt, &approvedAt)
 	if err != nil {
 		return domain.KnowledgeItem{}, fmt.Errorf("create knowledge candidate: %w", err)
 	}
@@ -96,14 +97,14 @@ func (r *Repository) RecordGeneration(ctx context.Context, capture domain.Genera
 }
 
 const knowledgeColumns = `id::text,project_id,title,problem,summary,content,procedure,validation_evidence,task_type,language,tags,status,
-	COALESCE(source_generation_id::text,''),version,created_at,approved_at`
+	COALESCE(source_generation_id::text,''),COALESCE(workflow_id::text,''),COALESCE(workflow_step_id::text,''),version,created_at,approved_at`
 
 func scanKnowledge(row pgx.Row) (domain.KnowledgeItem, error) {
 	var item domain.KnowledgeItem
 	var approvedAt *time.Time
 	err := row.Scan(&item.ID, &item.ProjectID, &item.Title, &item.Problem, &item.Summary, &item.Content,
 		&item.Procedure, &item.ValidationEvidence, &item.TaskType, &item.Language, &item.Tags, &item.Status,
-		&item.SourceGenerationID, &item.Version, &item.CreatedAt, &approvedAt)
+		&item.SourceGenerationID, &item.WorkflowID, &item.WorkflowStepID, &item.Version, &item.CreatedAt, &approvedAt)
 	if approvedAt != nil {
 		item.ApprovedAt = *approvedAt
 	}
@@ -161,7 +162,7 @@ func (r *Repository) SearchApprovedLexical(ctx context.Context, projectID, query
 		var approvedAt *time.Time
 		if err := rows.Scan(&hit.ID, &hit.ProjectID, &hit.Title, &hit.Problem, &hit.Summary, &hit.Content,
 			&hit.Procedure, &hit.ValidationEvidence, &hit.TaskType, &hit.Language, &hit.Tags, &hit.Status,
-			&hit.SourceGenerationID, &hit.Version, &hit.CreatedAt, &approvedAt, &hit.Score); err != nil {
+			&hit.SourceGenerationID, &hit.WorkflowID, &hit.WorkflowStepID, &hit.Version, &hit.CreatedAt, &approvedAt, &hit.Score); err != nil {
 			return nil, err
 		}
 		if approvedAt != nil {
@@ -257,10 +258,10 @@ func (r *Repository) RecordReview(ctx context.Context, review domain.ReviewRecor
 	}
 	if _, err := tx.Exec(ctx, `INSERT INTO review_records(
 		id,knowledge_id,reviewer,provider,model,verdict,comments,improved_content,
-		review_artifact_sha256,context_manifest_artifact_sha256
-	  ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,NULLIF($9,''),NULLIF($10,''))`, review.ID, review.KnowledgeID, review.Reviewer,
+		review_artifact_sha256,context_manifest_artifact_sha256,workflow_id,workflow_step_id
+	  ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,NULLIF($9,''),NULLIF($10,''),NULLIF($11,'')::uuid,NULLIF($12,'')::uuid)`, review.ID, review.KnowledgeID, review.Reviewer,
 		review.Provider, review.Model, review.Verdict, review.Comments, review.ImprovedContent,
-		review.ReviewArtifact.SHA256, review.ContextManifestArtifact.SHA256); err != nil {
+		review.ReviewArtifact.SHA256, review.ContextManifestArtifact.SHA256, review.WorkflowID, review.WorkflowStepID); err != nil {
 		return err
 	}
 	if review.Verdict == "revise" && review.ImprovedContent != "" {

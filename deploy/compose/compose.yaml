@@ -13,12 +13,32 @@ x-platform-environment: &platform-environment
   MILVUS_COLLECTION: approved_knowledge_v1
   SEARCH_LEXICAL_FALLBACK: ${SEARCH_LEXICAL_FALLBACK:-true}
   AUTO_APPROVE_LOCAL: ${AUTO_APPROVE_LOCAL:-false}
+  AUTHORIZATION_MODE: ${AUTHORIZATION_MODE:-cerbos}
+  CERBOS_ADDRESS: cerbos:3593
+  CERBOS_REQUEST_TIMEOUT: ${CERBOS_REQUEST_TIMEOUT:-2s}
+  AUTH_TOKEN: ${AUTH_TOKEN:?set AUTH_TOKEN in .env}
   CODEGRAPH_ENABLED: "false"
   CODEGRAPH_MAX_FILES: ${CODEGRAPH_MAX_FILES:-5000}
   CODEGRAPH_MAX_ENTITIES: ${CODEGRAPH_MAX_ENTITIES:-200000}
   CODEGRAPH_MAX_RELATIONS: ${CODEGRAPH_MAX_RELATIONS:-1000000}
 
 services:
+  cerbos:
+    image: ghcr.io/cerbos/cerbos:0.54.0@sha256:211c261f6031675522a35c6055b13fd719c4aff13747307e4bcb6907326537ef
+    command: ["server", "--config=/config/config.yaml"]
+    environment:
+      CERBOS_NO_TELEMETRY: "1"
+    volumes:
+      - ../../policies/cerbos:/policies:ro
+      - ../cerbos/config.yaml:/config/config.yaml:ro
+      - cerbos-audit:/var/lib/cerbos/audit
+    healthcheck:
+      test: ["CMD", "cerbos", "healthcheck", "--config=/config/config.yaml"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
   postgres:
     image: postgres:17.10-alpine3.24
     environment:
@@ -161,6 +181,8 @@ services:
       MCP_TRANSPORT: http
       AUTH_MODE: token
       AUTH_TOKEN: ${AUTH_TOKEN:?set AUTH_TOKEN in .env}
+      CONTROLLER_AUTH_TOKEN: ${CONTROLLER_AUTH_TOKEN:?set CONTROLLER_AUTH_TOKEN in .env}
+      CONTROLLER_AUTH_PROJECTS: ${CONTROLLER_AUTH_PROJECTS:-*}
       CODEGRAPH_ENABLED: "true"
       CODEGRAPH_ALLOWED_ROOTS: /workspace
     ports:
@@ -169,6 +191,8 @@ services:
       - artifact-data:/var/lib/hybrid-ai/artifacts
       - ${CODEGRAPH_HOST_ROOT:-../..}:/workspace:ro
     depends_on:
+      cerbos:
+        condition: service_healthy
       migrate:
         condition: service_completed_successfully
       milvus-init:
@@ -196,6 +220,7 @@ services:
     restart: unless-stopped
 
 volumes:
+  cerbos-audit:
   postgres-data:
   etcd-data:
   minio-data:

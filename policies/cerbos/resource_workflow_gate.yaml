@@ -1,0 +1,92 @@
+---
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  resource: workflow_gate
+  version: default
+  rules:
+    - name: human_plan_decision
+      actions: ["plan_decide"]
+      effect: EFFECT_ALLOW
+      roles: ["product_owner"]
+      condition:
+        match:
+          expr: >-
+            request.principal.attr.human == true &&
+            request.resource.attr.gate == "plan_approval" &&
+            request.resource.attr.workflow_state == "awaiting_plan_approval" &&
+            request.resource.attr.evidence_present == true &&
+            request.principal.attr.project_ids.exists(project_id,
+              project_id == "*" || project_id == request.resource.attr.project_id) &&
+            (!request.resource.attr.distinct_principal_required ||
+              !request.resource.attr.prior_actor_ids.exists(actor_id,
+                actor_id == request.principal.id))
+
+    - name: human_qa_decision
+      actions: ["qa_decide"]
+      effect: EFFECT_ALLOW
+      roles: ["qa"]
+      condition:
+        match:
+          expr: >-
+            request.principal.attr.human == true &&
+            request.resource.attr.gate == "qa" &&
+            request.resource.attr.workflow_state == "awaiting_human_qa" &&
+            request.resource.attr.evidence_present == true &&
+            request.principal.attr.project_ids.exists(project_id,
+              project_id == "*" || project_id == request.resource.attr.project_id) &&
+            (!request.resource.attr.distinct_principal_required ||
+              !request.resource.attr.prior_actor_ids.exists(actor_id,
+                actor_id == request.principal.id))
+
+    - name: human_product_decision
+      actions: ["product_decide"]
+      effect: EFFECT_ALLOW
+      roles: ["product_owner"]
+      condition:
+        match:
+          expr: >-
+            request.principal.attr.human == true &&
+            request.resource.attr.gate == "product_approval" &&
+            request.resource.attr.workflow_state == "awaiting_product_approval" &&
+            request.resource.attr.evidence_present == true &&
+            request.principal.attr.project_ids.exists(project_id,
+              project_id == "*" || project_id == request.resource.attr.project_id) &&
+            (!request.resource.attr.distinct_principal_required ||
+              !request.resource.attr.prior_actor_ids.exists(actor_id,
+                actor_id == request.principal.id))
+
+    - name: human_disclosure_decision
+      actions: ["disclosure_decide"]
+      effect: EFFECT_ALLOW
+      roles: ["product_owner"]
+      condition:
+        match:
+          expr: >-
+            request.principal.attr.human == true &&
+            request.resource.attr.gate == "confidential_disclosure" &&
+            request.resource.attr.workflow_state == "awaiting_disclosure_approval" &&
+            request.resource.attr.scanner_passed == true &&
+            request.resource.attr.export_permitted == true &&
+            request.principal.attr.project_ids.exists(project_id,
+              project_id == "*" || project_id == request.resource.attr.project_id) &&
+            (!request.resource.attr.distinct_principal_required ||
+              !request.resource.attr.prior_actor_ids.exists(actor_id,
+                actor_id == request.principal.id))
+
+    - name: human_operations_decision
+      actions: ["operations_decide"]
+      effect: EFFECT_ALLOW
+      roles: ["operations"]
+      condition:
+        match:
+          expr: >-
+            request.principal.attr.human == true &&
+            request.resource.attr.gate == "maintenance_action" &&
+            request.resource.attr.workflow_state == "awaiting_operations_approval" &&
+            request.resource.attr.local_only == true &&
+            request.resource.attr.rollback_present == true &&
+            request.principal.attr.project_ids.exists(project_id,
+              project_id == "*" || project_id == request.resource.attr.project_id) &&
+            (!request.resource.attr.distinct_principal_required ||
+              !request.resource.attr.prior_actor_ids.exists(actor_id,
+                actor_id == request.principal.id))

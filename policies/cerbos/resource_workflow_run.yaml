@@ -1,0 +1,80 @@
+---
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  resource: workflow_run
+  version: default
+  variables:
+    local:
+      localProject: >-
+        request.principal.attr.project_ids.exists(project_id,
+          project_id == "*" || project_id == request.resource.attr.project_id)
+  rules:
+    - name: create_workflow
+      actions: ["create"]
+      effect: EFFECT_ALLOW
+      roles: ["controller", "development", "product_owner", "operations"]
+      condition:
+        match:
+          expr: V.localProject
+
+    - name: read_workflow
+      actions: ["read"]
+      effect: EFFECT_ALLOW
+      roles: ["controller", "development", "qa", "product_owner", "operations"]
+      condition:
+        match:
+          expr: V.localProject
+
+    - name: controller_transition
+      actions: ["transition"]
+      effect: EFFECT_ALLOW
+      roles: ["controller"]
+      condition:
+        match:
+          expr: V.localProject
+
+    - name: development_transition
+      actions: ["transition"]
+      effect: EFFECT_ALLOW
+      roles: ["development"]
+      condition:
+        match:
+          expr: >-
+            V.localProject &&
+            request.resource.attr.event in [
+              "CLASSIFIED", "READY", "PLAN_APPROVAL_REQUESTED",
+              "IMPLEMENTATION_STARTED", "IMPLEMENTATION_COMPLETED", "IMPLEMENTATION_FAILED",
+              "VERIFICATION_PASSED", "VERIFICATION_FAILED", "REVISION_REQUESTED"
+            ]
+
+    - name: qa_coordination_transition
+      actions: ["transition"]
+      effect: EFFECT_ALLOW
+      roles: ["qa"]
+      condition:
+        match:
+          expr: >-
+            V.localProject &&
+            request.resource.attr.event in ["HUMAN_QA_REQUESTED", "REVISION_REQUESTED"]
+
+    - name: product_coordination_transition
+      actions: ["transition"]
+      effect: EFFECT_ALLOW
+      roles: ["product_owner"]
+      condition:
+        match:
+          expr: >-
+            V.localProject &&
+            request.resource.attr.event in [
+              "POLICY_REJECTED", "PRODUCT_APPROVAL_REQUESTED", "PROMOTION_COMPLETED"
+            ]
+
+    - name: operations_cancel_transition
+      actions: ["transition"]
+      effect: EFFECT_ALLOW
+      roles: ["operations"]
+      condition:
+        match:
+          expr: >-
+            V.localProject &&
+            request.resource.attr.event in ["CANCEL_REQUESTED", "CANCELLED", "BLOCKED", "FAILED"]

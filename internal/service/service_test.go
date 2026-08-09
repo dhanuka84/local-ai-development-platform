@@ -21,9 +21,41 @@ type fakeRepository struct {
 	upsertRelation domain.RepositoryRelation
 	codeSnapshot   codegraph.Snapshot
 	codeEntities   []domain.CodeEntity
+	workflow       domain.WorkflowRun
+	workflowEvent  domain.WorkflowEvent
+	transition     domain.WorkflowTransition
+	transitioned   bool
 }
 
 func (f *fakeRepository) Ping(context.Context) error { return nil }
+func (f *fakeRepository) BootstrapPrincipals(context.Context, []domain.PrincipalBootstrap) error {
+	return nil
+}
+func (f *fakeRepository) AuthenticatePrincipal(context.Context, []byte) (domain.Principal, error) {
+	return domain.Principal{}, nil
+}
+func (f *fakeRepository) CreateWorkflow(_ context.Context, run domain.WorkflowRun, event domain.WorkflowEvent) (domain.WorkflowRun, error) {
+	f.workflow, f.workflowEvent = run, event
+	if f.workflow.Governance.Profile == "" {
+		f.workflow.Governance = domain.GovernancePolicy{ProjectID: run.ProjectID, Profile: domain.GovernanceSolo, AllowRoleOverlap: true}
+	}
+	return f.workflow, nil
+}
+func (f *fakeRepository) GetWorkflow(context.Context, string) (domain.WorkflowRun, error) {
+	return f.workflow, nil
+}
+func (f *fakeRepository) TransitionWorkflow(_ context.Context, transition domain.WorkflowTransition) (domain.WorkflowRun, domain.WorkflowEvent, error) {
+	f.transition, f.transitioned = transition, true
+	f.workflow.State = transition.ResultingState
+	f.workflow.Version++
+	if transition.SetImplementedBy {
+		f.workflow.ImplementedBy = transition.Event.ActorPrincipalID
+	}
+	if transition.SetQAValidatedBy {
+		f.workflow.QAValidatedBy = transition.Event.ActorPrincipalID
+	}
+	return f.workflow, transition.Event, nil
+}
 func (f *fakeRepository) RecordGeneration(_ context.Context, capture domain.GenerationCapture) (domain.KnowledgeItem, error) {
 	f.recorded = capture
 	return domain.KnowledgeItem{ID: "candidate", ProjectID: capture.ProjectID, Status: domain.CandidatePending}, nil

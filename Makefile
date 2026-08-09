@@ -5,9 +5,10 @@ MCP_URL := $(MCP_BASE_URL)/mcp
 PROJECT ?=
 LIMIT ?= 25
 ID ?=
-ACTOR ?=
+CERBOS_IMAGE ?= ghcr.io/cerbos/cerbos:0.54.0@sha256:211c261f6031675522a35c6055b13fd719c4aff13747307e4bcb6907326537ef
+OPENCLAW_PLUGIN_DIR := automation/openclaw-plugin
 
-.PHONY: help help-operations help-development help-qa help-product-owner env-init mcp-preflight preflight fmt check test build migrate milvus-init doctor reindex candidate-list candidate-get candidate-approve candidate-reject up up-gpu down logs mcp-start mcp-start-gpu mcp-status mcp-logs mcp-stop codex-login codex-check codex codex-repo workpacket-build workpacket-evaluate workpacket-verify diagram-review-loop pull-local-model clean ops-start ops-start-gpu ops-status ops-logs ops-stop ops-doctor ops-reindex dev-session dev-session-repo dev-policy-check dev-patch-verify dev-check qa-session qa-session-repo qa-patch-verify qa-check qa-candidates qa-candidate-get po-candidates po-candidate-get po-approve po-reject
+.PHONY: help help-operations help-development help-qa help-product-owner env-init mcp-preflight preflight fmt check check-all test build migrate milvus-init doctor reindex candidate-list candidate-get candidate-approve candidate-reject up up-gpu down logs mcp-start mcp-start-gpu mcp-status mcp-logs mcp-stop codex-login codex-check codex codex-repo workpacket-build workpacket-evaluate workpacket-verify authz-policy-test contracts-check openclaw-plugin-deps openclaw-plugin-check openclaw-config-check openclaw-plugin-build openclaw-plugin-install openclaw-plugin-doctor openclaw-start diagram-review-loop diagram-agentic-workflow pull-local-model clean ops-start ops-start-gpu ops-status ops-logs ops-stop ops-doctor ops-reindex dev-session dev-session-repo dev-policy-check dev-patch-verify dev-check dev-authz-policy-test qa-session qa-session-repo qa-patch-verify qa-check qa-authz-policy-test qa-candidates qa-candidate-get po-candidates po-candidate-get po-approve po-reject
 
 help: ## Show all commands plus role-specific workflow guides
 	@printf '%s\n' \
@@ -26,9 +27,11 @@ help-operations: ## Show the Operations workflow and commands
 		'One-time setup:' \
 		'  1. make env-init' \
 		'  2. Review .env and CODEGRAPH_HOST_ROOT' \
-		'  3. make mcp-preflight' \
-		'  4. make ops-start-gpu       # or: make ops-start' \
-		'  5. make pull-local-model' \
+		'  3. make openclaw-plugin-deps openclaw-plugin-build' \
+		'  4. make openclaw-plugin-install' \
+		'  5. make mcp-preflight' \
+		'  6. make ops-start-gpu       # or: make ops-start' \
+		'  7. make pull-local-model' \
 		'' \
 		'Each platform session:' \
 		'  1. make ops-start-gpu       # or: make ops-start' \
@@ -54,7 +57,8 @@ help-development: ## Show the Development workflow and commands
 		'  4. Implement locally or through Codex' \
 		'  5. make dev-patch-verify PACKET=... PATCH=...' \
 		'  6. make dev-check' \
-		'  7. Use generation_capture; hand candidate ID to QA'
+		'  7. make dev-authz-policy-test # when authorization policies change' \
+		'  8. Use generation_capture; hand candidate ID to QA'
 
 help-qa: ## Show the QA workflow and commands
 	@printf '%s\n' \
@@ -65,10 +69,11 @@ help-qa: ## Show the QA workflow and commands
 		'  3. make qa-session-repo REPO=/absolute/path' \
 		'  4. make qa-patch-verify PACKET=... PATCH=...' \
 		'  5. make qa-check' \
-		'  6. Record independent findings with review_record through MCP' \
-		'  7. Hand technically validated candidate ID to Product Owner' \
+		'  6. make qa-authz-policy-test  # when authorization policies change' \
+		'  7. Record independent findings with review_record through MCP' \
+		'  8. Hand technically validated candidate ID to Product Owner' \
 		'' \
-		'Note: role separation is procedural locally; MCP RBAC is enterprise work.'
+		'Note: one person may perform every role; each gate still records its acting role.'
 
 help-product-owner: ## Show the Product Owner workflow and commands
 	@printf '%s\n' \
@@ -77,8 +82,8 @@ help-product-owner: ## Show the Product Owner workflow and commands
 		'  1. make po-candidates PROJECT=<project> LIMIT=25' \
 		'  2. make po-candidate-get ID=<candidate-uuid>' \
 		'  3. Confirm QA evidence, applicability, and business acceptance' \
-		'  4. make po-approve ID=<candidate-uuid> ACTOR=<identity>' \
-		'     or: make po-reject ID=<candidate-uuid> ACTOR=<identity>' \
+		'  4. make po-approve ID=<candidate-uuid>' \
+		'     or: make po-reject ID=<candidate-uuid>' \
 		'  5. Operations monitors outbox/index completion'
 
 env-init: ## Create .env with random local secrets; never overwrites an existing file
@@ -89,10 +94,12 @@ env-init: ## Create .env with random local secrets; never overwrites an existing
 	env_tmp=$$(mktemp .env.tmp.XXXXXX); \
 	trap 'rm -f "$$env_tmp"' 0 1 2 3 15; \
 	auth_token_value=$$(openssl rand -hex 32); \
+	controller_auth_token_value=$$(openssl rand -hex 32); \
 	postgres_password_value=$$(openssl rand -hex 32); \
 	workspace_root=$$(pwd -P); \
 	sed \
 		-e "s|^AUTH_TOKEN=CHANGE_ME.*|AUTH_TOKEN=$$auth_token_value|" \
+		-e "s|^CONTROLLER_AUTH_TOKEN=CHANGE_ME.*|CONTROLLER_AUTH_TOKEN=$$controller_auth_token_value|" \
 		-e "s|^POSTGRES_PASSWORD=CHANGE_ME.*|POSTGRES_PASSWORD=$$postgres_password_value|" \
 		-e "s|^CODEGRAPH_HOST_ROOT=.*|CODEGRAPH_HOST_ROOT=$$workspace_root|" \
 		.env.example > "$$env_tmp"; \
@@ -106,8 +113,11 @@ mcp-preflight: ## Validate local tools, .env secrets, and Compose configuration
 	@command -v git >/dev/null 2>&1 || { echo "git is required" >&2; exit 1; }
 	@test -f .env || { echo "missing .env; run 'make env-init'" >&2; exit 1; }
 	@auth_token_value=$$(sed -n 's/^[[:space:]]*AUTH_TOKEN[[:space:]]*=[[:space:]]*//p' .env | tail -n 1); \
+	controller_auth_token_value=$$(sed -n 's/^[[:space:]]*CONTROLLER_AUTH_TOKEN[[:space:]]*=[[:space:]]*//p' .env | tail -n 1); \
 	postgres_password_value=$$(sed -n 's/^[[:space:]]*POSTGRES_PASSWORD[[:space:]]*=[[:space:]]*//p' .env | tail -n 1); \
 	case "$$auth_token_value" in ""|CHANGE_ME*) echo "set a real AUTH_TOKEN in .env" >&2; exit 1;; esac; \
+	case "$$controller_auth_token_value" in ""|CHANGE_ME*) echo "set a real CONTROLLER_AUTH_TOKEN in .env" >&2; exit 1;; esac; \
+	test "$$auth_token_value" != "$$controller_auth_token_value" || { echo "AUTH_TOKEN and CONTROLLER_AUTH_TOKEN must differ" >&2; exit 1; }; \
 	case "$$postgres_password_value" in ""|CHANGE_ME*) echo "set a real POSTGRES_PASSWORD in .env" >&2; exit 1;; esac
 	@docker compose version >/dev/null
 	@$(COMPOSE) config --quiet
@@ -122,6 +132,43 @@ check: ## Run formatting, vet, and unit tests
 	test -z "$$(gofmt -l cmd components internal migrations)"
 	go vet ./...
 	go test -race ./...
+
+check-all: check authz-policy-test contracts-check openclaw-plugin-check openclaw-config-check ## Run Go, Cerbos, contracts, and OpenClaw checks
+
+authz-policy-test: ## Compile and test the Cerbos policy-as-code contract
+	docker run --rm -v "$(CURDIR)/policies/cerbos:/policies:ro" $(CERBOS_IMAGE) compile /policies
+
+contracts-check: ## Parse every versioned workflow JSON Schema
+	@command -v jq >/dev/null 2>&1 || { echo "jq is required" >&2; exit 1; }
+	@for schema in contracts/workflow/v1/*.schema.json; do jq empty "$$schema" >/dev/null; done
+
+openclaw-plugin-deps: ## Install the pinned OpenClaw controller plugin dependencies
+	cd $(OPENCLAW_PLUGIN_DIR) && npm ci --ignore-scripts
+
+openclaw-plugin-check: ## Type-check/test the controller and validate its OpenClaw metadata
+	cd $(OPENCLAW_PLUGIN_DIR) && npm run check
+	cd $(OPENCLAW_PLUGIN_DIR) && npx openclaw plugins build --root . --check
+	cd $(OPENCLAW_PLUGIN_DIR) && npx openclaw plugins validate --root .
+	cd $(OPENCLAW_PLUGIN_DIR) && npm audit --omit=dev
+
+openclaw-config-check: ## Validate the example against the pinned OpenClaw config schema
+	cd $(OPENCLAW_PLUGIN_DIR) && CONTROLLER_AUTH_TOKEN=validation-only \
+		OPENCLAW_STATE_DIR="$(CURDIR)/$(OPENCLAW_PLUGIN_DIR)/node_modules/.config-check" \
+		OPENCLAW_CONFIG_PATH="$(CURDIR)/examples/openclaw/openclaw.validation.json5" \
+		npx openclaw config validate
+
+openclaw-plugin-build: ## Build the installable OpenClaw controller runtime
+	cd $(OPENCLAW_PLUGIN_DIR) && npm run build
+
+openclaw-plugin-install: openclaw-plugin-build ## Install/update the local OpenClaw controller plugin
+	openclaw plugins install ./$(OPENCLAW_PLUGIN_DIR)
+
+openclaw-plugin-doctor: ## Inspect OpenClaw plugin load/configuration problems
+	openclaw plugins doctor
+
+openclaw-start: mcp-preflight openclaw-plugin-build ## Start OpenClaw with the non-human controller credential
+	@controller_auth_token_value=$$(sed -n 's/^[[:space:]]*CONTROLLER_AUTH_TOKEN[[:space:]]*=[[:space:]]*//p' .env | tail -n 1); \
+	CONTROLLER_AUTH_TOKEN="$$controller_auth_token_value" exec openclaw gateway
 
 test: ## Run unit tests
 	go test ./...
@@ -154,15 +201,13 @@ candidate-get: mcp-preflight ## Fetch one candidate including pending content; r
 	@test -n "$(ID)" || { echo "usage: make candidate-get ID=<candidate-uuid>" >&2; exit 1; }
 	$(COMPOSE) run --rm migrate get "$(ID)"
 
-candidate-approve: mcp-preflight ## Approve a QA-validated candidate; requires ID and ACTOR
+candidate-approve: mcp-preflight ## Approve a QA-validated candidate as the authenticated local Product Owner
 	@test -n "$(ID)" || { echo "ID is required" >&2; exit 1; }
-	@test -n "$(ACTOR)" || { echo "usage: make candidate-approve ID=<uuid> ACTOR=<accountable-identity>" >&2; exit 1; }
-	$(COMPOSE) run --rm migrate approve "$(ID)" "$(ACTOR)"
+	$(COMPOSE) run --rm migrate approve "$(ID)"
 
-candidate-reject: mcp-preflight ## Reject a candidate; requires ID and ACTOR
+candidate-reject: mcp-preflight ## Reject a candidate as the authenticated local Product Owner
 	@test -n "$(ID)" || { echo "ID is required" >&2; exit 1; }
-	@test -n "$(ACTOR)" || { echo "usage: make candidate-reject ID=<uuid> ACTOR=<accountable-identity>" >&2; exit 1; }
-	$(COMPOSE) run --rm migrate reject "$(ID)" "$(ACTOR)"
+	$(COMPOSE) run --rm migrate reject "$(ID)"
 
 up: ## Start the local CPU stack
 	$(COMPOSE) up --build -d
@@ -245,6 +290,10 @@ diagram-review-loop: ## Render the review-learning Mermaid diagram as SVG and hi
 	npx -y @mermaid-js/mermaid-cli@11.16.0 -p docs/diagrams/puppeteer-config.json -i docs/diagrams/hybrid-ai-review-learning-loop.mmd -o docs/diagrams/hybrid-ai-review-learning-loop.svg -b '#ffffff'
 	npx -y @mermaid-js/mermaid-cli@11.16.0 -p docs/diagrams/puppeteer-config.json -i docs/diagrams/hybrid-ai-review-learning-loop.mmd -o docs/diagrams/hybrid-ai-review-learning-loop.png -b '#ffffff' -w 6400 -s 2
 
+diagram-agentic-workflow: ## Render the OpenClaw/Cerbos workflow as SVG and high-resolution PNG
+	npx -y @mermaid-js/mermaid-cli@11.16.0 -p docs/diagrams/puppeteer-config.json -i docs/diagrams/openclaw-agentic-automation-workflow.mmd -o docs/diagrams/openclaw-agentic-automation-workflow.svg -b '#ffffff'
+	npx -y @mermaid-js/mermaid-cli@11.16.0 -p docs/diagrams/puppeteer-config.json -i docs/diagrams/openclaw-agentic-automation-workflow.mmd -o docs/diagrams/openclaw-agentic-automation-workflow.png -b '#ffffff' -w 6400 -s 2
+
 pull-local-model: ## Pull the recommended GBX100 coding model
 	docker compose --env-file .env -f deploy/compose/compose.yaml exec ollama ollama pull "$${LOCAL_CHAT_MODEL:-qwen3.6:35b}"
 
@@ -267,6 +316,7 @@ dev-session-repo: codex-repo ## [Development] Start Codex in REPO with local MCP
 dev-policy-check: workpacket-evaluate ## [Development] Evaluate PACKET policy
 dev-patch-verify: workpacket-verify ## [Development] Verify PATCH using PACKET
 dev-check: check ## [Development] Run formatting, vet, and race tests
+dev-authz-policy-test: authz-policy-test ## [Development] Compile and test Cerbos policies
 
 # QA aliases. QA records its decision with review_record through MCP; these
 # commands do not perform final knowledge approval.
@@ -274,12 +324,13 @@ qa-session: codex ## [QA] Start an MCP-connected Codex validation session
 qa-session-repo: codex-repo ## [QA] Start validation in REPO
 qa-patch-verify: workpacket-verify ## [QA] Independently verify PATCH using PACKET
 qa-check: check ## [QA] Run the repository verification suite
+qa-authz-policy-test: authz-policy-test ## [QA] Independently test Cerbos policies
 qa-candidates: candidate-list ## [QA] List pending candidates
 qa-candidate-get: candidate-get ## [QA] Read one pending candidate
 
-# Product Owner aliases. Final decisions remain explicit and require the
-# accountable actor identity on every invocation.
+# Product Owner aliases. Final decisions remain explicit and derive the
+# accountable human identity from AUTH_TOKEN on every invocation.
 po-candidates: candidate-list ## [Product Owner] List pending candidates
 po-candidate-get: candidate-get ## [Product Owner] Read one pending candidate
-po-approve: candidate-approve ## [Product Owner] Approve ID as ACTOR
-po-reject: candidate-reject ## [Product Owner] Reject ID as ACTOR
+po-approve: candidate-approve ## [Product Owner] Approve ID as authenticated human
+po-reject: candidate-reject ## [Product Owner] Reject ID as authenticated human

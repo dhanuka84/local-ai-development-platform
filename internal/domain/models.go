@@ -14,6 +14,8 @@ const (
 type GenerationCapture struct {
 	ID                 string
 	ProjectID          string
+	WorkflowID         string
+	WorkflowStepID     string
 	SessionID          string
 	TaskType           string
 	Prompt             string
@@ -42,6 +44,8 @@ type Artifact struct {
 type KnowledgeItem struct {
 	ID                 string    `json:"id"`
 	ProjectID          string    `json:"project_id"`
+	WorkflowID         string    `json:"workflow_id,omitempty"`
+	WorkflowStepID     string    `json:"workflow_step_id,omitempty"`
 	Title              string    `json:"title"`
 	Problem            string    `json:"problem"`
 	Summary            string    `json:"summary"`
@@ -88,6 +92,8 @@ type VectorHit struct {
 type ReviewRecord struct {
 	ID                      string
 	KnowledgeID             string
+	WorkflowID              string
+	WorkflowStepID          string
 	Reviewer                string
 	Provider                string
 	Model                   string

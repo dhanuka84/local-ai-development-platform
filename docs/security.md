@@ -11,13 +11,21 @@
 
 Never send secrets, tokens, private keys, credential stores, personal data, production database dumps, raw customer payloads, or unrestricted private repositories to a cloud model. Cloud review packages should contain only the problem, minimal sanitized diff/snippets, relevant approved guidance, validation results, and the precise review question.
 
-Maintenance is fail-closed local: the OpenClaw `maintenance` agent uses an `ollama/*` allowlist and empty fallbacks. Do not place Kimi/OpenAI credentials in that agent's auth store or environment.
+Maintenance is fail-closed local: the OpenClaw `maintenance` agent has a
+one-model per-agent allowlist and empty fallbacks, so stored session overrides
+cannot select a cloud model. Do not place Kimi/OpenAI credentials in that
+agent's auth store or environment.
 
 ## Implemented controls
 
 - All Compose ports bind to loopback.
 - HTTP MCP requires a bearer token; unauthenticated mode is restricted to `APP_ENV=local`.
-- Tokens come from environment variables and are not stored in example configuration.
+- The default local human principal has Development, QA, Product Owner, and
+  Operations roles for all projects, so one developer can operate every gate.
+- OpenClaw uses a separate non-human controller credential that cannot cross
+  QA or Product Owner human gates. The two local tokens must differ.
+- Tokens come from environment variables, are stored only as SHA-256 hashes in
+  PostgreSQL, and are not stored as plaintext in example configuration.
 - Origin protection, body limits, server timeouts, and constant-time token comparison are enabled.
 - Worker/admin and production gateway images are static and non-root. The local analyzer-enabled gateway is non-root but includes Git and Go because `go/packages` needs the toolchain.
 - Artifacts use SHA-256 addressing, atomic publication, and mode `0600`.
@@ -30,12 +38,20 @@ Maintenance is fail-closed local: the OpenClaw `maintenance` agent uses an `olla
 - PostgreSQL outbox transactions prevent an approval without a durable indexing request.
 - Code analysis resolves symlinks, enforces explicit filesystem roots and size caps, checks revisions, and rejects dirty worktrees by default.
 
+Local bearer credentials authenticate distinct principals. Cerbos is the
+internal contextual policy decision point. The Go gateway remains the
+enforcement point, constructs trusted principal/resource context from
+authentication and PostgreSQL, fails protected actions closed, and records the
+Cerbos decision correlation with workflow events.
+
 ## Production requirements
 
 Before internet or enterprise exposure, add:
 
 - TLS and an OAuth 2.1/OIDC-aware API gateway.
 - Per-user/workload identities, scopes, audit subject propagation, and short-lived credentials.
+- Highly available internal Cerbos PDPs with pinned policy bundles, tested
+  policy-as-code, decision-log retention, and fail-closed enforcement.
 - Managed secrets/KMS; never plain Kubernetes Secrets as the only control.
 - NetworkPolicies and egress denial, especially for maintenance workloads.
 - PostgreSQL TLS, row-level/tenant isolation where needed, PITR, and encrypted storage.
@@ -54,7 +70,9 @@ Before internet or enterprise exposure, add:
 | Sensitive context hidden in a review artifact | Minimize and scan before cloud export; encrypt artifact storage, restrict evidence access, and apply retention/deletion policy independently of approved knowledge. |
 | Reviewer response cannot be tied to disclosed input | Store the exact response and JSON context manifest by SHA-256 on the same PostgreSQL review record. |
 | Stale/deleted vector result | PostgreSQL hydration and approved-status check. |
-| Agent self-publishes its output | Write-tool prompts and accountable actor; organizational policy must enforce actor identity at the gateway. |
+| Agent self-publishes its output | A separate non-human controller credential, human-only Cerbos gates, authenticated actor derivation, and explicit approval prompts. |
+| Agent claims another role or changes governance context | Derive identity from authentication, load role/resource facts from PostgreSQL, evaluate Cerbos server-side, and never trust model-supplied authorization attributes. |
+| Cerbos is unavailable or returns an unreadable decision | Fail protected writes closed; preserve workflow state and expose a retryable operational error. |
 | Repository graph poisoning | Evidence required, constrained edge vocabulary, prompted upsert, SQL authority. |
 | Repository prompt injection changes graph truth | Compiler-aware extraction is authoritative; OpenClaw/LLM interpretations are stored only as reviewable knowledge candidates. |
 | Analyzer reads unrelated host files | Read-only narrow bind mount plus canonical-path allowlist; never mount a home directory or filesystem root. |

@@ -1,0 +1,40 @@
+{
+  "name": "@hybrid-ai/openclaw-workflow-controller",
+  "version": "0.1.0",
+  "private": true,
+  "description": "OpenClaw managed Task Flow adapter for the Hybrid AI PostgreSQL workflow authority",
+  "type": "module",
+  "files": [
+    "dist",
+    "openclaw.plugin.json"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc -p tsconfig.json --noEmit && vitest run"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "typebox": "1.3.11"
+  },
+  "devDependencies": {
+    "openclaw": "2026.7.1-2",
+    "typescript": "7.0.2",
+    "vitest": "4.1.10"
+  },
+  "peerDependencies": {
+    "openclaw": ">=2026.7.1 <2027"
+  },
+  "peerDependenciesMeta": {
+    "openclaw": {
+      "optional": true
+    }
+  },
+  "openclaw": {
+    "extensions": [
+      "./src/index.ts"
+    ],
+    "runtimeExtensions": [
+      "./dist/index.js"
+    ]
+  }
+}

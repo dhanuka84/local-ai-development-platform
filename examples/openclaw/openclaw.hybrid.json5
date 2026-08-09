@@ -1,6 +1,20 @@
 // Merge these sections into ~/.openclaw/openclaw.json after onboarding.
 // Secrets are environment references; do not replace them with literal keys in Git.
 {
+  plugins: {
+    entries: {
+      "hybrid-workflow-controller": {
+        enabled: true,
+        config: {
+          mcpUrl: "http://127.0.0.1:8080/mcp",
+          tokenEnv: "CONTROLLER_AUTH_TOKEN",
+          controllerAgentIds: ["workflow-coordinator"],
+          requestTimeoutMs: 30000
+        }
+      }
+    }
+  },
+
   models: {
     mode: "merge",
     providers: {
@@ -25,10 +39,33 @@
   },
 
   agents: {
+    defaults: {
+      subagents: { maxSpawnDepth: 1 }
+    },
     list: [
       {
-        id: "developer",
+        id: "workflow-coordinator",
         default: true,
+        name: "Hybrid Workflow Coordinator",
+        workspace: "~/.openclaw/workspace-coordinator",
+        model: { primary: "ollama/qwen3.6:35b", fallbacks: [] },
+        subagents: {
+          requireAgentId: true,
+          allowAgents: ["developer", "qa", "cloud-review"]
+        },
+        tools: {
+          allow: [
+            "hybrid_workflow_start",
+            "hybrid_workflow_status",
+            "hybrid_workflow_transition",
+            "hybrid_workflow_cancel",
+            "sessions_spawn",
+            "lobster"
+          ]
+        }
+      },
+      {
+        id: "developer",
         name: "Hybrid Developer",
         workspace: "~/.openclaw/workspace-developer",
         model: { primary: "ollama/qwen3.6:35b", fallbacks: [] },
@@ -36,11 +73,21 @@
         tools: { profile: "coding" }
       },
       {
+        id: "qa",
+        name: "Independent Local QA",
+        workspace: "~/.openclaw/workspace-qa",
+        model: { primary: "ollama/qwen3.6:35b", fallbacks: [] },
+        sandbox: { mode: "all", scope: "agent", workspaceAccess: "ro" },
+        tools: { profile: "coding", deny: ["write", "edit", "apply_patch"] }
+      },
+      {
         id: "maintenance",
         name: "Local Maintenance",
         workspace: "~/.openclaw/workspace-maintenance",
         model: { primary: "ollama/qwen3.6:35b", fallbacks: [] },
-        modelPolicy: { allow: ["ollama/*"] },
+        // A non-empty per-agent model catalog is an allowlist. This prevents
+        // stored session overrides from switching maintenance to cloud.
+        models: { "ollama/qwen3.6:35b": {} },
         tools: { profile: "coding" }
       },
       {
@@ -59,7 +106,7 @@
       hybridKnowledge: {
         url: "http://127.0.0.1:8080/mcp",
         transport: "streamable-http",
-        headers: { Authorization: "Bearer ${HYBRID_AI_MCP_TOKEN}" },
+        headers: { Authorization: "Bearer ${CONTROLLER_AUTH_TOKEN}" },
         timeout: 120,
         connectTimeout: 10,
         supportsParallelToolCalls: true,
@@ -74,17 +121,15 @@
             "code_symbol_search",
             "code_graph_get",
             "code_repository_index",
-            "repository_relation_upsert",
             "generation_capture",
-            "review_record",
-            "knowledge_candidate_decide"
+            "workflow_run_get"
           ]
         },
         codex: {
           // Cloud review receives only the context explicitly delegated by the
           // developer; it cannot query the unrestricted local MCP graph.
           agents: ["developer", "maintenance"],
-          defaultToolsApprovalMode: "writes"
+          defaultToolsApprovalMode: "prompt"
         }
       }
     }

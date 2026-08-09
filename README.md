@@ -11,6 +11,11 @@ The repository implements:
 - Ollama for local embeddings and local coding inference.
 - Immutable SHA-256 prompt/output artifacts.
 - An asynchronous indexing worker and administrative CLI.
+- A versioned workflow state machine with authenticated principals, Cerbos
+  policy enforcement, immutable transition evidence, and optimistic/idempotent
+  transitions.
+- An OpenClaw controller plugin backed by managed Task Flows plus deterministic
+  Lobster workflow definitions.
 - An independent bounded-work contract and disposable-clone patch verifier for OpenClaw local execution.
 - Local Docker Compose deployment, Codex/OpenClaw examples, CI, and an enterprise migration path.
 
@@ -94,7 +99,9 @@ make help-product-owner
 
 Role-prefixed aliases such as `ops-start-gpu`, `dev-session-repo`,
 `qa-candidates`, and `po-approve` expose who owns an action without duplicating
-its implementation. Follow the complete [role workflows and handoffs](docs/role-workflows.md).
+its implementation. One person may perform all four roles in the `solo`
+governance profile; the role and evidence still change explicitly at every
+gate. Follow the complete [role workflows and handoffs](docs/role-workflows.md).
 
 ## Connect Codex
 
@@ -140,7 +147,8 @@ The STDIO alternative is in [examples/codex/config-stdio.toml](examples/codex/co
 
 ## Connect OpenClaw, Ollama, and Kimi
 
-This repository targets OpenClaw `2026.7.1` or newer.
+This repository pins and tests its controller plugin against OpenClaw
+`2026.7.1-2`.
 
 1. Configure local Ollama using its native URL—never `/v1` for OpenClaw tool calling:
 
@@ -162,21 +170,38 @@ This repository targets OpenClaw `2026.7.1` or newer.
    openclaw models set moonshot/kimi-k3
    ```
 
-3. Merge [examples/openclaw/openclaw.hybrid.json5](examples/openclaw/openclaw.hybrid.json5) into `~/.openclaw/openclaw.json`. It defines:
-
-   - `developer`: local primary model, permitted to delegate explicitly to cloud review.
-   - `maintenance`: local model only, empty fallbacks, and an `ollama/*` allowlist.
-   - `cloud-review`: Kimi K3 with a read-only sandbox.
-   - The MCP server with secret interpolation and a bounded tool list.
-
-4. Export the MCP token and verify live tool discovery:
+3. Build, verify, and install the local controller plugin:
 
    ```bash
-   export HYBRID_AI_MCP_TOKEN='the AUTH_TOKEN value from .env'
-   openclaw mcp doctor hybridKnowledge --probe
+   make openclaw-plugin-deps
+   make openclaw-plugin-check
+   make openclaw-plugin-install
    ```
 
-Current official references: [Kimi K3 in OpenClaw](https://platform.kimi.ai/docs/guide/use-kimi-in-openclaw), [OpenClaw Ollama provider](https://docs.openclaw.ai/providers/ollama), and [OpenClaw MCP](https://docs.openclaw.ai/cli/mcp).
+4. Merge [examples/openclaw/openclaw.hybrid.json5](examples/openclaw/openclaw.hybrid.json5) into `~/.openclaw/openclaw.json`. It defines:
+
+   - `workflow-coordinator`: the non-human managed-flow controller.
+   - `developer`: local primary model, permitted to delegate explicitly to cloud review.
+   - `qa`: local independent validation agent.
+   - `maintenance`: local model only, empty fallbacks, and a one-model
+     per-agent allowlist that prevents stored cloud-model overrides.
+   - `cloud-review`: Kimi K3 with a read-only sandbox.
+   - The MCP server using `CONTROLLER_AUTH_TOKEN` and a bounded tool list.
+
+5. Start OpenClaw in its own terminal. This loads only the non-human controller
+   credential from `.env`:
+
+   ```bash
+   make openclaw-start
+   ```
+
+The default local human credential remains `AUTH_TOKEN`. It represents
+`human:local-developer` with Development, QA, Product Owner, and Operations
+roles for every project, so one developer can perform the complete solo flow.
+OpenClaw never receives this credential and therefore cannot cross human QA or
+Product Owner gates.
+
+Current official references: [Kimi K3 in OpenClaw](https://platform.kimi.ai/docs/guide/use-kimi-in-openclaw), [OpenClaw Ollama provider](https://docs.openclaw.ai/providers/ollama), [managed Task Flows](https://docs.openclaw.ai/automation/taskflow), and [Lobster workflows](https://docs.openclaw.ai/tools/lobster).
 
 ## Bounded local work and review learning
 
@@ -241,8 +266,11 @@ Supported repository edge types are `depends_on`, `provides_api_to`, `deploys_wi
 ```text
 cmd/                 gateway, indexing worker, and admin CLI
 components/          code graph analyzer plus bounded-work policy/verifier
+automation/          OpenClaw controller plugin and Lobster workflows
+contracts/           versioned workflow JSON Schemas
 internal/            domain, services, PostgreSQL, Milvus, Ollama, MCP, HTTP
 migrations/          embedded transactional SQL migrations
+policies/            versioned Cerbos policies and allow/deny fixtures
 deploy/compose/      complete local stack and NVIDIA GPU overlay
 deploy/kubernetes/   enterprise application-layer Kustomize base
 examples/            Codex and OpenClaw configurations
@@ -252,7 +280,7 @@ docs/                architecture, implementation, security, operations, ADRs
 ## Development
 
 ```bash
-make check
+make check-all
 make build
 docker compose --env-file .env.example -f deploy/compose/compose.yaml config --quiet
 ```
@@ -279,6 +307,7 @@ See [enterprise-deployment.md](docs/enterprise-deployment.md) and the [enterpris
 - [Implementation guide](docs/implementation-guide.md)
 - [Remote review and local learning](docs/remote-review-learning.md)
 - [Role workflows and Make commands](docs/role-workflows.md)
+- [OpenClaw agentic automation design and implementation plan](docs/openclaw-agentic-automation-plan.md)
 - [Routing capability and benchmark scorecard](docs/cost-routing-evaluation.md)
 - [Operations runbook](docs/operations.md)
 - [Security model](docs/security.md)

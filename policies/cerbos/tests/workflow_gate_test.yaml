@@ -1,0 +1,219 @@
+---
+name: WorkflowGateGovernance
+description: Solo overlap is allowed while identity, project, human, and regulated gates remain enforced.
+
+principals:
+  solo_alice:
+    id: human:alice
+    roles: [development, qa, product_owner, operations]
+    attr:
+      human: true
+      project_ids: [project-a]
+
+  regulated_bob:
+    id: human:bob
+    roles: [product_owner]
+    attr:
+      human: true
+      project_ids: [project-a]
+
+  wrong_project_owner:
+    id: human:mallory
+    roles: [product_owner]
+    attr:
+      human: true
+      project_ids: [project-b]
+
+  product_agent:
+    id: agent:product-assistant
+    roles: [product_owner]
+    attr:
+      human: false
+      project_ids: [project-a]
+
+resources:
+  solo_product_gate:
+    kind: workflow_gate
+    id: workflow-1:product-approval:attempt-1
+    attr:
+      project_id: project-a
+      gate: product_approval
+      workflow_state: awaiting_product_approval
+      evidence_present: true
+      distinct_principal_required: false
+      prior_actor_ids: [human:alice]
+
+  regulated_product_gate:
+    kind: workflow_gate
+    id: workflow-2:product-approval:attempt-1
+    attr:
+      project_id: project-a
+      gate: product_approval
+      workflow_state: awaiting_product_approval
+      evidence_present: true
+      distinct_principal_required: true
+      prior_actor_ids: [human:alice]
+
+  missing_evidence_gate:
+    kind: workflow_gate
+    id: workflow-3:product-approval:attempt-1
+    attr:
+      project_id: project-a
+      gate: product_approval
+      workflow_state: awaiting_product_approval
+      evidence_present: false
+      distinct_principal_required: false
+      prior_actor_ids: []
+
+  solo_qa_gate:
+    kind: workflow_gate
+    id: workflow-4:qa:attempt-1
+    attr:
+      project_id: project-a
+      gate: qa
+      workflow_state: awaiting_human_qa
+      evidence_present: true
+      distinct_principal_required: false
+      prior_actor_ids: [human:alice]
+
+  disclosure_allowed_gate:
+    kind: workflow_gate
+    id: workflow-5:confidential-disclosure:attempt-1
+    attr:
+      project_id: project-a
+      gate: confidential_disclosure
+      workflow_state: awaiting_disclosure_approval
+      scanner_passed: true
+      export_permitted: true
+      distinct_principal_required: false
+      prior_actor_ids: [human:alice]
+
+  disclosure_blocked_gate:
+    kind: workflow_gate
+    id: workflow-6:confidential-disclosure:attempt-1
+    attr:
+      project_id: project-a
+      gate: confidential_disclosure
+      workflow_state: awaiting_disclosure_approval
+      scanner_passed: true
+      export_permitted: false
+      distinct_principal_required: false
+      prior_actor_ids: []
+
+  local_maintenance_gate:
+    kind: workflow_gate
+    id: workflow-7:maintenance:attempt-1
+    attr:
+      project_id: project-a
+      gate: maintenance_action
+      workflow_state: awaiting_operations_approval
+      local_only: true
+      rollback_present: true
+      distinct_principal_required: false
+      prior_actor_ids: [human:alice]
+
+  unsafe_maintenance_gate:
+    kind: workflow_gate
+    id: workflow-8:maintenance:attempt-1
+    attr:
+      project_id: project-a
+      gate: maintenance_action
+      workflow_state: awaiting_operations_approval
+      local_only: false
+      rollback_present: false
+      distinct_principal_required: false
+      prior_actor_ids: []
+
+tests:
+  - name: Solo operator may make the later product decision as an explicit role
+    input:
+      principals: [solo_alice]
+      resources: [solo_product_gate]
+      actions: [product_decide]
+    expected:
+      - principal: solo_alice
+        resource: solo_product_gate
+        actions:
+          product_decide: EFFECT_ALLOW
+
+  - name: Regulated gate rejects prior actor and accepts a distinct product owner
+    input:
+      principals: [solo_alice, regulated_bob]
+      resources: [regulated_product_gate]
+      actions: [product_decide]
+    expected:
+      - principal: solo_alice
+        resource: regulated_product_gate
+        actions:
+          product_decide: EFFECT_DENY
+      - principal: regulated_bob
+        resource: regulated_product_gate
+        actions:
+          product_decide: EFFECT_ALLOW
+
+  - name: Cross-project and non-human product decisions are denied
+    input:
+      principals: [wrong_project_owner, product_agent]
+      resources: [solo_product_gate]
+      actions: [product_decide]
+    expected:
+      - principal: wrong_project_owner
+        resource: solo_product_gate
+        actions:
+          product_decide: EFFECT_DENY
+      - principal: product_agent
+        resource: solo_product_gate
+        actions:
+          product_decide: EFFECT_DENY
+
+  - name: Product decision without evidence is denied
+    input:
+      principals: [solo_alice]
+      resources: [missing_evidence_gate]
+      actions: [product_decide]
+    expected:
+      - principal: solo_alice
+        resource: missing_evidence_gate
+        actions:
+          product_decide: EFFECT_DENY
+
+  - name: Solo operator may perform a separate human QA transition
+    input:
+      principals: [solo_alice]
+      resources: [solo_qa_gate]
+      actions: [qa_decide]
+    expected:
+      - principal: solo_alice
+        resource: solo_qa_gate
+        actions:
+          qa_decide: EFFECT_ALLOW
+
+  - name: Disclosure requires scanner and export policy approval
+    input:
+      principals: [solo_alice]
+      resources: [disclosure_allowed_gate, disclosure_blocked_gate]
+      actions: [disclosure_decide]
+    expected:
+      - principal: solo_alice
+        resource: disclosure_allowed_gate
+        actions:
+          disclosure_decide: EFFECT_ALLOW
+      - principal: solo_alice
+        resource: disclosure_blocked_gate
+        actions:
+          disclosure_decide: EFFECT_DENY
+
+  - name: Operations approval requires a local-only action and rollback
+    input:
+      principals: [solo_alice]
+      resources: [local_maintenance_gate, unsafe_maintenance_gate]
+      actions: [operations_decide]
+    expected:
+      - principal: solo_alice
+        resource: local_maintenance_gate
+        actions:
+          operations_decide: EFFECT_ALLOW
+      - principal: solo_alice
+        resource: unsafe_maintenance_gate
+        actions:
+          operations_decide: EFFECT_DENY

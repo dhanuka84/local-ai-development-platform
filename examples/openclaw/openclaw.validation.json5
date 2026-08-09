@@ -1,0 +1,11 @@
+// CI/developer validation wrapper only. Merge openclaw.hybrid.json5 into the
+// real user configuration after installing the plugin; do not install this
+// wrapper as the active configuration.
+{
+  $include: "./openclaw.hybrid.json5",
+  plugins: {
+    load: {
+      paths: ["../../automation/openclaw-plugin"]
+    }
+  }
+}

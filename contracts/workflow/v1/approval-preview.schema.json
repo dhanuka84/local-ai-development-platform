@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hybrid-ai.local/contracts/workflow/v1/approval-preview.schema.json",
+  "title": "Hybrid approval preview",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["workflow_id", "workflow_version", "gate", "summary", "evidence_artifact_sha256", "unresolved_risks"],
+  "properties": {
+    "workflow_id": { "type": "string", "format": "uuid" },
+    "workflow_version": { "type": "integer", "minimum": 1 },
+    "gate": { "enum": ["plan_approval", "qa", "product_approval", "confidential_disclosure", "maintenance_action"] },
+    "summary": { "type": "string", "minLength": 1 },
+    "evidence_artifact_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "unresolved_risks": { "type": "array", "items": { "type": "string" }, "maxItems": 100 },
+    "expires_at": { "type": "string", "format": "date-time" }
+  }
+}

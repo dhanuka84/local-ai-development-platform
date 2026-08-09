@@ -6,6 +6,11 @@ import "github.com/dhanuka84/hybrid-ai-platform/components/codegraph"
 
 type Repository interface {
 	Ping(context.Context) error
+	BootstrapPrincipals(context.Context, []PrincipalBootstrap) error
+	AuthenticatePrincipal(context.Context, []byte) (Principal, error)
+	CreateWorkflow(context.Context, WorkflowRun, WorkflowEvent) (WorkflowRun, error)
+	GetWorkflow(context.Context, string) (WorkflowRun, error)
+	TransitionWorkflow(context.Context, WorkflowTransition) (WorkflowRun, WorkflowEvent, error)
 	RecordGeneration(context.Context, GenerationCapture) (KnowledgeItem, error)
 	GetKnowledge(context.Context, string, bool) (KnowledgeItem, error)
 	GetKnowledgeMany(context.Context, []string) ([]KnowledgeItem, error)

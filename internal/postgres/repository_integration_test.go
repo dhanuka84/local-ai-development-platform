@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"crypto/sha256"
 	"os"
 	"testing"
 	"time"
@@ -28,6 +29,74 @@ func TestRepositoryWorkflowIntegration(t *testing.T) {
 	if _, err := repository.Pool().Exec(ctx, `TRUNCATE projects CASCADE; TRUNCATE outbox_events RESTART IDENTITY`); err != nil {
 		t.Fatal(err)
 	}
+	principals := []domain.PrincipalBootstrap{{
+		ID: "human:integration-developer", DisplayName: "Integration developer", Token: "integration-test-token",
+		Human: true, Roles: []string{"development", "qa", "product_owner", "operations"}, ProjectIDs: []string{"*"},
+	}}
+	if err := repository.BootstrapPrincipals(ctx, principals); err != nil {
+		t.Fatal(err)
+	}
+	tokenHash := sha256.Sum256([]byte(principals[0].Token))
+	principal, err := repository.AuthenticatePrincipal(ctx, tokenHash[:])
+	if err != nil || principal.ID != principals[0].ID || !principal.HasRole("product", "qa") {
+		t.Fatalf("authenticated principal=%#v err=%v", principal, err)
+	}
+
+	requestArtifact := domain.Artifact{
+		SHA256: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+		URI:    "file:///workflow-request", MediaType: "text/markdown", SizeBytes: 11,
+	}
+	workflowID, _ := domain.NewID()
+	createdEventID, _ := domain.NewID()
+	workflow, err := repository.CreateWorkflow(ctx, domain.WorkflowRun{
+		ID: workflowID, ProjectID: "product", Kind: "software-development", State: "intake", Version: 1,
+		Risk: "low", DataClassification: "internal", RequestArtifact: requestArtifact,
+		IdempotencyKey: "integration-workflow", CreatedBy: principal.ID, Metadata: map[string]any{"source": "integration"},
+	}, domain.WorkflowEvent{
+		ID: createdEventID, WorkflowID: workflowID, EventType: "WORKFLOW_CREATED", ToState: "intake",
+		ActorPrincipalID: principal.ID, ActorRole: "development", IdempotencyKey: "integration-workflow:created",
+		Payload: map[string]any{}, AuthorizationDecision: "allow", CerbosCallID: "test-call", PolicyVersion: "default",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if workflow.State != "intake" || workflow.Governance.Profile != domain.GovernanceSolo {
+		t.Fatalf("workflow=%#v", workflow)
+	}
+	transitionEventID, _ := domain.NewID()
+	workflow, event, err := repository.TransitionWorkflow(ctx, domain.WorkflowTransition{
+		WorkflowID: workflow.ID, ExpectedVersion: 1, ExpectedState: "intake", ResultingState: "classified",
+		Event: domain.WorkflowEvent{
+			ID: transitionEventID, WorkflowID: workflow.ID, EventType: "CLASSIFIED", FromState: "intake", ToState: "classified",
+			ActorPrincipalID: principal.ID, ActorRole: "development", IdempotencyKey: "integration-workflow:classified",
+			Payload: map[string]any{"risk": "low"}, AuthorizationDecision: "allow", CerbosCallID: "test-call-2", PolicyVersion: "default",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if workflow.State != "classified" || workflow.Version != 2 || event.Sequence != 2 {
+		t.Fatalf("workflow=%#v event=%#v", workflow, event)
+	}
+	idempotentWorkflow, idempotentEvent, err := repository.TransitionWorkflow(ctx, domain.WorkflowTransition{
+		WorkflowID: workflow.ID, ExpectedVersion: 1, ExpectedState: "intake", ResultingState: "classified",
+		Event: event,
+	})
+	if err != nil || idempotentWorkflow.Version != 2 || idempotentEvent.ID != event.ID {
+		t.Fatalf("idempotent workflow=%#v event=%#v err=%v", idempotentWorkflow, idempotentEvent, err)
+	}
+	staleEventID, _ := domain.NewID()
+	_, _, err = repository.TransitionWorkflow(ctx, domain.WorkflowTransition{
+		WorkflowID: workflow.ID, ExpectedVersion: 1, ExpectedState: "classified", ResultingState: "ready",
+		Event: domain.WorkflowEvent{
+			ID: staleEventID, WorkflowID: workflow.ID, EventType: "READY", FromState: "classified", ToState: "ready",
+			ActorPrincipalID: principal.ID, ActorRole: "development", IdempotencyKey: "integration-workflow:stale",
+			Payload: map[string]any{}, AuthorizationDecision: "allow",
+		},
+	})
+	if err == nil {
+		t.Fatal("stale transition unexpectedly succeeded")
+	}
 
 	generationID, err := domain.NewID()
 	if err != nil {
@@ -36,7 +105,7 @@ func TestRepositoryWorkflowIntegration(t *testing.T) {
 	artifactA := domain.Artifact{SHA256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", URI: "file:///a", MediaType: "text/plain", SizeBytes: 7}
 	artifactB := domain.Artifact{SHA256: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", URI: "file:///b", MediaType: "text/plain", SizeBytes: 8}
 	candidate, err := repository.RecordGeneration(ctx, domain.GenerationCapture{
-		ID: generationID, ProjectID: "product", SessionID: "session", TaskType: "debugging",
+		ID: generationID, ProjectID: "product", WorkflowID: workflow.ID, SessionID: "session", TaskType: "debugging",
 		Prompt: "fix repository contract mismatch", Response: "original solution", Summary: "repair shared contract",
 		Procedure: []string{"inspect schema", "update client"}, ValidationEvidence: []string{"go test ./... passed"},
 		Provider: "local", Model: "test", PromptArtifact: artifactA, OutputArtifact: artifactB,
@@ -44,27 +113,27 @@ func TestRepositoryWorkflowIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if candidate.Status != domain.CandidatePending || candidate.Problem == "" || len(candidate.Procedure) != 2 {
+	if candidate.Status != domain.CandidatePending || candidate.WorkflowID != workflow.ID || candidate.Problem == "" || len(candidate.Procedure) != 2 {
 		t.Fatalf("candidate = %#v", candidate)
 	}
 	reviewID, _ := domain.NewID()
 	reviewArtifact := domain.Artifact{SHA256: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", URI: "file:///review", MediaType: "text/markdown", SizeBytes: 9}
 	manifestArtifact := domain.Artifact{SHA256: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", URI: "file:///manifest", MediaType: "application/json", SizeBytes: 10}
 	if err := repository.RecordReview(ctx, domain.ReviewRecord{
-		ID: reviewID, KnowledgeID: candidate.ID, Reviewer: "codex", Provider: "openai", Model: "review-model",
+		ID: reviewID, KnowledgeID: candidate.ID, WorkflowID: workflow.ID, Reviewer: "codex", Provider: "openai", Model: "review-model",
 		Verdict: "revise", Comments: "make validation explicit", ImprovedContent: "reviewed solution",
 		ValidationEvidence: []string{"go test ./... passed after revision"},
 		ReviewArtifact:     reviewArtifact, ContextManifestArtifact: manifestArtifact,
 	}); err != nil {
 		t.Fatal(err)
 	}
-	var reviewArtifactSHA, manifestArtifactSHA string
-	if err := repository.Pool().QueryRow(ctx, `SELECT review_artifact_sha256,context_manifest_artifact_sha256
-		FROM review_records WHERE id=$1`, reviewID).Scan(&reviewArtifactSHA, &manifestArtifactSHA); err != nil {
+	var reviewArtifactSHA, manifestArtifactSHA, reviewWorkflowID string
+	if err := repository.Pool().QueryRow(ctx, `SELECT review_artifact_sha256,context_manifest_artifact_sha256,workflow_id::text
+		FROM review_records WHERE id=$1`, reviewID).Scan(&reviewArtifactSHA, &manifestArtifactSHA, &reviewWorkflowID); err != nil {
 		t.Fatal(err)
 	}
-	if reviewArtifactSHA != reviewArtifact.SHA256 || manifestArtifactSHA != manifestArtifact.SHA256 {
-		t.Fatalf("review artifact refs = %q, %q", reviewArtifactSHA, manifestArtifactSHA)
+	if reviewArtifactSHA != reviewArtifact.SHA256 || manifestArtifactSHA != manifestArtifact.SHA256 || reviewWorkflowID != workflow.ID {
+		t.Fatalf("review refs = %q, %q, %q", reviewArtifactSHA, manifestArtifactSHA, reviewWorkflowID)
 	}
 	revised, err := repository.GetKnowledge(ctx, candidate.ID, true)
 	if err != nil {

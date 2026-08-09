@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dhanuka84/hybrid-ai-platform/internal/domain"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/mcpserver"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/service"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -16,7 +17,7 @@ import (
 
 func TestHealthIsPublicAndMCPRequiresToken(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	server := New("", "token", "secret", nil, logger, func(*http.Request) map[string]string {
+	server := New("", "token", nil, domain.Principal{}, nil, logger, func(*http.Request) map[string]string {
 		return map[string]string{"postgres": "ok"}
 	})
 
@@ -36,7 +37,7 @@ func TestHealthIsPublicAndMCPRequiresToken(t *testing.T) {
 
 func TestReadyReportsDependencyFailure(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	server := New("", "none", "", nil, logger, func(*http.Request) map[string]string {
+	server := New("", "none", nil, domain.Principal{}, nil, logger, func(*http.Request) map[string]string {
 		return map[string]string{"postgres": "connection refused"}
 	})
 	response := httptest.NewRecorder()
@@ -48,6 +49,12 @@ func TestReadyReportsDependencyFailure(t *testing.T) {
 
 type bearerTransport struct{ base http.RoundTripper }
 
+type fakeAuthenticator struct{}
+
+func (fakeAuthenticator) AuthenticateToken(context.Context, string) (domain.Principal, error) {
+	return domain.Principal{ID: "human:test", Human: true, RoleBindings: map[string][]string{"*": {"development", "qa", "product_owner", "operations"}}}, nil
+}
+
 func (t bearerTransport) RoundTrip(request *http.Request) (*http.Response, error) {
 	request = request.Clone(request.Context())
 	request.Header.Set("Authorization", "Bearer secret")
@@ -56,7 +63,7 @@ func (t bearerTransport) RoundTrip(request *http.Request) (*http.Response, error
 
 func TestStatelessStreamableHTTPListsTools(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	server := New("", "token", "secret", mcpserver.New(&service.Service{}), logger, func(*http.Request) map[string]string {
+	server := New("", "token", fakeAuthenticator{}, domain.Principal{}, mcpserver.New(&service.Service{}), logger, func(*http.Request) map[string]string {
 		return map[string]string{"postgres": "ok"}
 	})
 	httpTestServer := httptest.NewServer(server.Handler)
@@ -78,7 +85,7 @@ func TestStatelessStreamableHTTPListsTools(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(tools.Tools) != 12 {
+	if len(tools.Tools) != 15 {
 		t.Fatalf("tool count = %d", len(tools.Tools))
 	}
 }

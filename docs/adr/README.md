@@ -6,3 +6,5 @@
 - [0004 — Dual repository graph representation](0004-repository-graph.md)
 - [0005 — Revisioned code graph and isolated MPL analyzer](0005-code-graph-analyzer.md)
 - [0006 — Bounded local execution with advisory cloud review](0006-bounded-local-execution-and-cloud-review.md)
+- [0007 — OpenClaw managed agentic workflows](0007-openclaw-managed-agentic-workflows.md)
+- [0008 — Cerbos contextual authorization](0008-cerbos-contextual-authorization.md)

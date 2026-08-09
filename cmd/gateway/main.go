@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/dhanuka84/hybrid-ai-platform/internal/config"
+	"github.com/dhanuka84/hybrid-ai-platform/internal/domain"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/httpserver"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/logging"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/mcpserver"
@@ -36,7 +37,17 @@ func main() {
 	if err := app.Initialize(ctx); err != nil {
 		fail(err)
 	}
-	server := mcpserver.New(app.Service)
+	var localPrincipal domain.Principal
+	for _, bootstrap := range cfg.AuthPrincipals {
+		if bootstrap.Human {
+			localPrincipal = bootstrap.Principal()
+			break
+		}
+	}
+	if localPrincipal.ID == "" && len(cfg.AuthPrincipals) > 0 {
+		localPrincipal = cfg.AuthPrincipals[0].Principal()
+	}
+	server := mcpserver.New(app.Service, localPrincipal)
 	if cfg.MCPTransport == "stdio" {
 		logger.Info("starting MCP gateway", "transport", "stdio")
 		if err := server.Run(ctx, &mcp.StdioTransport{}); err != nil && !errors.Is(err, context.Canceled) {
@@ -45,7 +56,7 @@ func main() {
 		return
 	}
 
-	httpServer := httpserver.New(cfg.HTTPAddress, cfg.AuthMode, cfg.AuthToken, server, logger, func(r *http.Request) map[string]string {
+	httpServer := httpserver.New(cfg.HTTPAddress, cfg.AuthMode, app.Service, localPrincipal, server, logger, func(r *http.Request) map[string]string {
 		checkCtx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
 		defer cancel()
 		return app.Service.Dependencies(checkCtx)

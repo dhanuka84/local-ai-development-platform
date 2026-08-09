@@ -1,0 +1,25 @@
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  resource: repository_relation
+  version: default
+  rules:
+    - name: project_read
+      actions: ["read"]
+      effect: EFFECT_ALLOW
+      roles: ["controller", "development", "qa", "product_owner", "operations", "repository_analyzer"]
+      condition:
+        match:
+          expr: >-
+            request.principal.attr.project_ids.exists(project_id,
+              project_id == "*" || project_id == request.resource.attr.project_id)
+
+    - name: evidence_backed_human_upsert
+      actions: ["upsert"]
+      effect: EFFECT_ALLOW
+      roles: ["product_owner", "repository_analyzer"]
+      condition:
+        match:
+          expr: >-
+            request.principal.attr.human == true &&
+            request.principal.attr.project_ids.exists(project_id,
+              project_id == "*" || project_id == request.resource.attr.project_id)

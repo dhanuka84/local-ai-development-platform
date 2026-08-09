@@ -12,10 +12,19 @@ make help-qa
 make help-product-owner
 ```
 
-The aliases do not create authorization boundaries. The local profile still
-uses one MCP bearer token and a PostgreSQL actor string. Role separation is a
-required operating procedure until enterprise OIDC identities, scopes, and a
-separate QA gate are implemented.
+The aliases do not create authorization boundaries. A role describes the
+responsibility being exercised at a workflow gate; it does not require a
+different employee. In the `solo` governance profile, one authenticated person
+may perform Operations, Development, QA, and Product Owner actions in sequence.
+Each action still records its explicit acting role, evidence, and decision.
+
+The current local profile bootstraps one authenticated human with all four
+roles plus a distinct non-human OpenClaw controller. Acting identity comes from
+the credential, never an MCP `actor` field, and Cerbos evaluates each protected
+action. `team` projects may require different people at selected gates, while
+the `regulated` profile enforces a distinct principal at sensitive gates.
+Executing a true two-person approval from `workflow_approvals` remains in the
+staged approval-API milestone.
 
 ## Operations
 
@@ -27,6 +36,8 @@ and projection health.
 ```bash
 make env-init
 # Review .env, especially CODEGRAPH_HOST_ROOT and model settings.
+make openclaw-plugin-deps openclaw-plugin-build
+make openclaw-plugin-install
 make mcp-preflight
 make ops-start-gpu       # or: make ops-start
 make pull-local-model
@@ -59,8 +70,10 @@ through the Compose admin image. They therefore use the same database password
 and service-network addresses as the running platform without exporting a
 database URL into the developer shell.
 
-Operations must not approve technical or product knowledge. After Product
-Owner approval, Operations monitors the outbox worker and projection freshness.
+While acting as Operations, the person must not approve technical or product
+knowledge. The same person may later make that decision only through the
+explicit Product Owner gate in `solo` mode. After Product Owner approval,
+Operations monitors the outbox worker and projection freshness.
 
 ## Development
 
@@ -92,12 +105,16 @@ make dev-patch-verify \
   PACKET=/path/to/work-packet.json \
   PATCH=/path/to/candidate.patch
 make dev-check
+# Required when `policies/cerbos` changes:
+make dev-authz-policy-test
 ```
 
 After successful validation, Development uses `generation_capture` through MCP
 and passes the pending candidate UUID, work packet, patch/diff, and evidence to
-QA. Development may record Codex/Kimi output with `review_record`, but cannot
-run `po-approve` on its own candidate.
+QA. Development may record Codex/Kimi output with `review_record`. In `team` or
+`regulated` mode, policy can prevent the implementing principal from performing
+later decisions. In `solo` mode, the same person may continue only by entering
+the separate QA and Product Owner transitions with the required evidence.
 
 ## QA
 
@@ -119,6 +136,8 @@ make qa-patch-verify \
   PACKET=/path/to/work-packet.json \
   PATCH=/path/to/candidate.patch
 make qa-check
+# Required when `policies/cerbos` changes:
+make qa-authz-policy-test
 ```
 
 QA records its independent verdict and findings with `review_record` through
@@ -152,14 +171,50 @@ Before deciding, confirm:
 ### Make the explicit decision
 
 ```bash
-make po-approve ID=<candidate-uuid> ACTOR=<accountable-identity>
+make po-approve ID=<candidate-uuid>
 # or
-make po-reject ID=<candidate-uuid> ACTOR=<accountable-identity>
+make po-reject ID=<candidate-uuid>
 ```
 
 Approval commits the knowledge decision and outbox intent in PostgreSQL.
-Embedding and Milvus publication remain asynchronous. Product Owner must never
-share or reuse another person's actor identity.
+Embedding and Milvus publication remain asynchronous. Always use the real
+authenticated identity. A solo operator reuses their own identity with a new
+`acting_role`; they never invent or borrow another person's identity.
+
+## Solo operator sequence
+
+One person can run the full local workflow without creating four accounts:
+
+```bash
+# Acting as Operations
+make ops-start-gpu       # or: make ops-start
+make ops-status
+
+# Acting as Development
+make dev-session-repo REPO=/absolute/path/to/repository
+make dev-policy-check PACKET=/path/to/work-packet.json
+make dev-patch-verify PACKET=/path/to/work-packet.json PATCH=/path/to/candidate.patch
+make dev-check
+
+# Acting as QA in a clean checkout/session
+make qa-patch-verify PACKET=/path/to/work-packet.json PATCH=/path/to/candidate.patch
+make qa-check
+make qa-candidate-get ID=<candidate-uuid>
+
+# Acting as Product Owner after QA evidence exists
+make po-candidate-get ID=<candidate-uuid>
+make po-approve ID=<candidate-uuid>
+
+# Acting as Operations again
+make ops-doctor
+```
+
+Changing role is an explicit workflow transition, not a logout/login exercise.
+The OpenClaw flow pauses at human gates and the same person can confirm the
+next acting role in `solo` mode through their human MCP credential. The
+non-human controller credential cannot cross those gates. Cerbos evaluates that action
+against the project profile; PostgreSQL will validate and commit the state
+transition.
 
 ## Handoff sequence
 
@@ -185,8 +240,8 @@ Operations
 | Role | Workflow commands | Canonical/supporting commands |
 |---|---|---|
 | Operations | `ops-start`, `ops-start-gpu`, `ops-status`, `ops-logs`, `ops-stop`, `ops-doctor`, `ops-reindex` | `env-init`, `mcp-preflight`, `migrate`, `milvus-init`, `up`, `up-gpu`, `down`, `logs`, `mcp-start`, `mcp-start-gpu`, `mcp-status`, `mcp-logs`, `mcp-stop`, `doctor`, `reindex`, `pull-local-model` |
-| Development | `dev-session`, `dev-session-repo`, `dev-policy-check`, `dev-patch-verify`, `dev-check` | `codex-login`, `codex-check`, `codex`, `codex-repo`, `preflight`, `fmt`, `test`, `check`, `build`, `workpacket-build`, `workpacket-evaluate`, `workpacket-verify`, `diagram-review-loop`, `clean`, plus MCP retrieval/capture/review tools |
-| QA | `qa-session`, `qa-session-repo`, `qa-patch-verify`, `qa-check`, `qa-candidates`, `qa-candidate-get` | `candidate-list`, `candidate-get`, `codex-check`, `test`, `check`, `workpacket-verify`, plus MCP `review_record` |
+| Development | `dev-session`, `dev-session-repo`, `dev-policy-check`, `dev-patch-verify`, `dev-check`, `dev-authz-policy-test` | `codex-login`, `codex-check`, `codex`, `codex-repo`, `preflight`, `fmt`, `test`, `check`, `build`, `workpacket-build`, `workpacket-evaluate`, `workpacket-verify`, `authz-policy-test`, `diagram-review-loop`, `diagram-agentic-workflow`, `clean`, plus MCP retrieval/capture/review tools |
+| QA | `qa-session`, `qa-session-repo`, `qa-patch-verify`, `qa-check`, `qa-authz-policy-test`, `qa-candidates`, `qa-candidate-get` | `candidate-list`, `candidate-get`, `codex-check`, `test`, `check`, `workpacket-verify`, `authz-policy-test`, plus MCP `review_record` |
 | Product Owner | `po-candidates`, `po-candidate-get`, `po-approve`, `po-reject` | `candidate-list`, `candidate-get`, `candidate-approve`, `candidate-reject` |
 
 The four `help-*` commands are shared discovery commands. `fmt`, `test`,

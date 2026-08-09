@@ -12,6 +12,7 @@ the local, review-learning, and enterprise deployment profiles.
 | Remote review and local learning loop | `hybrid-ai-review-learning-loop.mmd` | `hybrid-ai-review-learning-loop.png` | `hybrid-ai-review-learning-loop.svg` |
 | Enterprise distributed architecture | `hybrid-ai-enterprise-architecture.mmd` | `hybrid-ai-enterprise-architecture.png` | `hybrid-ai-enterprise-architecture.svg` |
 | Local-to-enterprise evolution | `hybrid-ai-local-to-enterprise-evolution.mmd` | `hybrid-ai-local-to-enterprise-evolution.png` | `hybrid-ai-local-to-enterprise-evolution.svg` |
+| OpenClaw agentic automation and Cerbos governance | `openclaw-agentic-automation-workflow.mmd` | `openclaw-agentic-automation-workflow.png` | `openclaw-agentic-automation-workflow.svg` |
 
 The SVG files are recommended for detailed documentation and presentations
 because they remain readable at any zoom level. Mermaid PNGs are
@@ -63,6 +64,12 @@ The review-learning diagram has a dedicated reproducible target:
 
 ```bash
 make diagram-review-loop
+```
+
+The OpenClaw/Cerbos automation diagram has a dedicated target:
+
+```bash
+make diagram-agentic-workflow
 ```
 
 If Chrome is installed elsewhere, update `executablePath` in `puppeteer-config.json` before rendering.
