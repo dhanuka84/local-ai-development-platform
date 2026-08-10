@@ -139,47 +139,387 @@ mode, one person may perform all four roles. The platform still records the
 role and evidence at each approval step. Follow the complete
 [role workflows and handoffs](docs/role-workflows.md).
 
-## Connect Codex
-
-The current Codex configuration supports local STDIO and Streamable HTTP MCP servers. Codex can use a stored ChatGPT sign-in, so this workflow does not require `OPENAI_API_KEY`. The local MCP bearer token is a separate, non-billable secret used only between Codex and the gateway. Merge [examples/codex/config.toml](examples/codex/config.toml) into `~/.codex/config.toml` or use this repository's project-scoped `.codex/config.toml`, then export the token:
-
-```bash
-export HYBRID_AI_MCP_TOKEN='the AUTH_TOKEN value from .env'
-codex mcp list
-```
-
-For two separate terminals, the repository provides a fail-fast workflow:
-
-```bash
-# Terminal 1: start the platform/MCP server, then follow its logs.
-make mcp-start
-# On the GBX100/GB10 host, use: make mcp-start-gpu
-make mcp-logs
-
-# Terminal 2: load AUTH_TOKEN from .env as HYBRID_AI_MCP_TOKEN and start Codex.
-make codex
-```
-
-To work in another checkout while retaining this HTTP MCP server:
-
-```bash
-make codex-repo REPO=/absolute/path/to/software-repository
-```
-
-Inside Codex, `/mcp` should show `hybrid_knowledge` connected. The project configuration has `required = true`, so a new Codex session fails clearly if the server or token is unavailable.
+## End-to-end development with Codex
 
 Codex CLI can be the primary development session, not only a final reviewer.
-Use MCP to retrieve approved knowledge and exact graphs, let Codex inspect and
-change the selected repository, run local validation, and capture the validated
-outcome with `generation_capture`. It remains pending until separately
-approved; once indexed, Ollama can retrieve the generalized solution for a
-similar future task. Because Codex inference is cloud-backed, this path follows
-the same disclosure rules as any other cloud development or review request and
-is never used by the maintenance profile.
+The standard `make dev-session` targets use the configured Codex provider and
+stored ChatGPT sign-in for cloud inference. The explicit
+`make dev-session-local` targets run Codex itself on the local Ollama model.
+Both routes register the same local MCP gateway. The cloud Codex route is the
+supported direct MCP workflow; the local route currently has the compatibility
+boundary documented in step 3. Neither route requires `OPENAI_API_KEY`.
 
-For authentication boundaries, first-time setup, `/mcp verbose` verification, token rotation, and troubleshooting, follow the [operations runbook](docs/operations.md).
+The local MCP bearer token is a separate, non-billable secret used only between
+Codex and the loopback gateway. The Make targets load it from `.env` without
+printing it. OpenClaw is not required for this Codex workflow; use
+`make mcp-status` for Codex-only health checks and `make platform-status` only
+when the OpenClaw integration is also expected to be running.
 
-The STDIO alternative is in [examples/codex/config-stdio.toml](examples/codex/config-stdio.toml). Codex is configured to prompt for write tools, with an explicit prompt for the approval decision tool. See the official [Codex MCP documentation](https://learn.chatgpt.com/docs/extend/mcp) and OpenAI's [MCP server guide](https://developers.openai.com/plugins/build/mcp-server/).
+The complete loop is:
+
+```text
+start MCP → launch Codex in the target repository → verify MCP
+  → refresh the revisioned code graph when needed
+  → retrieve approved knowledge and exact repository/code graphs
+  → validate a bounded work packet → implement and test
+  → verify the patch in a disposable clone → capture a pending candidate
+  → independent QA review → explicit Product Owner decision
+  → local embedding and future retrieval
+```
+
+### 1. Perform one-time Codex setup
+
+From this repository:
+
+```bash
+make env-init       # only when .env does not already exist
+make mcp-preflight
+
+# Required only if you will use the cloud-backed Codex targets:
+make codex-login
+make preflight
+```
+
+`make mcp-preflight` validates Docker access, local secrets, and Compose
+configuration. For the cloud route, `make preflight` additionally validates the
+stored Codex login and the `hybrid_knowledge` MCP registration. The
+project-scoped [`.codex/config.toml`](.codex/config.toml) registers the local
+Streamable HTTP server; the Make targets also supply equivalent one-process
+overrides when Codex is launched in another repository.
+
+### 2. Start the local platform
+
+In the platform terminal:
+
+```bash
+# GBX100/GB10 with NVIDIA Container Toolkit
+make mcp-start-gpu
+
+# Or use the CPU fallback
+# make mcp-start
+
+make mcp-status
+```
+
+`mcp-status` must show healthy dependencies and successful `/healthz` and
+`/readyz` responses. Follow the gateway and worker when troubleshooting; this
+command blocks until interrupted, but the containers continue running:
+
+```bash
+make mcp-logs
+```
+
+### 3. Choose and verify the Codex inference route
+
+Show both available routes before launching a session:
+
+```bash
+make codex-route
+```
+
+The output distinguishes the default Codex model provider from the explicit
+local route and separately reports the MCP URL. An MCP call proves that Codex
+used a local tool; it does not prove that the conversation model was local.
+
+Verify that Codex supports local providers, the MCP gateway is reachable, and
+the configured Qwen model is present in Ollama:
+
+```bash
+make codex-local-check
+make codex-local-smoke
+```
+
+The local target explicitly passes `--oss --local-provider ollama`, the model
+from `LOCAL_CHAT_MODEL`, a checked-in Qwen model catalog, and
+`model_reasoning_effort="high"`. The catalog prevents Codex from applying
+unknown-model fallback metadata. The reasoning override is required because
+Ollama rejects the `xhigh` value that may be valid for the configured cloud
+model. `codex-local-smoke` performs a real ephemeral Qwen response and requires
+the exact `LOCAL_QWEN_OK` result.
+
+Current compatibility boundary: Codex CLI `0.147.0` always defers MCP tool
+schemas. Local Qwen inference succeeds, but Qwen did not reliably discover and
+invoke `hybrid_knowledge` tools through that deferred interface in the
+end-to-end test. `/mcp verbose`, `codex-local-check`, and the inference smoke
+test must not be treated as proof of a successful MCP tool call. Until that
+client/model compatibility changes, use one of these supported paths:
+
+- `make dev-session` for Codex with direct `hybrid_knowledge` calls;
+- `make openclaw-start` for local Qwen with the OpenClaw-managed MCP tool path;
+- `make dev-session-local` only when the task does not depend on MCP calls.
+
+Codex officially supports selecting Ollama with `--oss` and
+`--local-provider`; see the
+[Codex advanced configuration guide](https://developers.openai.com/codex/config-advanced/#oss-mode-local-providers).
+
+### 4. Launch Codex in the repository being changed
+
+For the complete Codex-and-MCP workflow in this platform repository:
+
+```bash
+make dev-session
+```
+
+For another checkout while retaining this independently running MCP server:
+
+```bash
+make dev-session-repo REPO=/absolute/path/to/software-repository
+```
+
+When the task does not require MCP tools, explicitly select local Qwen with:
+
+```bash
+make dev-session-local
+make dev-session-local-repo REPO=/absolute/path/to/software-repository
+```
+
+The second target resolves the repository path, changes the Codex working
+directory, and loads `AUTH_TOKEN` as `HYBRID_AI_MCP_TOKEN` only for the child
+process. Do not copy `.env` or the bearer token into the target repository.
+
+The local launcher prints the selected model route before Codex starts. The
+Codex startup banner must also show values equivalent to:
+
+```text
+model: qwen3.6:35b
+provider: ollama
+reasoning effort: high
+```
+
+After sending a prompt, independently confirm the model loaded in Ollama:
+
+```bash
+curl --silent http://127.0.0.1:11434/api/ps | jq -r '.models[].name'
+```
+
+`qwen3.6:35b` should appear while it remains loaded. This runtime evidence,
+together with the Codex startup banner, proves the conversation used Qwen.
+
+Inside Codex, verify a real MCP connection:
+
+```text
+/mcp verbose
+```
+
+Confirm that `hybrid_knowledge` is connected and its tools are visible, then
+ask:
+
+```text
+Call platform_status and report the dependency health.
+Use project_id "local-development" for the following task unless I specify a
+different project namespace.
+```
+
+The MCP server is configured as required, so a new Codex session fails clearly
+when the server cannot initialize or the bearer token is invalid.
+
+### 5. Create or refresh the repository code snapshot
+
+Every active code graph is mapped to a repository, checked-out branch, and
+exact Git revision. Before the first task in a repository—or after its clean
+`HEAD` changes—ask Codex:
+
+```text
+Read this repository's exact name, origin URL, checked-out branch, remote
+default branch, and full HEAD commit. Convert the host repository path relative
+to CODEGRAPH_HOST_ROOT into the corresponding /workspace/<relative-path>.
+
+Call code_repository_index with project_id "local-development", those exact
+identity values, and allow_dirty=false. Return the repository, branch,
+revision, analyzers, entity count, relation count, duration, and indexing
+state. Do not index an uncommitted working tree.
+```
+
+Approve the MCP write prompt. Use `allow_dirty=true` only when a deliberately
+non-reproducible working-tree snapshot is required. Documentation-only or
+unsupported-language repositories may be reported as skipped rather than
+receiving an empty active graph. For request JSON, multi-repository ordering,
+and SQL verification, use the
+[multi-repository indexing runbook](docs/local-setup-and-indexing.md#8-index-repositories-through-mcp).
+
+### 6. Retrieve context before changing files
+
+Give Codex the task and require retrieval before implementation:
+
+```text
+I need to implement: <describe the task>.
+
+Before changing files:
+1. Call knowledge_search with project_id "local-development".
+2. If sibling repositories may be affected, call repository_graph_get for the
+   current repository with depth 2.
+3. Call code_symbol_search for the relevant behavior, identifiers, or symbols.
+4. Call code_graph_get for the best matching symbols to inspect callers,
+   dependencies, implementations, references, and tests.
+5. Confirm the repository, branch, and revision attached to graph results.
+6. Inspect the current working tree and repository guidance.
+7. Propose a bounded implementation and validation plan. Do not edit yet.
+```
+
+Semantic matches are discovery candidates. Exact topology comes from the
+PostgreSQL-backed graph. An empty repository relationship result means no
+evidence-backed relationship has been recorded; it is not permission to invent
+one.
+
+### 7. Define and evaluate bounded work
+
+For the complete governed path, copy and customize the versioned
+[work-packet example](examples/openclaw/work-packet.example.json). Set the
+absolute target workspace, exact base revision, allowed and forbidden files,
+data classification, risk categories, deterministic checks, change limits, and
+rollback steps.
+
+Evaluate it from this platform repository before allowing edits:
+
+```bash
+make dev-policy-check PACKET=/path/to/task.work-packet.json
+```
+
+Do not continue when the evaluation returns `allowed: false`. High-risk or
+destructive work requires the approval fields enforced by the packet policy.
+Restricted and maintenance work must remain local-only; use the OpenClaw
+maintenance profile with Ollama instead of this cloud-backed Codex path.
+
+### 8. Implement, test, and verify the patch
+
+After accepting the plan, tell Codex:
+
+```text
+Proceed with the implementation within the approved work-packet boundaries.
+Do not modify secrets, environment files, generated output, or unrelated files.
+Run the target repository's native tests and checks. Inspect the final diff and
+report files changed, behavior changed, validation results, remaining risks,
+and rollback steps.
+```
+
+Create a patch without modifying file contents. If the task adds untracked
+files, make each one visible to `git diff` with an intent-to-add entry, then
+clear that entry after writing the patch:
+
+```bash
+cd /absolute/path/to/software-repository
+git status --short
+git add --intent-to-add -- path/to/new-file  # repeat only for intended new files
+git diff HEAD --binary --output=/tmp/task.patch
+git reset -- path/to/new-file                # clear each intent-to-add entry
+```
+
+Apply and verify that patch in a disposable clone using the packet's exact
+checks:
+
+```bash
+cd /absolute/path/to/local-ai-development-platform
+make dev-patch-verify \
+  PACKET=/path/to/task.work-packet.json \
+  PATCH=/tmp/task.patch
+```
+
+Use the target repository's own Maven, Gradle, npm, Python, Go, or other native
+checks. `make dev-check` validates this platform repository itself. Run it for
+platform changes, and add the authorization-policy test when Cerbos policies
+change:
+
+```bash
+make dev-check
+make dev-authz-policy-test  # required when policies/cerbos changes
+```
+
+### 9. Capture the validated outcome
+
+After every required check passes, ask Codex:
+
+```text
+Call generation_capture with project_id "local-development". Record the
+original task, final implementation summary, provider and model, repository
+revision, ordered procedure, important tool actions, validation commands and
+observed results, applicability, exclusions, rollback guidance, and outcome
+"success". Return the pending candidate ID. Do not approve it.
+```
+
+`generation_capture` stores immutable prompt/output artifacts and creates a
+pending candidate. Model generation or self-review never makes that candidate
+approved knowledge.
+
+### 10. Perform independent QA
+
+First rerun the disposable-clone verifier from the platform repository:
+
+```bash
+make qa-candidates PROJECT=local-development LIMIT=25
+make qa-candidate-get ID=<candidate-uuid>
+make qa-patch-verify \
+  PACKET=/path/to/task.work-packet.json \
+  PATCH=/tmp/task.patch
+```
+
+Then create a fresh QA worktree at the packet's exact base revision, apply the
+candidate patch, and start a new Codex session there:
+
+```bash
+git -C /absolute/path/to/software-repository worktree add --detach \
+  /absolute/path/to/qa-worktree <base-revision>
+git -C /absolute/path/to/qa-worktree apply /tmp/task.patch
+
+cd /absolute/path/to/local-ai-development-platform
+make qa-session-repo REPO=/absolute/path/to/qa-worktree
+```
+
+Inside the QA Codex session:
+
+```text
+Independently review candidate <candidate-uuid> and its patch. Verify scope,
+acceptance criteria, tests, error handling, security implications,
+cross-repository impact, reusable-knowledge quality, and rollback guidance.
+Reproduce the important checks. Call review_record with verdict approve,
+reject, revise, or comment and include the exact validation evidence. Do not
+perform the final knowledge decision.
+```
+
+A `revise` verdict requires improved content and fresh local validation.
+`review_record` preserves review evidence but cannot publish the candidate.
+
+### 11. Make the explicit knowledge decision
+
+After checking QA evidence, applicability, exclusions, and business acceptance:
+
+```bash
+make po-candidate-get ID=<candidate-uuid>
+make po-approve ID=<candidate-uuid>
+# Or: make po-reject ID=<candidate-uuid>
+```
+
+Approval commits the authoritative PostgreSQL decision and queues local Ollama
+embedding and Milvus projection. Monitor dependency and worker health with:
+
+```bash
+make ops-doctor
+make mcp-logs
+```
+
+The projection is asynchronous. Future Codex sessions can retrieve the approved
+generalized outcome with `knowledge_search`; they must still inspect current
+source and repeat relevant validation rather than copying stored output blindly.
+
+### 12. Commit and re-index the new revision
+
+Commit only after reviewing the verified diff according to the target
+repository's normal Git workflow. Then repeat step 5 with the new clean `HEAD`
+so future symbol searches and graph traversals use the new repository, branch,
+and revision mapping. Never claim that an uncommitted implementation is
+represented by the previous active snapshot.
+
+For authentication boundaries, token rotation, startup failures, and MCP
+diagnostics, follow the [operations runbook](docs/operations.md). For the concise
+Development → QA → Product Owner responsibilities, see
+[role workflows and handoffs](docs/role-workflows.md). The STDIO alternative is
+in [examples/codex/config-stdio.toml](examples/codex/config-stdio.toml); it makes
+Codex own the MCP subprocess rather than using the independently running HTTP
+gateway described above.
+
+Codex is configured to prompt for MCP write tools and explicitly prompt for
+indexing, repository-relation, and approval writes. See the official
+[Codex MCP documentation](https://learn.chatgpt.com/docs/extend/mcp) and
+OpenAI's [MCP server guide](https://developers.openai.com/plugins/build/mcp-server/).
 
 ## Connect OpenClaw, Ollama, and Kimi
 

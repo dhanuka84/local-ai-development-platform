@@ -5,6 +5,12 @@ MCP_URL := $(MCP_BASE_URL)/mcp
 PROJECT ?=
 LIMIT ?= 25
 ID ?=
+CODEX_LOCAL_MODEL ?= $(shell sed -n 's/^[[:space:]]*LOCAL_CHAT_MODEL[[:space:]]*=[[:space:]]*//p' .env 2>/dev/null | tail -n 1)
+ifeq ($(strip $(CODEX_LOCAL_MODEL)),)
+CODEX_LOCAL_MODEL := qwen3.6:35b
+endif
+CODEX_LOCAL_REASONING_EFFORT ?= high
+CODEX_LOCAL_MODEL_CATALOG ?= $(CURDIR)/examples/codex/qwen-model-catalog.json
 CERBOS_IMAGE ?= ghcr.io/cerbos/cerbos:0.54.0@sha256:211c261f6031675522a35c6055b13fd719c4aff13747307e4bcb6907326537ef
 OPENCLAW_PLUGIN_DIR := automation/openclaw-plugin
 OPENCLAW_PLUGIN_ID := hybrid-workflow-controller
@@ -20,8 +26,14 @@ CODEX_MCP_ARGS := \
 	-c 'mcp_servers.hybrid_knowledge.tools.knowledge_candidate_decide.approval_mode="prompt"' \
 	-c 'mcp_servers.hybrid_knowledge.tools.repository_relation_upsert.approval_mode="prompt"' \
 	-c 'mcp_servers.hybrid_knowledge.tools.code_repository_index.approval_mode="prompt"'
+CODEX_LOCAL_ARGS := \
+	--oss \
+	--local-provider ollama \
+	--model "$(CODEX_LOCAL_MODEL)" \
+	-c 'model_catalog_json="$(CODEX_LOCAL_MODEL_CATALOG)"' \
+	-c 'model_reasoning_effort="$(CODEX_LOCAL_REASONING_EFFORT)"'
 
-.PHONY: help help-operations help-development help-qa help-product-owner env-init mcp-preflight preflight fmt check check-all test build migrate milvus-init doctor reindex candidate-list candidate-get candidate-approve candidate-reject up up-gpu down logs mcp-start mcp-start-gpu mcp-status mcp-logs mcp-stop codex-login codex-check codex codex-repo workpacket-build workpacket-evaluate workpacket-verify authz-policy-test contracts-check openclaw-plugin-deps openclaw-plugin-check openclaw-config-check openclaw-config-plan openclaw-config-apply openclaw-plugin-build openclaw-plugin-install openclaw-plugin-doctor openclaw-setup openclaw-start openclaw-status platform-status diagram-review-loop diagram-agentic-workflow pull-local-model clean ops-start ops-start-gpu ops-status ops-logs ops-stop ops-doctor ops-reindex dev-session dev-session-repo dev-policy-check dev-patch-verify dev-check dev-authz-policy-test qa-session qa-session-repo qa-patch-verify qa-check qa-authz-policy-test qa-candidates qa-candidate-get po-candidates po-candidate-get po-approve po-reject
+.PHONY: help help-operations help-development help-qa help-product-owner env-init mcp-preflight preflight fmt check check-all test build migrate milvus-init doctor reindex candidate-list candidate-get candidate-approve candidate-reject up up-gpu down logs mcp-start mcp-start-gpu mcp-status mcp-logs mcp-stop codex-login codex-check codex-route codex-local-check codex-local-smoke codex codex-repo codex-local codex-local-repo workpacket-build workpacket-evaluate workpacket-verify authz-policy-test contracts-check openclaw-plugin-deps openclaw-plugin-check openclaw-config-check openclaw-config-plan openclaw-config-apply openclaw-plugin-build openclaw-plugin-install openclaw-plugin-doctor openclaw-setup openclaw-start openclaw-status platform-status diagram-review-loop diagram-agentic-workflow pull-local-model clean ops-start ops-start-gpu ops-status ops-logs ops-stop ops-doctor ops-reindex dev-session dev-session-repo dev-session-local dev-session-local-repo dev-policy-check dev-patch-verify dev-check dev-authz-policy-test qa-session qa-session-repo qa-session-local qa-session-local-repo qa-patch-verify qa-check qa-authz-policy-test qa-candidates qa-candidate-get po-candidates po-candidate-get po-approve po-reject
 
 help: ## Show all commands plus role-specific workflow guides
 	@printf '%s\n' \
@@ -60,19 +72,23 @@ help-development: ## Show the Development workflow and commands
 	@printf '%s\n' \
 		'DEVELOPMENT' \
 		'One-time setup:' \
-		'  1. make codex-login' \
-		'  2. make preflight' \
+		'  1. make mcp-preflight' \
+		'  2. make codex-login && make preflight  # cloud route only' \
 		'' \
 		'Each development task:' \
-		'  1. make dev-session' \
+		'  1. make codex-route' \
+		'  2. make dev-session' \
 		'     or: make dev-session-repo REPO=/absolute/path' \
-		'  2. Search approved knowledge and repository/code graphs through MCP' \
-		'  3. make dev-policy-check PACKET=/path/work-packet.json' \
-		'  4. Implement locally or through Codex' \
-		'  5. make dev-patch-verify PACKET=... PATCH=...' \
-		'  6. make dev-check' \
-		'  7. make dev-authz-policy-test # when authorization policies change' \
-		'  8. Use generation_capture; hand candidate ID to QA'
+		'     local-Qwen inference check: make codex-local-smoke' \
+		'     local-Qwen session: make dev-session-local' \
+		'     or: make dev-session-local-repo REPO=/absolute/path' \
+		'  3. Search approved knowledge and repository/code graphs through MCP' \
+		'  4. make dev-policy-check PACKET=/path/work-packet.json' \
+		'  5. Implement locally or through Codex' \
+		'  6. make dev-patch-verify PACKET=... PATCH=...' \
+		'  7. make dev-check' \
+		'  8. make dev-authz-policy-test # when authorization policies change' \
+		'  9. Use generation_capture; hand candidate ID to QA'
 
 help-qa: ## Show the QA workflow and commands
 	@printf '%s\n' \
@@ -81,6 +97,7 @@ help-qa: ## Show the QA workflow and commands
 		'  1. make qa-candidates PROJECT=<project> LIMIT=25' \
 		'  2. make qa-candidate-get ID=<candidate-uuid>' \
 		'  3. make qa-session-repo REPO=/absolute/path' \
+		'     local-Qwen alternative: make qa-session-local-repo REPO=/absolute/path' \
 		'  4. make qa-patch-verify PACKET=... PATCH=...' \
 		'  5. make qa-check' \
 		'  6. make qa-authz-policy-test  # when authorization policies change' \
@@ -322,6 +339,39 @@ codex-check: mcp-preflight ## Check Codex authentication and MCP registration
 	HYBRID_AI_MCP_TOKEN="$$auth_token_value" codex mcp get $(CODEX_MCP_ARGS) hybrid_knowledge >/dev/null; \
 	echo "Codex MCP registration passed: hybrid_knowledge"
 
+codex-route: ## Show the default Codex route and the explicit local route
+	@command -v codex >/dev/null 2>&1 || { echo "codex is required" >&2; exit 1; }
+	@doctor_output=$$(codex doctor --json 2>/dev/null || true); \
+	default_model=$$(printf '%s\n' "$$doctor_output" | sed -n 's/^[[:space:]]*"model": "\([^"]*\)",[[:space:]]*$$/\1/p' | head -n 1); \
+	default_provider=$$(printf '%s\n' "$$doctor_output" | sed -n 's/^[[:space:]]*"model provider": "\([^"]*\)",[[:space:]]*$$/\1/p' | head -n 1); \
+	test -n "$$default_model" || default_model=unknown; \
+	test -n "$$default_provider" || default_provider=unknown; \
+	printf '%s\n' \
+		"Default Codex route: $$default_provider/$$default_model" \
+		"Local Codex route: ollama/$(CODEX_LOCAL_MODEL) (reasoning=$(CODEX_LOCAL_REASONING_EFFORT))" \
+		"MCP tool route: $(MCP_URL)"
+
+codex-local-check: mcp-preflight ## Verify Codex can use the configured local Ollama model
+	@command -v codex >/dev/null 2>&1 || { echo "codex is required" >&2; exit 1; }
+	@command -v jq >/dev/null 2>&1 || { echo "jq is required" >&2; exit 1; }
+	@codex --help | grep -q -- '--oss' || { echo "this Codex version does not support --oss" >&2; exit 1; }
+	@codex --help | grep -q -- '--local-provider' || { echo "this Codex version does not support --local-provider" >&2; exit 1; }
+	@case "$(CODEX_LOCAL_REASONING_EFFORT)" in none|low|medium|high|max) ;; *) echo "CODEX_LOCAL_REASONING_EFFORT must be none, low, medium, high, or max" >&2; exit 1;; esac
+	@test -f "$(CODEX_LOCAL_MODEL_CATALOG)" || { echo "missing Codex local model catalog: $(CODEX_LOCAL_MODEL_CATALOG)" >&2; exit 1; }
+	@codex -c 'model_catalog_json="$(CODEX_LOCAL_MODEL_CATALOG)"' debug models | jq -e --arg model "$(CODEX_LOCAL_MODEL)" '.models[] | select(.slug == $$model and .tool_mode == "direct")' >/dev/null || { echo "Codex model catalog has no direct-tool entry for $(CODEX_LOCAL_MODEL)" >&2; exit 1; }
+	@curl --fail --silent --show-error --max-time 5 "$(MCP_BASE_URL)/healthz" >/dev/null || { echo "MCP gateway is unavailable; start it with 'make mcp-start' or 'make mcp-start-gpu'" >&2; exit 1; }
+	@models_json=$$(curl --fail --silent --show-error --max-time 5 http://127.0.0.1:11434/api/tags) || { echo "Ollama is unavailable at http://127.0.0.1:11434" >&2; exit 1; }; \
+	printf '%s' "$$models_json" | grep -Fq '"name":"$(CODEX_LOCAL_MODEL)"' || { echo "Ollama model $(CODEX_LOCAL_MODEL) is missing; run 'make pull-local-model'" >&2; exit 1; }; \
+	printf '%s\n' \
+		"Codex local route ready: ollama/$(CODEX_LOCAL_MODEL) (reasoning=$(CODEX_LOCAL_REASONING_EFFORT))" \
+		"Compatibility note: this verifies registration, not a Qwen-initiated deferred MCP tool call"
+
+codex-local-smoke: codex-local-check ## Run one ephemeral local-Qwen Codex response
+	@smoke_output=$$(codex exec --ephemeral $(CODEX_LOCAL_ARGS) -c 'mcp_servers.hybrid_knowledge.enabled=false' --sandbox read-only 'Reply with exactly: LOCAL_QWEN_OK'); \
+	printf '%s\n' "$$smoke_output"; \
+	printf '%s\n' "$$smoke_output" | grep -Fxq 'LOCAL_QWEN_OK' || { echo "local Codex inference smoke test failed" >&2; exit 1; }; \
+	echo "Codex local inference passed: ollama/$(CODEX_LOCAL_MODEL)"
+
 codex: mcp-preflight ## Start Codex in this repository with the MCP bearer token loaded
 	@command -v codex >/dev/null 2>&1 || { echo "codex is required" >&2; exit 1; }
 	@codex login status >/dev/null || { echo "Codex is signed out; run 'make codex-login'" >&2; exit 1; }
@@ -338,6 +388,22 @@ codex-repo: mcp-preflight ## Start Codex for REPO=/absolute/path with this HTTP 
 	@auth_token_value=$$(sed -n 's/^[[:space:]]*AUTH_TOKEN[[:space:]]*=[[:space:]]*//p' .env | tail -n 1); \
 	repository_path=$$(cd "$(REPO)" 2>/dev/null && pwd -P) || { echo "REPO is not an accessible directory: $(REPO)" >&2; exit 1; }; \
 	HYBRID_AI_MCP_TOKEN="$$auth_token_value" exec codex -C "$$repository_path" $(CODEX_MCP_ARGS)
+
+codex-local: codex-local-check ## Start local-Ollama Codex; MCP is registered but deferred
+	@auth_token_value=$$(sed -n 's/^[[:space:]]*AUTH_TOKEN[[:space:]]*=[[:space:]]*//p' .env | tail -n 1); \
+	case "$$auth_token_value" in ""|CHANGE_ME*) echo "set a real AUTH_TOKEN in .env" >&2; exit 1;; esac; \
+	echo "Codex model route: ollama/$(CODEX_LOCAL_MODEL) (reasoning=$(CODEX_LOCAL_REASONING_EFFORT), no cloud fallback)"; \
+	echo "Compatibility: use cloud Codex or OpenClaw when the task requires hybrid_knowledge tool calls"; \
+	HYBRID_AI_MCP_TOKEN="$$auth_token_value" exec codex $(CODEX_LOCAL_ARGS) $(CODEX_MCP_ARGS)
+
+codex-local-repo: codex-local-check ## Start local-Ollama Codex in REPO; MCP is registered
+	@test -n "$(REPO)" || { echo "usage: make codex-local-repo REPO=/absolute/path/to/repository" >&2; exit 1; }
+	@auth_token_value=$$(sed -n 's/^[[:space:]]*AUTH_TOKEN[[:space:]]*=[[:space:]]*//p' .env | tail -n 1); \
+	case "$$auth_token_value" in ""|CHANGE_ME*) echo "set a real AUTH_TOKEN in .env" >&2; exit 1;; esac; \
+	repository_path=$$(cd "$(REPO)" 2>/dev/null && pwd -P) || { echo "REPO is not an accessible directory: $(REPO)" >&2; exit 1; }; \
+	echo "Codex model route: ollama/$(CODEX_LOCAL_MODEL) (reasoning=$(CODEX_LOCAL_REASONING_EFFORT), no cloud fallback)"; \
+	echo "Compatibility: use cloud Codex or OpenClaw when the task requires hybrid_knowledge tool calls"; \
+	HYBRID_AI_MCP_TOKEN="$$auth_token_value" exec codex -C "$$repository_path" $(CODEX_LOCAL_ARGS) $(CODEX_MCP_ARGS)
 
 workpacket-build: ## Build the independent bounded-work policy verifier
 	mkdir -p bin
@@ -379,6 +445,8 @@ ops-reindex: reindex ## [Operations] Requeue approved semantic projections
 # Development aliases.
 dev-session: codex ## [Development] Start Codex with the local MCP server
 dev-session-repo: codex-repo ## [Development] Start Codex in REPO with local MCP
+dev-session-local: codex-local ## [Development] Start local-Ollama Codex; see MCP caveat
+dev-session-local-repo: codex-local-repo ## [Development] Start local-Ollama Codex in REPO
 dev-policy-check: workpacket-evaluate ## [Development] Evaluate PACKET policy
 dev-patch-verify: workpacket-verify ## [Development] Verify PATCH using PACKET
 dev-check: check ## [Development] Run formatting, vet, and race tests
@@ -388,6 +456,8 @@ dev-authz-policy-test: authz-policy-test ## [Development] Compile and test Cerbo
 # commands do not perform final knowledge approval.
 qa-session: codex ## [QA] Start an MCP-connected Codex validation session
 qa-session-repo: codex-repo ## [QA] Start validation in REPO
+qa-session-local: codex-local ## [QA] Start local-Ollama validation; see MCP caveat
+qa-session-local-repo: codex-local-repo ## [QA] Start local-Ollama validation in REPO
 qa-patch-verify: workpacket-verify ## [QA] Independently verify PATCH using PACKET
 qa-check: check ## [QA] Run the repository verification suite
 qa-authz-policy-test: authz-policy-test ## [QA] Independently test Cerbos policies

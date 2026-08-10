@@ -91,6 +91,9 @@ minimization, review disposition, and candidate capture.
 ### One-time Codex setup
 
 ```bash
+make mcp-preflight
+
+# Required only for the cloud-backed Codex route:
 make codex-login
 make preflight
 ```
@@ -98,10 +101,22 @@ make preflight
 ### Per-task workflow
 
 ```bash
+make codex-route
 make dev-session
 # Or work in another checkout:
 make dev-session-repo REPO=/absolute/path/to/repository
+
+# Local-Qwen alternative for tasks that do not require MCP tool calls:
+make codex-local-smoke
+make dev-session-local-repo REPO=/absolute/path/to/repository
 ```
+
+The local targets explicitly select `ollama/$LOCAL_CHAT_MODEL` and print the
+route before Codex starts. The startup banner (`provider: ollama`) and the
+inference smoke test prove local model inference. Codex CLI `0.147.0` defers MCP
+tool schemas, and local Qwen did not reliably invoke those deferred tools in
+validation. Use the standard Codex session or the OpenClaw local route when the
+task requires `hybrid_knowledge` tools.
 
 Inside Codex or OpenClaw, Development searches approved knowledge, repository
 relationships, and code symbols before substantial work. For an
@@ -135,6 +150,8 @@ and reusable-knowledge quality.
 make qa-candidates PROJECT=my-product LIMIT=25
 make qa-candidate-get ID=<candidate-uuid>
 make qa-session-repo REPO=/absolute/path/to/repository
+# Local alternative only when this session does not need MCP tool calls:
+make qa-session-local-repo REPO=/absolute/path/to/repository
 ```
 
 ### Independent verification
