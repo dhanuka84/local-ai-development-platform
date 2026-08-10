@@ -115,6 +115,11 @@ Prerequisites: Docker Compose v2, Git, and approximately 16 GB free RAM for the 
    make mcp-status
    ```
 
+For Docker permission repair, a deliberately volume-free rebuild, cloning and
+indexing multiple repositories, exact MCP request examples, SQL verification,
+and timing guidance, follow the
+[local setup and multi-repository indexing runbook](docs/local-setup-and-indexing.md).
+
 All published ports bind to `127.0.0.1`. Do not expose PostgreSQL, Milvus, Ollama, or the MCP endpoint directly to an untrusted network.
 
 ## Role-based commands
@@ -336,6 +341,7 @@ See [enterprise-deployment.md](docs/enterprise-deployment.md) and the [enterpris
 ## Documentation
 
 - [Plain-English glossary](docs/glossary.md)
+- [Local setup and multi-repository indexing](docs/local-setup-and-indexing.md)
 - [Implementation guide](docs/implementation-guide.md)
 - [Remote review and local learning](docs/remote-review-learning.md)
 - [Role workflows and Make commands](docs/role-workflows.md)

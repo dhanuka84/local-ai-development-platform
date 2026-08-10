@@ -58,6 +58,11 @@ committing it or entering it in shell history. Project governance remains `solo`
 
 Prerequisites are Docker with Compose v2, Git, Codex CLI, and enough memory for the selected Ollama model. GPU mode additionally requires a supported NVIDIA driver and the NVIDIA Container Toolkit.
 
+For the end-to-end workstation procedure—including Docker group repair,
+multi-repository cloning, an explicitly destructive volume-free rebuild,
+indexing requests, SQL verification, and measured timing—use the
+[local setup and multi-repository indexing runbook](local-setup-and-indexing.md).
+
 1. Create the local environment file:
 
    ```bash
@@ -306,6 +311,10 @@ Monitor worker logs until the outbox drains. Reindex includes approved knowledge
 ## Analyze a repository
 
 Set `CODEGRAPH_HOST_ROOT` in `.env` to the host repository or a narrow parent directory exposed read-only to the Compose gateway, then rebuild/restart the gateway. Invoke `code_repository_index` through Codex/OpenClaw with `repository_path=/workspace` (or a child path) and an explicit write approval. Supply both the expected checked-out `branch` and commit `revision` whenever possible, and leave `allow_dirty=false` for reproducible snapshots. Every stored analysis and returned symbol reports its repository name, branch, and revision.
+
+The [local indexing runbook](local-setup-and-indexing.md) provides a complete
+request body, a safe order for sibling repositories, active-snapshot SQL, and
+outbox monitoring commands.
 
 For an organization cloned as sibling directories, mount its parent directory once and index one repository per call. For example, set `CODEGRAPH_HOST_ROOT=/home/user/projects/repositories`, restart with `make mcp-stop && make mcp-start-gpu`, then use child paths such as `/workspace/service-a` and `/workspace/web-app`. The router automatically selects and combines Go, Java/Kotlin, TypeScript/JavaScript, and Python providers. Large compiler-backed scans can take several minutes; the gateway allows 20 minutes for a response, so MCP clients should use a matching tool timeout while keeping ordinary network health checks short.
 
