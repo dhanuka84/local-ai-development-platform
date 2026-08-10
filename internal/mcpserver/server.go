@@ -45,7 +45,7 @@ func (a *API) register(server *mcp.Server) {
 	mcp.AddTool(server, writeTool("generation_capture", "Capture a generation", "Persist a prompt, generated response, provenance, and a review candidate. This is additive and does not approve the candidate."), a.capture)
 	mcp.AddTool(server, writeTool("repository_relation_upsert", "Record repository relationship", "Upsert two Git repositories and an approved, evidence-backed relationship; vector indexing is queued transactionally."), a.repositoryRelationUpsert)
 	if a.service.CodeGraphAnalysisEnabled() {
-		mcp.AddTool(server, writeTool("code_repository_index", "Index a code repository", "Analyze an allowlisted local Go repository, persist a revisioned graph in PostgreSQL, and queue symbol embeddings."), a.codeRepositoryIndex)
+		mcp.AddTool(server, writeTool("code_repository_index", "Index a code repository", "Analyze an allowlisted local Go, Java, Kotlin, TypeScript, JavaScript, or Python repository, persist a repository-, branch-, and revision-mapped graph in PostgreSQL, and queue symbol embeddings."), a.codeRepositoryIndex)
 	}
 	mcp.AddTool(server, writeTool("review_record", "Record review feedback", "Attach Codex, ChatGPT, Kimi, or human review feedback to a candidate without approving it."), a.review)
 	mcp.AddTool(server, writeTool("knowledge_candidate_decide", "Approve or reject candidate", "Approve or reject a pending candidate. Approval schedules indexing into Milvus."), a.decide)
@@ -361,6 +361,7 @@ type codeRepositoryIndexInput struct {
 	ProjectID      string          `json:"project_id" jsonschema:"software product or solution namespace; required"`
 	Repository     repositoryInput `json:"repository" jsonschema:"repository identity; required"`
 	RepositoryPath string          `json:"repository_path" jsonschema:"local path below CODEGRAPH_ALLOWED_ROOTS; required"`
+	Branch         string          `json:"branch,omitempty" jsonschema:"expected checked-out Git branch; analysis fails if it does not match"`
 	Revision       string          `json:"revision,omitempty" jsonschema:"expected Git commit; analysis fails if it does not match"`
 	AllowDirty     bool            `json:"allow_dirty,omitempty" jsonschema:"permit uncommitted files and fingerprint the dirty snapshot"`
 }
@@ -382,7 +383,7 @@ func (a *API) codeRepositoryIndex(ctx context.Context, _ *mcp.CallToolRequest, i
 			Name: input.Repository.Name, CanonicalURL: input.Repository.CanonicalURL,
 			DefaultBranch: input.Repository.DefaultBranch,
 		},
-		RepositoryPath: input.RepositoryPath, Revision: input.Revision,
+		RepositoryPath: input.RepositoryPath, Branch: input.Branch, Revision: input.Revision,
 		AllowDirty: input.AllowDirty, RequestedBy: principal.ID,
 	})
 	return nil, codeRepositoryIndexOutput{Analysis: analysis, IndexState: "queued"}, err

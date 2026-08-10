@@ -111,12 +111,16 @@ func TestLoadParsesCodeGraphRootsAndLimits(t *testing.T) {
 	t.Setenv("CODEGRAPH_MAX_FILES", "123")
 	t.Setenv("CODEGRAPH_MAX_ENTITIES", "456")
 	t.Setenv("CODEGRAPH_MAX_RELATIONS", "789")
+	t.Setenv("CODEGRAPH_JVM_INDEXER_COMMAND", "/test/jvm")
+	t.Setenv("CODEGRAPH_TYPESCRIPT_INDEXER_COMMAND", "/test/typescript")
+	t.Setenv("CODEGRAPH_PYTHON_INDEXER_COMMAND", "/test/python")
 	cfg, err := LoadCLI()
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(cfg.CodeGraphAllowedRoots) != 2 || cfg.CodeGraphAllowedRoots[1] != "/srv/repo-b" ||
-		cfg.CodeGraphMaxFiles != 123 || cfg.CodeGraphMaxEntities != 456 || cfg.CodeGraphMaxRelations != 789 {
+		cfg.CodeGraphMaxFiles != 123 || cfg.CodeGraphMaxEntities != 456 || cfg.CodeGraphMaxRelations != 789 ||
+		cfg.CodeGraphJVMIndexer != "/test/jvm" || cfg.CodeGraphTSIndexer != "/test/typescript" || cfg.CodeGraphPythonIndexer != "/test/python" {
 		t.Fatalf("code graph config = %#v", cfg)
 	}
 }

@@ -1,0 +1,19 @@
+#!/bin/sh
+# SPDX-License-Identifier: MPL-2.0
+set -eu
+
+source_root=${1:?repository copy is required}
+output_root=${2:?output directory is required}
+mkdir -p "$output_root"
+
+project_name=${CODEGRAPH_PROJECT_NAME:-$(basename "$source_root")}
+rm -f "$source_root/index.scip"
+(
+    cd "$source_root"
+    scip-python index . --project-name="$project_name" --project-version=_
+)
+if [ ! -s "$source_root/index.scip" ]; then
+    echo "scip-python did not produce an index" >&2
+    exit 1
+fi
+cp "$source_root/index.scip" "$output_root/python-1.scip"

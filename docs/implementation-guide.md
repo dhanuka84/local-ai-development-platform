@@ -148,9 +148,11 @@ Both approved knowledge and repository edges share one Milvus collection with a 
 
 ## Source-code graph
 
-`code_repository_index` analyzes a checked-out Go repository below `CODEGRAPH_ALLOWED_ROOTS`. The service resolves symlinks before checking the allowlist, verifies the requested Git revision, rejects a dirty worktree unless explicitly permitted, and applies file/entity/relation caps. The analyzer does not use an LLM and does not execute repository programs.
+`code_repository_index` analyzes checked-out Go, Java, Kotlin, TypeScript, JavaScript, and Python repositories below `CODEGRAPH_ALLOWED_ROOTS`. A language router runs every applicable provider for a mixed-language repository. The service resolves symlinks before checking the allowlist, verifies the requested Git branch and revision, rejects a dirty worktree unless explicitly permitted, and applies file/entity/relation caps. The analyzers do not use an LLM or execute the repository's application entry points.
 
-Each successful run contains modules, packages, files, types, interfaces, functions, methods, fields, variables, constants, and tests plus typed `contains`, `defines`, `imports`, `calls`, `references`, `implements`, `embeds`, and `tests` edges. PostgreSQL writes the entire run and advances `code_repository_heads` in one transaction. A failed or partial analysis cannot replace the active graph.
+Go uses compiler APIs directly. The other providers import the official SCIP protocol: `scip-java` covers Maven/Gradle Java and Gradle Kotlin, `scip-typescript` covers TypeScript and JavaScript, and `scip-python` covers Python. They run on a disposable copy so generated files, downloaded dependencies, and build output cannot modify the allowlisted checkout. Maven and Gradle may execute build plugins inside the analyzer container; TypeScript dependency installation disables lifecycle scripts, and Python indexing does not install repository packages. Kotlin projects built only with Maven are not supported by `scip-java`. Maven indexing activates a root `deploy` profile when present to cover modules outside the default reactor, but executes the `install` lifecycle rather than publishing artifacts and skips release signing, source archives, and Javadoc generation. A dedicated named volume caches downloaded dependencies; successful Maven analysis also installs the disposable build's artifacts there so dependent sibling repositories can be indexed afterward.
+
+Each successful run records the repository name, checked-out branch, and exact commit (or explicit dirty-worktree fingerprint). It contains modules, packages, files, types, interfaces, functions, methods, fields, variables, constants, and tests plus typed `contains`, `defines`, `imports`, `calls`, `references`, `implements`, `embeds`, and `tests` edges. PostgreSQL writes the entire run and advances `code_repository_heads` in one transaction. A failed or partial analysis cannot replace the active graph. Search and traversal results repeat the repository, branch, and revision mapping so similarly named symbols from sibling repositories remain attributable.
 
 Logical identities use a repository-scoped stable key composed from language, entity kind, and qualified name. `code_entities` reuses its UUID across analysis revisions. Milvus stores selected first-party types, interfaces, functions, methods, and tests—including signatures, source paths, and available documentation—using that UUID as the vector primary key:
 
@@ -208,6 +210,9 @@ Configuration is environment-only and validated at startup. Important values:
 | `CODEGRAPH_MAX_FILES` | `5000` | Hard cap per analysis request. |
 | `CODEGRAPH_MAX_ENTITIES` | `200000` | Hard cap per analysis request. |
 | `CODEGRAPH_MAX_RELATIONS` | `1000000` | Hard cap per analysis request. |
+| `CODEGRAPH_JVM_INDEXER_COMMAND` | `/usr/local/bin/hybrid-index-jvm` | Disposable-copy Java/Kotlin SCIP adapter. |
+| `CODEGRAPH_TYPESCRIPT_INDEXER_COMMAND` | `/usr/local/bin/hybrid-index-typescript` | Disposable-copy TypeScript/JavaScript SCIP adapter. |
+| `CODEGRAPH_PYTHON_INDEXER_COMMAND` | `/usr/local/bin/hybrid-index-python` | Disposable-copy Python SCIP adapter. |
 
 ## Schema and embedding evolution
 

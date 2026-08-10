@@ -43,7 +43,7 @@ func New(address, authMode string, authenticator Authenticator, localPrincipal d
 	return &http.Server{
 		Addr: address, Handler: requestLog(logger, mux),
 		ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 5 * time.Minute,
-		WriteTimeout: 5 * time.Minute, IdleTimeout: 2 * time.Minute,
+		WriteTimeout: 20 * time.Minute, IdleTimeout: 2 * time.Minute,
 	}
 }
 

@@ -1,0 +1,44 @@
+#!/bin/sh
+# SPDX-License-Identifier: MPL-2.0
+set -eu
+
+source_root=${1:?repository copy is required}
+output_root=${2:?output directory is required}
+mkdir -p "$output_root"
+
+build_roots=$(mktemp)
+trap 'rm -f "$build_roots"' EXIT
+
+if [ -f "$source_root/pom.xml" ] || [ -f "$source_root/build.gradle" ] || [ -f "$source_root/build.gradle.kts" ] || [ -f "$source_root/settings.gradle" ] || [ -f "$source_root/settings.gradle.kts" ]; then
+    printf '%s\n' "$source_root" >"$build_roots"
+else
+    find "$source_root" -mindepth 2 -maxdepth 5 -type f \( -name pom.xml -o -name build.gradle -o -name build.gradle.kts -o -name settings.gradle -o -name settings.gradle.kts \) -printf '%h\n' | sort -u >"$build_roots"
+fi
+
+if [ ! -s "$build_roots" ]; then
+    echo "no Maven or Gradle project was found" >&2
+    exit 1
+fi
+
+index=0
+while IFS= read -r build_root; do
+    index=$((index + 1))
+    rm -f "$build_root/index.scip"
+    (
+        cd "$build_root"
+        if [ -f pom.xml ]; then
+            set -- --batch-mode clean install -DskipTests
+            if grep -Eq '<id>[[:space:]]*deploy[[:space:]]*</id>' pom.xml; then
+                set -- "$@" -Pdeploy -Dgpg.skip=true -Dmaven.javadoc.skip=true -Dmaven.source.skip=true
+            fi
+            scip-java index -- "$@"
+        else
+            scip-java index
+        fi
+    )
+    if [ ! -s "$build_root/index.scip" ]; then
+        echo "scip-java did not produce an index for $build_root" >&2
+        exit 1
+    fi
+    cp "$build_root/index.scip" "$output_root/jvm-$index.scip"
+done <"$build_roots"

@@ -149,6 +149,7 @@ type CodeAnalysis struct {
 	ID              string             `json:"id"`
 	ProjectID       string             `json:"project_id"`
 	Repository      SoftwareRepository `json:"repository"`
+	Branch          string             `json:"branch"`
 	Revision        string             `json:"revision"`
 	Analyzer        string             `json:"analyzer"`
 	AnalyzerVersion string             `json:"analyzer_version"`
@@ -168,25 +169,29 @@ type CodeLocation struct {
 }
 
 type CodeEntity struct {
-	ID            string            `json:"id"`
-	ProjectID     string            `json:"project_id"`
-	RepositoryID  string            `json:"repository_id"`
-	AnalysisRunID string            `json:"analysis_run_id"`
-	Revision      string            `json:"revision"`
-	StableKey     string            `json:"stable_key"`
-	Language      string            `json:"language"`
-	Kind          string            `json:"kind"`
-	Name          string            `json:"name"`
-	QualifiedName string            `json:"qualified_name"`
-	Signature     string            `json:"signature,omitempty"`
-	ContentHash   string            `json:"content_hash,omitempty"`
-	Location      CodeLocation      `json:"location"`
-	Metadata      map[string]string `json:"metadata,omitempty"`
-	Score         float32           `json:"score,omitempty"`
+	ID             string            `json:"id"`
+	ProjectID      string            `json:"project_id"`
+	RepositoryID   string            `json:"repository_id"`
+	RepositoryName string            `json:"repository_name"`
+	AnalysisRunID  string            `json:"analysis_run_id"`
+	Branch         string            `json:"branch"`
+	Revision       string            `json:"revision"`
+	StableKey      string            `json:"stable_key"`
+	Language       string            `json:"language"`
+	Kind           string            `json:"kind"`
+	Name           string            `json:"name"`
+	QualifiedName  string            `json:"qualified_name"`
+	Signature      string            `json:"signature,omitempty"`
+	ContentHash    string            `json:"content_hash,omitempty"`
+	Location       CodeLocation      `json:"location"`
+	Metadata       map[string]string `json:"metadata,omitempty"`
+	Score          float32           `json:"score,omitempty"`
 }
 
 func (e CodeEntity) RetrievalText() string {
-	text := "Code entity: " + e.QualifiedName + "\nLanguage: " + e.Language + "\nKind: " + e.Kind
+	text := "Code entity: " + e.QualifiedName + "\nRepository: " + e.RepositoryName +
+		"\nBranch: " + e.Branch + "\nRevision: " + e.Revision +
+		"\nLanguage: " + e.Language + "\nKind: " + e.Kind
 	if e.Signature != "" {
 		text += "\nSignature: " + e.Signature
 	}

@@ -305,9 +305,13 @@ Monitor worker logs until the outbox drains. Reindex includes approved knowledge
 
 ## Analyze a repository
 
-Set `CODEGRAPH_HOST_ROOT` in `.env` to the host repository or parent directory exposed read-only to the Compose gateway, then restart the gateway. Invoke `code_repository_index` through Codex/OpenClaw with `repository_path=/workspace` (or a child path) and an explicit write approval. Supply the expected commit SHA whenever possible and leave `allow_dirty=false` for reproducible snapshots.
+Set `CODEGRAPH_HOST_ROOT` in `.env` to the host repository or a narrow parent directory exposed read-only to the Compose gateway, then rebuild/restart the gateway. Invoke `code_repository_index` through Codex/OpenClaw with `repository_path=/workspace` (or a child path) and an explicit write approval. Supply both the expected checked-out `branch` and commit `revision` whenever possible, and leave `allow_dirty=false` for reproducible snapshots. Every stored analysis and returned symbol reports its repository name, branch, and revision.
 
-For native STDIO operation, set `CODEGRAPH_ALLOWED_ROOTS` to an OS path-list of permitted roots. Git and the matching Go toolchain must be installed. If dependency disclosure is prohibited, pre-populate the Go module cache or vendor dependencies and run the analyzer environment with `GOPROXY=off`.
+For an organization cloned as sibling directories, mount its parent directory once and index one repository per call. For example, set `CODEGRAPH_HOST_ROOT=/home/user/projects/repositories`, restart with `make mcp-stop && make mcp-start-gpu`, then use child paths such as `/workspace/service-a` and `/workspace/web-app`. The router automatically selects and combines Go, Java/Kotlin, TypeScript/JavaScript, and Python providers. Large compiler-backed scans can take several minutes; the gateway allows 20 minutes for a response, so MCP clients should use a matching tool timeout while keeping ordinary network health checks short.
+
+The source mount is read-only. Java/Kotlin, TypeScript/JavaScript, and Python analysis is performed in disposable copies inside the gateway. Maven and Gradle dependency resolution/build plugins can run in that container; npm lifecycle scripts are disabled; Python dependencies are not installed. Network access may therefore improve JVM/TypeScript resolution but should be disabled or proxied for restricted source. `scip-java` supports Kotlin through Gradle, not Maven-only Kotlin projects. Maven analysis activates a root `deploy` profile when one exists so source modules commonly omitted from the default reactor are included; it still runs `install`, never `deploy`, and disables release signing, source archives, and Javadoc generation. When local Maven projects depend on sibling artifacts, index the foundational/BOM repository first; its disposable Maven build installs artifacts into the dedicated `analyzer-cache` volume for later scans.
+
+For native STDIO operation, set `CODEGRAPH_ALLOWED_ROOTS` to an OS path-list of permitted roots and install Git plus every required compiler/indexer. If dependency disclosure is prohibited, pre-populate language dependency caches and disable egress (for Go, set `GOPROXY=off`).
 
 ## Backup
 
@@ -369,7 +373,7 @@ of OpenAI.
 | Codex MCP tools report a missing token | Token env not exported to the Codex process | Start with `make codex` or export `HYBRID_AI_MCP_TOKEN`; do not put the token value in TOML. |
 | Repository graph is empty | Root does not exactly match UUID/URL/name | Use the canonical URL returned by relation upsert. |
 | Code analysis path is rejected | Path is outside the resolved allowlist or its bind mount | Update `CODEGRAPH_HOST_ROOT`/`CODEGRAPH_ALLOWED_ROOTS`; never expose a broad filesystem root. |
-| Code analysis reports package errors | Required Go version or modules are unavailable | Use the repository's supported Go toolchain and populate its module cache/vendor tree. |
+| Code analysis reports package/build errors | A required toolchain, dependency, or build configuration is unavailable | Inspect gateway logs; populate the relevant cache/vendor tree and confirm Maven/Gradle, tsconfig/package metadata, or Python source roots are valid. |
 | Symbol search uses lexical fallback | Symbol vectors are queued or Ollama/Milvus is down | Inspect `code_entity.upsert` events and worker logs; SQL graph traversal remains authoritative. |
 
 ## Cloud-disclosure checks

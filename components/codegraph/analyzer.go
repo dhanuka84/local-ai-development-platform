@@ -6,6 +6,8 @@ import "context"
 
 type Request struct {
 	RepositoryPath string
+	RepositoryName string
+	Branch         string
 	Revision       string
 	AllowDirty     bool
 	MaxFiles       int

@@ -5,7 +5,7 @@ url = "http://127.0.0.1:8080/mcp"
 bearer_token_env_var = "HYBRID_AI_MCP_TOKEN"
 required = true
 startup_timeout_sec = 20
-tool_timeout_sec = 120
+tool_timeout_sec = 1200
 default_tools_approval_mode = "writes"
 
 # Keep the explicit approval gate for publishing knowledge.

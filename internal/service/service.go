@@ -98,6 +98,7 @@ type CodeIndexInput struct {
 	ProjectID      string
 	Repository     domain.SoftwareRepository
 	RepositoryPath string
+	Branch         string
 	Revision       string
 	AllowDirty     bool
 	RequestedBy    string
@@ -108,6 +109,7 @@ func (s *Service) IndexCodeRepository(ctx context.Context, input CodeIndexInput)
 	input.Repository.Name = strings.TrimSpace(input.Repository.Name)
 	input.Repository.CanonicalURL = strings.TrimSpace(input.Repository.CanonicalURL)
 	input.Repository.DefaultBranch = strings.TrimSpace(input.Repository.DefaultBranch)
+	input.Branch = strings.TrimSpace(input.Branch)
 	input.Revision = strings.TrimSpace(input.Revision)
 	input.RequestedBy = strings.TrimSpace(input.RequestedBy)
 	if input.ProjectID == "" || input.Repository.Name == "" || input.Repository.CanonicalURL == "" ||
@@ -123,6 +125,8 @@ func (s *Service) IndexCodeRepository(ctx context.Context, input CodeIndexInput)
 	}
 	snapshot, err := s.codeAnalyzer.Analyze(ctx, codegraph.Request{
 		RepositoryPath: path,
+		RepositoryName: input.Repository.Name,
+		Branch:         input.Branch,
 		Revision:       input.Revision,
 		AllowDirty:     input.AllowDirty,
 		MaxFiles:       s.codeLimits.MaxFiles,

@@ -76,7 +76,7 @@ before following calls, references, implementations, imports, or tests.
 | Local inference | Ollama | Simple local model serving and local embeddings. |
 | Local coding on GBX100/GB10 | `qwen3.6:35b` | Current open-weight agentic coding model with ample memory headroom on 128 GB. |
 | Local embeddings | `embeddinggemma` | Small local embedding model; 768 dimensions by default. |
-| Code analysis | Go packages, AST, and type information | Deterministic build-aware evidence without an LLM or editor bridge. |
+| Code analysis | Go compiler APIs plus SCIP for JVM, TypeScript/JavaScript, and Python | Deterministic, build-aware evidence without an LLM or editor bridge. |
 | Cloud architecture review | `moonshot/kimi-k3` | Explicit, sanitized review subagent. |
 | Cloud coding and independent code review | Codex/ChatGPT | MCP-connected implementation/review and reusable validated outcome capture. |
 
@@ -286,7 +286,7 @@ Available tools:
 | `repository_relation_upsert` | Store a typed, approved Git-repository edge and queue its vector projection. |
 | `repository_graph_get` | Traverse exact SQL relationships to depth 1–5. |
 | `repository_relation_search` | Semantically search relationship evidence in Milvus. |
-| `code_repository_index` | Analyze an allowlisted local Go repository and atomically publish its SQL graph snapshot. |
+| `code_repository_index` | Analyze an allowlisted local Go, Java, Kotlin, TypeScript, JavaScript, or Python repository and atomically publish a repository-, branch-, and revision-mapped SQL graph snapshot. |
 | `code_symbol_search` | Discover selected symbols through Milvus, then hydrate the active PostgreSQL entity. |
 | `code_graph_get` | Traverse the exact active SQL graph around a symbol to depth 1–5. |
 
@@ -316,7 +316,7 @@ make build
 docker compose --env-file .env.example -f deploy/compose/compose.yaml config --quiet
 ```
 
-Native and STDIO code analysis requires Git and the Go toolchain. The local Compose gateway uses the `gateway-analyzer` image and a read-only `/workspace` mount. The production gateway target remains distroless; enterprise deployments should run analyzers in isolated queued workers.
+Native and STDIO code analysis requires Git plus the selected language indexers and build toolchains. The local Compose `gateway-analyzer` image includes Go, Java/Maven/Gradle, Node, and pinned SCIP indexers. It keeps `/workspace` read-only and runs non-Go indexers against disposable copies. The production gateway target remains distroless; enterprise deployments should run analyzers in isolated queued workers.
 
 The module uses the official MCP Go SDK `v1.7.0`, which supports MCP protocol `2026-07-28`, and the Milvus Go client `v2.6.5`. Milvus Standalone is pinned to `v2.6.21`, matching the official 2.6 deployment line. Review dependency and image updates through CI rather than following floating `latest` tags.
 

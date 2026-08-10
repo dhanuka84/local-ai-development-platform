@@ -13,7 +13,6 @@ import (
 	"go/token"
 	"go/types"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -69,7 +68,7 @@ func (a *Analyzer) Analyze(ctx context.Context, request codegraph.Request) (code
 	if !info.IsDir() {
 		return codegraph.Snapshot{}, errors.New("repository path must be a directory")
 	}
-	revision, dirty, err := resolveRevision(ctx, root, strings.TrimSpace(request.Revision))
+	revision, branch, dirty, err := codegraph.ResolveRepositoryState(ctx, root, request.Revision, request.Branch)
 	if err != nil {
 		return codegraph.Snapshot{}, err
 	}
@@ -82,10 +81,16 @@ func (a *Analyzer) Analyze(ctx context.Context, request codegraph.Request) (code
 		maxFiles: positiveOr(request.MaxFiles, defaultMaxFiles), maxEntities: positiveOr(request.MaxEntities, defaultMaxNodes),
 		maxRelations: positiveOr(request.MaxRelations, defaultMaxEdges),
 	}
+	repositoryName := strings.TrimSpace(request.RepositoryName)
+	if repositoryName == "" {
+		repositoryName = filepath.Base(root)
+	}
 	repositoryKey := codegraph.StableKey("go", codegraph.EntityRepository, ".")
 	b.addEntity(codegraph.Entity{
 		Key: repositoryKey, Language: "go", Kind: codegraph.EntityRepository,
-		Name: filepath.Base(root), QualifiedName: ".", Metadata: map[string]string{"path": root},
+		Name: repositoryName, QualifiedName: ".", Metadata: map[string]string{
+			"path": root, "repository": repositoryName, "branch": branch, "revision": revision,
+		},
 	})
 
 	modules, err := discoverModules(root)
@@ -114,10 +119,16 @@ func (a *Analyzer) Analyze(ctx context.Context, request codegraph.Request) (code
 		relations = append(relations, relation)
 	}
 	if dirty {
-		revision += "+worktree." + worktreeFingerprint(entities)
+		revision += "+worktree." + codegraph.WorktreeFingerprint(entities)
+	}
+	for index := range entities {
+		if entities[index].Kind == codegraph.EntityRepository {
+			entities[index].Metadata["revision"] = revision
+		}
 	}
 	snapshot := codegraph.Snapshot{
-		RepositoryPath: root, Revision: revision, Analyzer: a.Name(), AnalyzerVersion: a.Version(),
+		RepositoryPath: root, RepositoryName: repositoryName, Branch: branch, Revision: revision,
+		Analyzer: a.Name(), AnalyzerVersion: a.Version(),
 		StartedAt: started, CompletedAt: time.Now().UTC(), Entities: entities, Relations: relations,
 		Statistics: map[string]int64{"files": int64(len(b.files)), "modules": int64(len(modules))},
 	}
@@ -517,24 +528,6 @@ func discoverModules(root string) ([]string, error) {
 	return modules, nil
 }
 
-func resolveRevision(ctx context.Context, root, expected string) (string, bool, error) {
-	command := exec.CommandContext(ctx, "git", "-C", root, "rev-parse", "HEAD")
-	output, err := command.CombinedOutput()
-	if err != nil {
-		return "", false, fmt.Errorf("resolve Git revision: %w: %s", err, strings.TrimSpace(string(output)))
-	}
-	revision := strings.TrimSpace(string(output))
-	if expected != "" && expected != revision {
-		return "", false, fmt.Errorf("repository is at revision %s, expected %s", revision, expected)
-	}
-	status := exec.CommandContext(ctx, "git", "-C", root, "status", "--porcelain=v1", "--untracked-files=normal")
-	statusOutput, err := status.CombinedOutput()
-	if err != nil {
-		return "", false, fmt.Errorf("inspect Git worktree: %w: %s", err, strings.TrimSpace(string(statusOutput)))
-	}
-	return revision, len(statusOutput) > 0, nil
-}
-
 func entityForDefinition(pkg *packages.Package, identifier *ast.Ident, relative string, node ast.Node, contents []byte) (codegraph.Entity, types.Object, bool) {
 	object := pkg.TypesInfo.Defs[identifier]
 	if object == nil || object.Pkg() == nil {
@@ -722,16 +715,6 @@ func isTestFunction(name, relative string) bool {
 		return false
 	}
 	return strings.HasPrefix(name, "Test") || strings.HasPrefix(name, "Benchmark") || strings.HasPrefix(name, "Fuzz") || strings.HasPrefix(name, "Example")
-}
-
-func worktreeFingerprint(entities []codegraph.Entity) string {
-	sort.Slice(entities, func(i, j int) bool { return entities[i].Key < entities[j].Key })
-	parts := make([]string, 0, len(entities))
-	for _, entity := range entities {
-		parts = append(parts, entity.Key+":"+entity.ContentHash)
-	}
-	hash := codegraph.HashContent([]byte(strings.Join(parts, "\n")))
-	return hash[:12]
 }
 
 func positiveOr(value, fallback int) int {

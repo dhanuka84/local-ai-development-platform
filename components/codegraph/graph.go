@@ -80,6 +80,8 @@ type Relation struct {
 
 type Snapshot struct {
 	RepositoryPath  string           `json:"repository_path"`
+	RepositoryName  string           `json:"repository_name"`
+	Branch          string           `json:"branch"`
 	Revision        string           `json:"revision"`
 	Analyzer        string           `json:"analyzer"`
 	AnalyzerVersion string           `json:"analyzer_version"`
@@ -102,6 +104,9 @@ func HashContent(content []byte) string {
 func (s *Snapshot) Normalize() error {
 	if strings.TrimSpace(s.RepositoryPath) == "" {
 		return errors.New("repository path is required")
+	}
+	if strings.TrimSpace(s.RepositoryName) == "" || strings.TrimSpace(s.Branch) == "" {
+		return errors.New("repository name and branch are required")
 	}
 	if strings.TrimSpace(s.Revision) == "" {
 		return errors.New("repository revision is required")

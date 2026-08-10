@@ -11,7 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-const codeEntityColumns = `e.id::text,e.project_id,e.repository_id::text,o.analysis_run_id::text,run.revision,
+const codeEntityColumns = `e.id::text,e.project_id,e.repository_id::text,repository.name,o.analysis_run_id::text,run.branch,run.revision,
     e.stable_key,e.language,e.kind,e.name,e.qualified_name,o.signature,COALESCE(o.content_hash::text,''),
     o.file_path,o.start_line,o.start_column,o.end_line,o.end_column,e.metadata`
 
@@ -23,7 +23,8 @@ func scanCodeEntity(row scanner) (domain.CodeEntity, error) {
 	var entity domain.CodeEntity
 	var metadata []byte
 	err := row.Scan(
-		&entity.ID, &entity.ProjectID, &entity.RepositoryID, &entity.AnalysisRunID, &entity.Revision,
+		&entity.ID, &entity.ProjectID, &entity.RepositoryID, &entity.RepositoryName,
+		&entity.AnalysisRunID, &entity.Branch, &entity.Revision,
 		&entity.StableKey, &entity.Language, &entity.Kind, &entity.Name, &entity.QualifiedName,
 		&entity.Signature, &entity.ContentHash, &entity.Location.FilePath, &entity.Location.StartLine,
 		&entity.Location.StartColumn, &entity.Location.EndLine, &entity.Location.EndColumn, &metadata,
@@ -65,9 +66,9 @@ func (r *Repository) StoreCodeGraph(
 	}
 	var runID string
 	err = tx.QueryRow(ctx, `INSERT INTO code_analysis_runs(
-        project_id,repository_id,revision,analyzer,analyzer_version,requested_by,statistics,started_at,completed_at
-      ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id::text`,
-		projectID, repositoryID, snapshot.Revision, snapshot.Analyzer, snapshot.AnalyzerVersion,
+        project_id,repository_id,branch,revision,analyzer,analyzer_version,requested_by,statistics,started_at,completed_at
+      ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id::text`,
+		projectID, repositoryID, snapshot.Branch, snapshot.Revision, snapshot.Analyzer, snapshot.AnalyzerVersion,
 		requestedBy, statistics, snapshot.StartedAt, snapshot.CompletedAt,
 	).Scan(&runID)
 	if err != nil {
@@ -144,7 +145,7 @@ func (r *Repository) StoreCodeGraph(
 	repository.ProjectID = projectID
 	repository.Revision = snapshot.Revision
 	return domain.CodeAnalysis{
-		ID: runID, ProjectID: projectID, Repository: repository, Revision: snapshot.Revision,
+		ID: runID, ProjectID: projectID, Repository: repository, Branch: snapshot.Branch, Revision: snapshot.Revision,
 		Analyzer: snapshot.Analyzer, AnalyzerVersion: snapshot.AnalyzerVersion, RequestedBy: requestedBy,
 		EntityCount: len(snapshot.Entities), RelationCount: len(snapshot.Relations),
 		StartedAt: snapshot.StartedAt, CompletedAt: snapshot.CompletedAt,
@@ -157,6 +158,7 @@ func (r *Repository) GetCodeEntity(ctx context.Context, id string) (domain.CodeE
       JOIN code_repository_heads h ON h.repository_id=e.repository_id
       JOIN code_occurrences o ON o.entity_id=e.id AND o.analysis_run_id=h.analysis_run_id
       JOIN code_analysis_runs run ON run.id=o.analysis_run_id
+	  JOIN software_repositories repository ON repository.id=e.repository_id
       WHERE e.id::text=$1`, id))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return entity, fmt.Errorf("active code entity %q not found", id)
@@ -173,6 +175,7 @@ func (r *Repository) GetCodeEntitiesMany(ctx context.Context, ids []string) ([]d
       JOIN code_repository_heads h ON h.repository_id=e.repository_id
       JOIN code_occurrences o ON o.entity_id=e.id AND o.analysis_run_id=h.analysis_run_id
       JOIN code_analysis_runs run ON run.id=o.analysis_run_id
+	  JOIN software_repositories repository ON repository.id=e.repository_id
       WHERE e.id::text=ANY($1)`, ids)
 	if err != nil {
 		return nil, err
@@ -221,7 +224,8 @@ func scanCodeEntityWithScore(row scanner) (domain.CodeEntity, error) {
 	var entity domain.CodeEntity
 	var metadata []byte
 	err := row.Scan(
-		&entity.ID, &entity.ProjectID, &entity.RepositoryID, &entity.AnalysisRunID, &entity.Revision,
+		&entity.ID, &entity.ProjectID, &entity.RepositoryID, &entity.RepositoryName,
+		&entity.AnalysisRunID, &entity.Branch, &entity.Revision,
 		&entity.StableKey, &entity.Language, &entity.Kind, &entity.Name, &entity.QualifiedName,
 		&entity.Signature, &entity.ContentHash, &entity.Location.FilePath, &entity.Location.StartLine,
 		&entity.Location.StartColumn, &entity.Location.EndLine, &entity.Location.EndColumn, &metadata, &entity.Score,
@@ -255,6 +259,7 @@ func (r *Repository) GetCodeGraph(ctx context.Context, projectID, repositoryRoot
       FROM code_entities e
       JOIN code_occurrences o ON o.entity_id=e.id AND o.analysis_run_id=$1
       JOIN code_analysis_runs run ON run.id=o.analysis_run_id
+	  JOIN software_repositories repository ON repository.id=e.repository_id
       WHERE e.id IN (SELECT DISTINCT entity_id FROM walk)
       ORDER BY e.qualified_name`, analysis.ID, symbolRoot, depth)
 	if err != nil {
@@ -320,7 +325,7 @@ func (r *Repository) getActiveCodeAnalysis(ctx context.Context, projectID, root 
 	var statistics []byte
 	err := r.pool.QueryRow(ctx, `SELECT run.id::text,run.project_id,repository.id::text,repository.project_id,
         repository.name,repository.canonical_url,repository.default_branch,repository.revision,
-        repository.created_at,repository.updated_at,run.revision,run.analyzer,run.analyzer_version,
+		repository.created_at,repository.updated_at,run.branch,run.revision,run.analyzer,run.analyzer_version,
         run.requested_by,run.statistics,run.started_at,run.completed_at
       FROM software_repositories repository
       JOIN code_repository_heads head ON head.repository_id=repository.id
@@ -330,7 +335,7 @@ func (r *Repository) getActiveCodeAnalysis(ctx context.Context, projectID, root 
 		&analysis.ID, &analysis.ProjectID, &analysis.Repository.ID, &analysis.Repository.ProjectID,
 		&analysis.Repository.Name, &analysis.Repository.CanonicalURL, &analysis.Repository.DefaultBranch,
 		&analysis.Repository.Revision, &analysis.Repository.CreatedAt, &analysis.Repository.UpdatedAt,
-		&analysis.Revision, &analysis.Analyzer, &analysis.AnalyzerVersion, &analysis.RequestedBy,
+		&analysis.Branch, &analysis.Revision, &analysis.Analyzer, &analysis.AnalyzerVersion, &analysis.RequestedBy,
 		&statistics, &analysis.StartedAt, &analysis.CompletedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {

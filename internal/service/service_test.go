@@ -109,7 +109,7 @@ func (f *fakeRepository) GetRepositoryGraph(context.Context, string, string, int
 }
 func (f *fakeRepository) StoreCodeGraph(_ context.Context, projectID string, repository domain.SoftwareRepository, requestedBy string, snapshot codegraph.Snapshot) (domain.CodeAnalysis, error) {
 	f.codeSnapshot = snapshot
-	return domain.CodeAnalysis{ID: "analysis", ProjectID: projectID, Repository: repository, Revision: snapshot.Revision, RequestedBy: requestedBy}, nil
+	return domain.CodeAnalysis{ID: "analysis", ProjectID: projectID, Repository: repository, Branch: snapshot.Branch, Revision: snapshot.Revision, RequestedBy: requestedBy}, nil
 }
 func (f *fakeRepository) GetCodeEntity(context.Context, string) (domain.CodeEntity, error) {
 	return domain.CodeEntity{}, nil
@@ -305,7 +305,8 @@ func (f *fakeCodeAnalyzer) Analyze(_ context.Context, request codegraph.Request)
 	f.request = request
 	now := time.Now()
 	return codegraph.Snapshot{
-		RepositoryPath: request.RepositoryPath, Revision: "abc123", Analyzer: f.Name(), AnalyzerVersion: f.Version(),
+		RepositoryPath: request.RepositoryPath, RepositoryName: request.RepositoryName,
+		Branch: request.Branch, Revision: "abc123", Analyzer: f.Name(), AnalyzerVersion: f.Version(),
 		StartedAt: now, CompletedAt: now,
 	}, nil
 }
@@ -323,13 +324,14 @@ func TestIndexCodeRepositoryEnforcesAllowedRoot(t *testing.T) {
 		t.Fatal(err)
 	}
 	analysis, err := svc.IndexCodeRepository(context.Background(), CodeIndexInput{
-		ProjectID: "product", RepositoryPath: repositoryPath, RequestedBy: "codex",
+		ProjectID: "product", RepositoryPath: repositoryPath, Branch: "feature/indexing", RequestedBy: "codex",
 		Repository: domain.SoftwareRepository{Name: "repo", CanonicalURL: "https://example.test/repo.git"},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if analysis.ID != "analysis" || analyzer.request.MaxRelations != 30 || repository.codeSnapshot.Revision != "abc123" {
+	if analysis.ID != "analysis" || analyzer.request.MaxRelations != 30 || analyzer.request.RepositoryName != "repo" ||
+		analysis.Branch != "feature/indexing" || repository.codeSnapshot.Revision != "abc123" {
 		t.Fatalf("analysis=%#v request=%#v", analysis, analyzer.request)
 	}
 	_, err = svc.IndexCodeRepository(context.Background(), CodeIndexInput{

@@ -1,0 +1,61 @@
+#!/bin/sh
+# SPDX-License-Identifier: MPL-2.0
+set -eu
+
+source_root=${1:?repository copy is required}
+output_root=${2:?output directory is required}
+mkdir -p "$output_root"
+
+project_roots=$(mktemp)
+trap 'rm -f "$project_roots"' EXIT
+
+if [ -f "$source_root/package.json" ] || [ -f "$source_root/tsconfig.json" ]; then
+    printf '%s\n' "$source_root" >"$project_roots"
+else
+    find "$source_root" -mindepth 2 -maxdepth 5 -type f \( -name package.json -o -name tsconfig.json \) -printf '%h\n' | sort -u >"$project_roots"
+fi
+
+if [ ! -s "$project_roots" ]; then
+    echo "no package.json or tsconfig.json was found" >&2
+    exit 1
+fi
+
+install_dependencies() {
+    project_root=$1
+    if [ -f "$project_root/package-lock.json" ] || [ -f "$project_root/npm-shrinkwrap.json" ]; then
+        (cd "$project_root" && npm ci --ignore-scripts --no-audit --no-fund) || echo "npm ci failed; continuing with available dependencies" >&2
+    elif [ -f "$project_root/package.json" ]; then
+        (cd "$project_root" && npm install --ignore-scripts --no-audit --no-fund) || echo "npm install failed; continuing with available dependencies" >&2
+    fi
+}
+
+index=0
+while IFS= read -r project_root; do
+    index=$((index + 1))
+    install_dependencies "$project_root"
+    rm -f "$project_root/index.scip"
+    if [ -f "$project_root/tsconfig.json" ]; then
+        (cd "$project_root" && scip-typescript index --no-global-caches)
+    else
+        printf '%s\n' \
+            '{' \
+            '  "compilerOptions": {' \
+            '    "allowJs": true,' \
+            '    "checkJs": false,' \
+            '    "noEmit": true,' \
+            '    "target": "ES2022",' \
+            '    "module": "NodeNext",' \
+            '    "moduleResolution": "NodeNext",' \
+            '    "skipLibCheck": true' \
+            '  },' \
+            '  "include": ["**/*.js", "**/*.jsx", "**/*.mjs", "**/*.cjs", "**/*.ts", "**/*.tsx"],' \
+            '  "exclude": ["node_modules", "target", "build", "dist", "coverage"]' \
+            '}' >"$project_root/tsconfig.json"
+        (cd "$project_root" && scip-typescript index --no-global-caches)
+    fi
+    if [ ! -s "$project_root/index.scip" ]; then
+        echo "scip-typescript did not produce an index for $project_root" >&2
+        exit 1
+    fi
+    cp "$project_root/index.scip" "$output_root/typescript-$index.scip"
+done <"$project_roots"

@@ -14,34 +14,37 @@ import (
 )
 
 type Config struct {
-	Environment           string
-	LogLevel              string
-	HTTPAddress           string
-	MCPTransport          string
-	AuthMode              string
-	AuthToken             string
-	AuthPrincipals        []domain.PrincipalBootstrap
-	AuthorizationMode     string
-	CerbosAddress         string
-	CerbosRequestTimeout  time.Duration
-	DatabaseURL           string
-	ArtifactsPath         string
-	OllamaURL             string
-	EmbeddingModel        string
-	EmbeddingDimension    int
-	MilvusAddress         string
-	MilvusDatabase        string
-	MilvusCollection      string
-	MilvusAPIKey          string
-	WorkerPollInterval    time.Duration
-	WorkerBatchSize       int
-	SearchFallback        bool
-	AutoApproveLocal      bool
-	CodeGraphEnabled      bool
-	CodeGraphAllowedRoots []string
-	CodeGraphMaxFiles     int
-	CodeGraphMaxEntities  int
-	CodeGraphMaxRelations int
+	Environment            string
+	LogLevel               string
+	HTTPAddress            string
+	MCPTransport           string
+	AuthMode               string
+	AuthToken              string
+	AuthPrincipals         []domain.PrincipalBootstrap
+	AuthorizationMode      string
+	CerbosAddress          string
+	CerbosRequestTimeout   time.Duration
+	DatabaseURL            string
+	ArtifactsPath          string
+	OllamaURL              string
+	EmbeddingModel         string
+	EmbeddingDimension     int
+	MilvusAddress          string
+	MilvusDatabase         string
+	MilvusCollection       string
+	MilvusAPIKey           string
+	WorkerPollInterval     time.Duration
+	WorkerBatchSize        int
+	SearchFallback         bool
+	AutoApproveLocal       bool
+	CodeGraphEnabled       bool
+	CodeGraphAllowedRoots  []string
+	CodeGraphMaxFiles      int
+	CodeGraphMaxEntities   int
+	CodeGraphMaxRelations  int
+	CodeGraphJVMIndexer    string
+	CodeGraphTSIndexer     string
+	CodeGraphPythonIndexer string
 }
 
 func Load() (Config, error) { return load(true) }
@@ -59,34 +62,37 @@ func load(validateAuth bool) (Config, error) {
 		return Config{}, err
 	}
 	cfg := Config{
-		Environment:           environment,
-		LogLevel:              env("LOG_LEVEL", "info"),
-		HTTPAddress:           env("HTTP_ADDRESS", "127.0.0.1:8080"),
-		MCPTransport:          env("MCP_TRANSPORT", "http"),
-		AuthMode:              env("AUTH_MODE", "token"),
-		AuthToken:             os.Getenv("AUTH_TOKEN"),
-		AuthPrincipals:        authPrincipals,
-		AuthorizationMode:     env("AUTHORIZATION_MODE", authorizationDefault),
-		CerbosAddress:         env("CERBOS_ADDRESS", "127.0.0.1:3593"),
-		CerbosRequestTimeout:  durationEnv("CERBOS_REQUEST_TIMEOUT", 2*time.Second),
-		DatabaseURL:           env("DATABASE_URL", "postgres://hybrid:hybrid@127.0.0.1:5432/hybrid?sslmode=disable"),
-		ArtifactsPath:         env("ARTIFACTS_PATH", "./data/artifacts"),
-		OllamaURL:             strings.TrimRight(env("OLLAMA_URL", "http://127.0.0.1:11434"), "/"),
-		EmbeddingModel:        env("OLLAMA_EMBEDDING_MODEL", "embeddinggemma"),
-		MilvusAddress:         env("MILVUS_ADDRESS", "127.0.0.1:19530"),
-		MilvusDatabase:        env("MILVUS_DATABASE", "default"),
-		MilvusCollection:      env("MILVUS_COLLECTION", "approved_knowledge_v1"),
-		MilvusAPIKey:          os.Getenv("MILVUS_API_KEY"),
-		WorkerPollInterval:    durationEnv("WORKER_POLL_INTERVAL", 2*time.Second),
-		EmbeddingDimension:    intEnv("EMBEDDING_DIMENSION", 768),
-		WorkerBatchSize:       intEnv("WORKER_BATCH_SIZE", 25),
-		SearchFallback:        boolEnv("SEARCH_LEXICAL_FALLBACK", true),
-		AutoApproveLocal:      boolEnv("AUTO_APPROVE_LOCAL", false),
-		CodeGraphEnabled:      boolEnv("CODEGRAPH_ENABLED", environment == "local"),
-		CodeGraphAllowedRoots: pathListEnv("CODEGRAPH_ALLOWED_ROOTS", "."),
-		CodeGraphMaxFiles:     intEnv("CODEGRAPH_MAX_FILES", 5000),
-		CodeGraphMaxEntities:  intEnv("CODEGRAPH_MAX_ENTITIES", 200000),
-		CodeGraphMaxRelations: intEnv("CODEGRAPH_MAX_RELATIONS", 1000000),
+		Environment:            environment,
+		LogLevel:               env("LOG_LEVEL", "info"),
+		HTTPAddress:            env("HTTP_ADDRESS", "127.0.0.1:8080"),
+		MCPTransport:           env("MCP_TRANSPORT", "http"),
+		AuthMode:               env("AUTH_MODE", "token"),
+		AuthToken:              os.Getenv("AUTH_TOKEN"),
+		AuthPrincipals:         authPrincipals,
+		AuthorizationMode:      env("AUTHORIZATION_MODE", authorizationDefault),
+		CerbosAddress:          env("CERBOS_ADDRESS", "127.0.0.1:3593"),
+		CerbosRequestTimeout:   durationEnv("CERBOS_REQUEST_TIMEOUT", 2*time.Second),
+		DatabaseURL:            env("DATABASE_URL", "postgres://hybrid:hybrid@127.0.0.1:5432/hybrid?sslmode=disable"),
+		ArtifactsPath:          env("ARTIFACTS_PATH", "./data/artifacts"),
+		OllamaURL:              strings.TrimRight(env("OLLAMA_URL", "http://127.0.0.1:11434"), "/"),
+		EmbeddingModel:         env("OLLAMA_EMBEDDING_MODEL", "embeddinggemma"),
+		MilvusAddress:          env("MILVUS_ADDRESS", "127.0.0.1:19530"),
+		MilvusDatabase:         env("MILVUS_DATABASE", "default"),
+		MilvusCollection:       env("MILVUS_COLLECTION", "approved_knowledge_v1"),
+		MilvusAPIKey:           os.Getenv("MILVUS_API_KEY"),
+		WorkerPollInterval:     durationEnv("WORKER_POLL_INTERVAL", 2*time.Second),
+		EmbeddingDimension:     intEnv("EMBEDDING_DIMENSION", 768),
+		WorkerBatchSize:        intEnv("WORKER_BATCH_SIZE", 25),
+		SearchFallback:         boolEnv("SEARCH_LEXICAL_FALLBACK", true),
+		AutoApproveLocal:       boolEnv("AUTO_APPROVE_LOCAL", false),
+		CodeGraphEnabled:       boolEnv("CODEGRAPH_ENABLED", environment == "local"),
+		CodeGraphAllowedRoots:  pathListEnv("CODEGRAPH_ALLOWED_ROOTS", "."),
+		CodeGraphMaxFiles:      intEnv("CODEGRAPH_MAX_FILES", 5000),
+		CodeGraphMaxEntities:   intEnv("CODEGRAPH_MAX_ENTITIES", 200000),
+		CodeGraphMaxRelations:  intEnv("CODEGRAPH_MAX_RELATIONS", 1000000),
+		CodeGraphJVMIndexer:    env("CODEGRAPH_JVM_INDEXER_COMMAND", "/usr/local/bin/hybrid-index-jvm"),
+		CodeGraphTSIndexer:     env("CODEGRAPH_TYPESCRIPT_INDEXER_COMMAND", "/usr/local/bin/hybrid-index-typescript"),
+		CodeGraphPythonIndexer: env("CODEGRAPH_PYTHON_INDEXER_COMMAND", "/usr/local/bin/hybrid-index-python"),
 	}
 
 	switch cfg.MCPTransport {

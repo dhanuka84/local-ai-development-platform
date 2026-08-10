@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	golanganalyzer "github.com/dhanuka84/hybrid-ai-platform/components/codegraph/golang"
+	codegraphrouter "github.com/dhanuka84/hybrid-ai-platform/components/codegraph/router"
+	scipanalyzer "github.com/dhanuka84/hybrid-ai-platform/components/codegraph/scip"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/artifacts"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/authorization"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/config"
@@ -52,7 +54,48 @@ func Open(ctx context.Context, cfg config.Config) (*Platform, error) {
 		return nil, err
 	}
 	if cfg.CodeGraphEnabled {
-		if err := svc.ConfigureCodeGraph(golanganalyzer.New(), cfg.CodeGraphAllowedRoots, service.CodeGraphLimits{
+		jvmAnalyzer, err := scipanalyzer.New(scipanalyzer.Config{
+			Name: "scip-java", Version: "0.13.1", Command: cfg.CodeGraphJVMIndexer, Language: "jvm",
+		})
+		if err != nil {
+			_ = vectors.Close(ctx)
+			repository.Close()
+			return nil, fmt.Errorf("configure JVM code analyzer: %w", err)
+		}
+		typeScriptAnalyzer, err := scipanalyzer.New(scipanalyzer.Config{
+			Name: "scip-typescript", Version: "0.4.0", Command: cfg.CodeGraphTSIndexer, Language: "typescript",
+		})
+		if err != nil {
+			_ = vectors.Close(ctx)
+			repository.Close()
+			return nil, fmt.Errorf("configure TypeScript code analyzer: %w", err)
+		}
+		pythonAnalyzer, err := scipanalyzer.New(scipanalyzer.Config{
+			Name: "scip-python", Version: "0.6.6", Command: cfg.CodeGraphPythonIndexer, Language: "python",
+		})
+		if err != nil {
+			_ = vectors.Close(ctx)
+			repository.Close()
+			return nil, fmt.Errorf("configure Python code analyzer: %w", err)
+		}
+		analyzer, err := codegraphrouter.New(
+			codegraphrouter.Candidate{Analyzer: golanganalyzer.New(), Extensions: []string{".go"}, Markers: []string{"go.mod"}},
+			codegraphrouter.Candidate{
+				Analyzer: jvmAnalyzer, Extensions: []string{".java", ".kt"},
+				Markers: []string{"pom.xml", "build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts", "gradlew"},
+			},
+			codegraphrouter.Candidate{
+				Analyzer: typeScriptAnalyzer, Extensions: []string{".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"},
+				Markers: []string{"package.json", "tsconfig.json"},
+			},
+			codegraphrouter.Candidate{Analyzer: pythonAnalyzer, Extensions: []string{".py"}},
+		)
+		if err != nil {
+			_ = vectors.Close(ctx)
+			repository.Close()
+			return nil, fmt.Errorf("configure code analyzer routing: %w", err)
+		}
+		if err := svc.ConfigureCodeGraph(analyzer, cfg.CodeGraphAllowedRoots, service.CodeGraphLimits{
 			MaxFiles: cfg.CodeGraphMaxFiles, MaxEntities: cfg.CodeGraphMaxEntities, MaxRelations: cfg.CodeGraphMaxRelations,
 		}); err != nil {
 			_ = vectors.Close(ctx)

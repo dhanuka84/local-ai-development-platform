@@ -182,7 +182,8 @@ func TestRepositoryWorkflowIntegration(t *testing.T) {
 
 	now := time.Now().UTC()
 	snapshot := codegraph.Snapshot{
-		RepositoryPath: "/tmp/api", Revision: "abc", Analyzer: "integration", AnalyzerVersion: "1",
+		RepositoryPath: "/tmp/api", RepositoryName: "api", Branch: "main", Revision: "abc",
+		Analyzer: "integration", AnalyzerVersion: "1",
 		StartedAt: now, CompletedAt: now,
 		Entities: []codegraph.Entity{
 			{Key: "go:repository:.", Language: "go", Kind: codegraph.EntityRepository, Name: "api", QualifiedName: "."},
@@ -200,14 +201,15 @@ func TestRepositoryWorkflowIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if analysis.EntityCount != 3 || analysis.RelationCount != 2 || analysis.Repository.ID == "" {
+	if analysis.EntityCount != 3 || analysis.RelationCount != 2 || analysis.Repository.ID == "" || analysis.Branch != "main" {
 		t.Fatalf("analysis = %#v", analysis)
 	}
 	symbols, err := repository.SearchCodeEntitiesLexical(ctx, "product", analysis.Repository.ID, "Save", 5)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(symbols) != 1 || symbols[0].QualifiedName != "example/api.Save" {
+	if len(symbols) != 1 || symbols[0].QualifiedName != "example/api.Save" ||
+		symbols[0].RepositoryName != "api" || symbols[0].Branch != "main" {
 		t.Fatalf("symbols = %#v", symbols)
 	}
 	codeGraph, err := repository.GetCodeGraph(ctx, "product", analysis.Repository.ID, "example/api.Save", 2)

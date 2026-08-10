@@ -33,7 +33,7 @@ services:
       - ../cerbos/config.yaml:/config/config.yaml:ro
       - cerbos-audit:/var/lib/cerbos/audit
     healthcheck:
-      test: ["CMD", "cerbos", "healthcheck", "--config=/config/config.yaml"]
+      test: ["CMD", "/cerbos", "healthcheck", "--config=/config/config.yaml"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -144,9 +144,10 @@ services:
 
   artifact-init:
     image: alpine:3.24.0
-    command: ["sh", "-c", "chown -R 65532:65532 /artifacts && chmod 700 /artifacts"]
+    command: ["sh", "-c", "chown -R 65532:65532 /artifacts /analyzer-cache && chmod 700 /artifacts /analyzer-cache"]
     volumes:
       - artifact-data:/artifacts
+      - analyzer-cache:/analyzer-cache
     restart: "no"
 
   migrate:
@@ -185,10 +186,12 @@ services:
       CONTROLLER_AUTH_PROJECTS: ${CONTROLLER_AUTH_PROJECTS:-*}
       CODEGRAPH_ENABLED: "true"
       CODEGRAPH_ALLOWED_ROOTS: /workspace
+      CODEGRAPH_ANALYZER_CACHE_ROOT: /var/cache/hybrid-analyzer
     ports:
       - "127.0.0.1:8080:8080"
     volumes:
       - artifact-data:/var/lib/hybrid-ai/artifacts
+      - analyzer-cache:/var/cache/hybrid-analyzer
       - ${CODEGRAPH_HOST_ROOT:-../..}:/workspace:ro
     depends_on:
       cerbos:
@@ -227,3 +230,4 @@ volumes:
   milvus-data:
   ollama-data:
   artifact-data:
+  analyzer-cache:
