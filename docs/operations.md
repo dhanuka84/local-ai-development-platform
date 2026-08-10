@@ -168,7 +168,7 @@ overrides. The target repository's trusted Codex configuration still applies.
 | Command | Purpose |
 |---|---|
 | `make env-init` | Create a protected `.env` with independent random local secrets; refuse overwrite. |
-| `make mcp-preflight` | Validate Docker, Git, curl, secrets, and Compose configuration. |
+| `make mcp-preflight` | Validate Docker daemon access, Git, curl, secrets, and Compose configuration. |
 | `make preflight` | Run MCP preflight plus Codex authentication/registration checks. |
 | `make mcp-start` | Start the CPU platform and HTTP MCP gateway. |
 | `make mcp-start-gpu` | Start the NVIDIA platform and HTTP MCP gateway. |
@@ -183,43 +183,61 @@ overrides. The target repository's trusted Codex configuration still applies.
 | `make openclaw-plugin-deps` | Install the controller plugin's pinned dependencies. |
 | `make openclaw-plugin-check` | Type-check/test the plugin, validate its metadata, and audit production dependencies. |
 | `make openclaw-config-check` | Validate the complete example against the pinned OpenClaw schema. |
-| `make openclaw-plugin-install` | Build and install/update the local controller plugin. |
-| `make openclaw-start` | Start the OpenClaw gateway with only the controller credential loaded. |
+| `make openclaw-config-plan` | Dry-run the user-configuration merge without writing it. |
+| `make openclaw-config-apply` | Apply the validated user-configuration merge. |
+| `make openclaw-plugin-install` | Apply configuration, then idempotently replace the trusted local plugin. |
+| `make openclaw-setup` | Run dependencies, checks, configuration, installation, and diagnostics in the required order. |
+| `make openclaw-start` | Start the foreground OpenClaw gateway with only the controller credential loaded; reject listener conflicts. |
+| `make openclaw-status` | Verify the gateway, plugin, agents, and authenticated MCP probe. |
+| `make platform-status` | Verify the complete Docker/MCP and OpenClaw integration. |
 | `make pull-local-model` | Pull the configured Ollama coding model. |
 | `make mcp-stop` | Stop the platform while retaining named volumes. |
 
 ## OpenClaw client operation
 
 OpenClaw connects to the same loopback MCP endpoint with the non-human
-`CONTROLLER_AUTH_TOKEN`. Install and validate the controller plugin, then start
-the OpenClaw gateway without printing or manually exporting the token:
+`CONTROLLER_AUTH_TOKEN`. Configure, validate, and install the controller, then
+start the OpenClaw gateway without printing or manually exporting the token:
 
 ```bash
-make openclaw-plugin-deps
-make openclaw-plugin-check
-make openclaw-plugin-install
+make openclaw-setup
 make openclaw-start
 ```
 
+`openclaw-setup` first validates the proposed merge and then applies the
+versioned JSON5 fragment. It uses OpenClaw's forced local-source replacement so
+the install target is safe to rerun after an interrupted or older installation.
+Use `make openclaw-config-plan` separately whenever only a non-mutating preview
+is wanted.
+
 `make openclaw-start` loads only `CONTROLLER_AUTH_TOKEN` into the OpenClaw
-process. The controller can coordinate state and run bounded work, but it cannot
-perform human QA or Product Owner decisions. Use `make codex` or another local
-human approval surface with `AUTH_TOKEN` at those gates.
+process. If a systemd or foreground gateway is already reachable, it exits with
+a corrective message instead of competing for the listener. The controller can
+coordinate state and run bounded work, but it cannot perform human QA or
+Product Owner decisions. Use `make codex` or another local human approval
+surface with `AUTH_TOKEN` at those gates.
+
+An OpenClaw systemd user service installed outside this workflow does not
+inherit the project `.env`. `make platform-status` inspects that service's
+configured environment without printing its contents and fails if the
+controller credential is absent. Stop the service with
+`systemctl --user stop openclaw-gateway`, then use `make openclaw-start` in a
+dedicated terminal.
 
 Use the `developer` agent for local development with explicit cloud-review escalation. Use the `maintenance` agent for local-only operation; its one-model per-agent catalog and empty fallbacks prevent Kimi or Codex model selection, including stored session overrides. Configure the Moonshot credential only in the `cloud-review` provider/agent through interactive OpenClaw onboarding. Do not put the Moonshot key in `.env`, Codex configuration, shell history, or the MCP service.
 
 ## Normal checks
 
 ```bash
-make doctor
-curl http://127.0.0.1:8080/healthz
-curl http://127.0.0.1:8080/readyz
-docker compose --env-file .env -f deploy/compose/compose.yaml ps
-make logs
+make platform-status
+make mcp-logs       # optional; follows logs until interrupted
 ```
 
-`healthz` proves that the gateway process can answer. `readyz` checks PostgreSQL,
-Ollama, Milvus, and Cerbos with a three-second request budget.
+`platform-status` checks the Docker services, MCP liveness/readiness, OpenClaw
+gateway health, controller plugin provenance, configured agents, MCP registry,
+and an authenticated OpenClaw-to-MCP capability probe. The underlying
+`healthz` proves that the MCP gateway process can answer; `readyz` checks
+PostgreSQL, Ollama, Milvus, and Cerbos with a three-second request budget.
 
 ## Start and stop
 

@@ -7,8 +7,21 @@ LIMIT ?= 25
 ID ?=
 CERBOS_IMAGE ?= ghcr.io/cerbos/cerbos:0.54.0@sha256:211c261f6031675522a35c6055b13fd719c4aff13747307e4bcb6907326537ef
 OPENCLAW_PLUGIN_DIR := automation/openclaw-plugin
+OPENCLAW_PLUGIN_ID := hybrid-workflow-controller
+OPENCLAW_CONFIG_PATCH := examples/openclaw/openclaw.hybrid.json5
+OPENCLAW_MCP_SERVER := hybridKnowledge
+CODEX_MCP_ARGS := \
+	-c 'mcp_servers.hybrid_knowledge.url="$(MCP_URL)"' \
+	-c 'mcp_servers.hybrid_knowledge.bearer_token_env_var="HYBRID_AI_MCP_TOKEN"' \
+	-c 'mcp_servers.hybrid_knowledge.required=true' \
+	-c 'mcp_servers.hybrid_knowledge.startup_timeout_sec=20' \
+	-c 'mcp_servers.hybrid_knowledge.tool_timeout_sec=1200' \
+	-c 'mcp_servers.hybrid_knowledge.default_tools_approval_mode="writes"' \
+	-c 'mcp_servers.hybrid_knowledge.tools.knowledge_candidate_decide.approval_mode="prompt"' \
+	-c 'mcp_servers.hybrid_knowledge.tools.repository_relation_upsert.approval_mode="prompt"' \
+	-c 'mcp_servers.hybrid_knowledge.tools.code_repository_index.approval_mode="prompt"'
 
-.PHONY: help help-operations help-development help-qa help-product-owner env-init mcp-preflight preflight fmt check check-all test build migrate milvus-init doctor reindex candidate-list candidate-get candidate-approve candidate-reject up up-gpu down logs mcp-start mcp-start-gpu mcp-status mcp-logs mcp-stop codex-login codex-check codex codex-repo workpacket-build workpacket-evaluate workpacket-verify authz-policy-test contracts-check openclaw-plugin-deps openclaw-plugin-check openclaw-config-check openclaw-plugin-build openclaw-plugin-install openclaw-plugin-doctor openclaw-start diagram-review-loop diagram-agentic-workflow pull-local-model clean ops-start ops-start-gpu ops-status ops-logs ops-stop ops-doctor ops-reindex dev-session dev-session-repo dev-policy-check dev-patch-verify dev-check dev-authz-policy-test qa-session qa-session-repo qa-patch-verify qa-check qa-authz-policy-test qa-candidates qa-candidate-get po-candidates po-candidate-get po-approve po-reject
+.PHONY: help help-operations help-development help-qa help-product-owner env-init mcp-preflight preflight fmt check check-all test build migrate milvus-init doctor reindex candidate-list candidate-get candidate-approve candidate-reject up up-gpu down logs mcp-start mcp-start-gpu mcp-status mcp-logs mcp-stop codex-login codex-check codex codex-repo workpacket-build workpacket-evaluate workpacket-verify authz-policy-test contracts-check openclaw-plugin-deps openclaw-plugin-check openclaw-config-check openclaw-config-plan openclaw-config-apply openclaw-plugin-build openclaw-plugin-install openclaw-plugin-doctor openclaw-setup openclaw-start openclaw-status platform-status diagram-review-loop diagram-agentic-workflow pull-local-model clean ops-start ops-start-gpu ops-status ops-logs ops-stop ops-doctor ops-reindex dev-session dev-session-repo dev-policy-check dev-patch-verify dev-check dev-authz-policy-test qa-session qa-session-repo qa-patch-verify qa-check qa-authz-policy-test qa-candidates qa-candidate-get po-candidates po-candidate-get po-approve po-reject
 
 help: ## Show all commands plus role-specific workflow guides
 	@printf '%s\n' \
@@ -27,17 +40,18 @@ help-operations: ## Show the Operations workflow and commands
 		'One-time setup:' \
 		'  1. make env-init' \
 		'  2. Review .env and CODEGRAPH_HOST_ROOT' \
-		'  3. make openclaw-plugin-deps openclaw-plugin-build' \
-		'  4. make openclaw-plugin-install' \
-		'  5. make mcp-preflight' \
-		'  6. make ops-start-gpu       # or: make ops-start' \
-		'  7. make pull-local-model' \
+		'  3. make openclaw-setup' \
+		'  4. make mcp-preflight' \
+		'  5. make ops-start-gpu       # or: make ops-start' \
+		'  6. make pull-local-model' \
+		'  7. make openclaw-start       # separate terminal; blocking' \
 		'' \
 		'Each platform session:' \
 		'  1. make ops-start-gpu       # or: make ops-start' \
-		'  2. make ops-status' \
-		'  3. make ops-logs             # optional, blocking' \
-		'  4. make ops-stop' \
+		'  2. make openclaw-start       # separate terminal; blocking' \
+		'  3. make platform-status' \
+		'  4. make ops-logs             # optional, blocking' \
+		'  5. make ops-stop' \
 		'' \
 		'Administration:' \
 		'  make migrate | make milvus-init | make ops-doctor | make ops-reindex'
@@ -120,6 +134,11 @@ mcp-preflight: ## Validate local tools, .env secrets, and Compose configuration
 	test "$$auth_token_value" != "$$controller_auth_token_value" || { echo "AUTH_TOKEN and CONTROLLER_AUTH_TOKEN must differ" >&2; exit 1; }; \
 	case "$$postgres_password_value" in ""|CHANGE_ME*) echo "set a real POSTGRES_PASSWORD in .env" >&2; exit 1;; esac
 	@docker compose version >/dev/null
+	@docker info >/dev/null 2>&1 || { \
+		echo "cannot connect to the Docker daemon; start Docker and verify this login session has docker-group access" >&2; \
+		echo "after adding the group, completely log out of the desktop/SSH session and log back in" >&2; \
+		exit 1; \
+	}
 	@$(COMPOSE) config --quiet
 	@echo "MCP preflight passed"
 
@@ -147,8 +166,10 @@ openclaw-plugin-deps: ## Install the pinned OpenClaw controller plugin dependenc
 
 openclaw-plugin-check: ## Type-check/test the controller and validate its OpenClaw metadata
 	cd $(OPENCLAW_PLUGIN_DIR) && npm run check
-	cd $(OPENCLAW_PLUGIN_DIR) && npx openclaw plugins build --root . --check
-	cd $(OPENCLAW_PLUGIN_DIR) && npx openclaw plugins validate --root .
+	cd $(OPENCLAW_PLUGIN_DIR) && CONTROLLER_AUTH_TOKEN=validation-only \
+		npx openclaw plugins build --root . --check
+	cd $(OPENCLAW_PLUGIN_DIR) && CONTROLLER_AUTH_TOKEN=validation-only \
+		npx openclaw plugins validate --root .
 	cd $(OPENCLAW_PLUGIN_DIR) && npm audit --omit=dev
 
 openclaw-config-check: ## Validate the example against the pinned OpenClaw config schema
@@ -157,18 +178,70 @@ openclaw-config-check: ## Validate the example against the pinned OpenClaw confi
 		OPENCLAW_CONFIG_PATH="$(CURDIR)/examples/openclaw/openclaw.validation.json5" \
 		npx openclaw config validate
 
+openclaw-config-plan: mcp-preflight ## Dry-run the local OpenClaw configuration merge
+	@command -v openclaw >/dev/null 2>&1 || { echo "openclaw is required" >&2; exit 1; }
+	@test -f "$(OPENCLAW_CONFIG_PATCH)" || { echo "missing $(OPENCLAW_CONFIG_PATCH)" >&2; exit 1; }
+	@controller_auth_token_value=$$(sed -n 's/^[[:space:]]*CONTROLLER_AUTH_TOKEN[[:space:]]*=[[:space:]]*//p' .env | tail -n 1); \
+	case "$$controller_auth_token_value" in ""|CHANGE_ME*) echo "set a real CONTROLLER_AUTH_TOKEN in .env" >&2; exit 1;; esac; \
+	CONTROLLER_AUTH_TOKEN="$$controller_auth_token_value" \
+		openclaw config patch --file "$(OPENCLAW_CONFIG_PATCH)" --dry-run
+
+openclaw-config-apply: openclaw-config-plan ## Apply the validated OpenClaw configuration merge
+	@controller_auth_token_value=$$(sed -n 's/^[[:space:]]*CONTROLLER_AUTH_TOKEN[[:space:]]*=[[:space:]]*//p' .env | tail -n 1); \
+	CONTROLLER_AUTH_TOKEN="$$controller_auth_token_value" \
+		openclaw config patch --file "$(OPENCLAW_CONFIG_PATCH)"
+
 openclaw-plugin-build: ## Build the installable OpenClaw controller runtime
 	cd $(OPENCLAW_PLUGIN_DIR) && npm run build
 
 openclaw-plugin-install: openclaw-plugin-build ## Install/update the local OpenClaw controller plugin
-	openclaw plugins install ./$(OPENCLAW_PLUGIN_DIR)
+	@$(MAKE) --no-print-directory openclaw-config-apply
+	openclaw plugins install --force ./$(OPENCLAW_PLUGIN_DIR)
 
 openclaw-plugin-doctor: ## Inspect OpenClaw plugin load/configuration problems
+	openclaw plugins inspect $(OPENCLAW_PLUGIN_ID)
 	openclaw plugins doctor
 
+openclaw-setup: mcp-preflight ## Configure, verify, and idempotently install the OpenClaw integration
+	@$(MAKE) --no-print-directory openclaw-plugin-deps
+	@$(MAKE) --no-print-directory openclaw-plugin-check
+	@$(MAKE) --no-print-directory openclaw-plugin-install
+	@$(MAKE) --no-print-directory openclaw-plugin-doctor
+	@echo "OpenClaw setup passed; use 'make openclaw-start' so the controller credential is loaded"
+
 openclaw-start: mcp-preflight openclaw-plugin-build ## Start OpenClaw with the non-human controller credential
+	@command -v openclaw >/dev/null 2>&1 || { echo "openclaw is required" >&2; exit 1; }
+	@openclaw config validate >/dev/null
+	@openclaw plugins inspect $(OPENCLAW_PLUGIN_ID) >/dev/null 2>&1 || { echo "OpenClaw integration is not installed; run 'make openclaw-setup'" >&2; exit 1; }
+	@openclaw mcp status | grep -q -- "$(OPENCLAW_MCP_SERVER):" || { echo "OpenClaw MCP configuration is missing; run 'make openclaw-setup'" >&2; exit 1; }
+	@if openclaw gateway probe >/dev/null 2>&1; then \
+		echo "an OpenClaw gateway is already reachable; use 'make openclaw-status'" >&2; \
+		echo "stop the existing user service before starting a foreground gateway: systemctl --user stop openclaw-gateway" >&2; \
+		exit 1; \
+	fi
 	@controller_auth_token_value=$$(sed -n 's/^[[:space:]]*CONTROLLER_AUTH_TOKEN[[:space:]]*=[[:space:]]*//p' .env | tail -n 1); \
 	CONTROLLER_AUTH_TOKEN="$$controller_auth_token_value" exec openclaw gateway
+
+openclaw-status: mcp-status ## Verify OpenClaw, its controller plugin, agents, and MCP connection
+	@command -v openclaw >/dev/null 2>&1 || { echo "openclaw is required" >&2; exit 1; }
+	@openclaw gateway status
+	@if command -v systemctl >/dev/null 2>&1 && systemctl --user is-active --quiet openclaw-gateway; then \
+		systemctl --user show openclaw-gateway --property=Environment --value | \
+			tr ' ' '\n' | grep -q '^CONTROLLER_AUTH_TOKEN=.' || { \
+			echo "the running OpenClaw user service lacks CONTROLLER_AUTH_TOKEN" >&2; \
+			echo "stop it with 'systemctl --user stop openclaw-gateway', then run 'make openclaw-start' in a dedicated terminal" >&2; \
+			exit 1; \
+		}; \
+	fi
+	@openclaw health
+	@openclaw plugins inspect $(OPENCLAW_PLUGIN_ID)
+	@openclaw plugins doctor
+	@openclaw agents list
+	@openclaw mcp status
+	@controller_auth_token_value=$$(sed -n 's/^[[:space:]]*CONTROLLER_AUTH_TOKEN[[:space:]]*=[[:space:]]*//p' .env | tail -n 1); \
+	CONTROLLER_AUTH_TOKEN="$$controller_auth_token_value" openclaw mcp probe $(OPENCLAW_MCP_SERVER)
+
+platform-status: openclaw-status ## Verify the complete MCP and OpenClaw integration
 
 test: ## Run unit tests
 	go test ./...
@@ -245,7 +318,9 @@ codex-login: ## Authenticate Codex through the interactive ChatGPT browser flow
 codex-check: mcp-preflight ## Check Codex authentication and MCP registration
 	@command -v codex >/dev/null 2>&1 || { echo "codex is required" >&2; exit 1; }
 	@codex login status
-	@codex mcp list
+	@auth_token_value=$$(sed -n 's/^[[:space:]]*AUTH_TOKEN[[:space:]]*=[[:space:]]*//p' .env | tail -n 1); \
+	HYBRID_AI_MCP_TOKEN="$$auth_token_value" codex mcp get $(CODEX_MCP_ARGS) hybrid_knowledge >/dev/null; \
+	echo "Codex MCP registration passed: hybrid_knowledge"
 
 codex: mcp-preflight ## Start Codex in this repository with the MCP bearer token loaded
 	@command -v codex >/dev/null 2>&1 || { echo "codex is required" >&2; exit 1; }
@@ -253,7 +328,7 @@ codex: mcp-preflight ## Start Codex in this repository with the MCP bearer token
 	@curl --fail --silent --show-error --max-time 5 "$(MCP_BASE_URL)/healthz" >/dev/null || { echo "MCP gateway is unavailable; start Terminal 1 with 'make mcp-start' or 'make mcp-start-gpu'" >&2; exit 1; }
 	@auth_token_value=$$(sed -n 's/^[[:space:]]*AUTH_TOKEN[[:space:]]*=[[:space:]]*//p' .env | tail -n 1); \
 	case "$$auth_token_value" in ""|CHANGE_ME*) echo "set a real AUTH_TOKEN in .env" >&2; exit 1;; esac; \
-	HYBRID_AI_MCP_TOKEN="$$auth_token_value" exec codex
+	HYBRID_AI_MCP_TOKEN="$$auth_token_value" exec codex $(CODEX_MCP_ARGS)
 
 codex-repo: mcp-preflight ## Start Codex for REPO=/absolute/path with this HTTP MCP server
 	@command -v codex >/dev/null 2>&1 || { echo "codex is required" >&2; exit 1; }
@@ -262,16 +337,7 @@ codex-repo: mcp-preflight ## Start Codex for REPO=/absolute/path with this HTTP 
 	@curl --fail --silent --show-error --max-time 5 "$(MCP_BASE_URL)/healthz" >/dev/null || { echo "MCP gateway is unavailable; start Terminal 1 first" >&2; exit 1; }
 	@auth_token_value=$$(sed -n 's/^[[:space:]]*AUTH_TOKEN[[:space:]]*=[[:space:]]*//p' .env | tail -n 1); \
 	repository_path=$$(cd "$(REPO)" 2>/dev/null && pwd -P) || { echo "REPO is not an accessible directory: $(REPO)" >&2; exit 1; }; \
-	HYBRID_AI_MCP_TOKEN="$$auth_token_value" exec codex -C "$$repository_path" \
-		-c 'mcp_servers.hybrid_knowledge.url="$(MCP_URL)"' \
-		-c 'mcp_servers.hybrid_knowledge.bearer_token_env_var="HYBRID_AI_MCP_TOKEN"' \
-		-c 'mcp_servers.hybrid_knowledge.required=true' \
-		-c 'mcp_servers.hybrid_knowledge.startup_timeout_sec=20' \
-		-c 'mcp_servers.hybrid_knowledge.tool_timeout_sec=1200' \
-		-c 'mcp_servers.hybrid_knowledge.default_tools_approval_mode="writes"' \
-		-c 'mcp_servers.hybrid_knowledge.tools.knowledge_candidate_decide.approval_mode="prompt"' \
-		-c 'mcp_servers.hybrid_knowledge.tools.repository_relation_upsert.approval_mode="prompt"' \
-		-c 'mcp_servers.hybrid_knowledge.tools.code_repository_index.approval_mode="prompt"'
+	HYBRID_AI_MCP_TOKEN="$$auth_token_value" exec codex -C "$$repository_path" $(CODEX_MCP_ARGS)
 
 workpacket-build: ## Build the independent bounded-work policy verifier
 	mkdir -p bin

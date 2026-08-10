@@ -206,15 +206,17 @@ This repository pins and tests its controller plugin against OpenClaw
    openclaw models set moonshot/kimi-k3
    ```
 
-3. Build, verify, and install the local controller plugin:
+3. Configure, verify, and idempotently install the local controller plugin:
 
    ```bash
-   make openclaw-plugin-deps
-   make openclaw-plugin-check
-   make openclaw-plugin-install
+   make openclaw-setup
    ```
 
-4. Merge [examples/openclaw/openclaw.hybrid.json5](examples/openclaw/openclaw.hybrid.json5) into `~/.openclaw/openclaw.json`. It defines:
+   The setup target installs pinned dependencies, runs all plugin checks,
+   dry-runs and applies
+   [examples/openclaw/openclaw.hybrid.json5](examples/openclaw/openclaw.hybrid.json5),
+   force-replaces the trusted local plugin so reruns are safe, and runs plugin
+   diagnostics. The applied configuration defines:
 
    - `workflow-coordinator`: the non-human managed-flow controller.
    - `developer`: local primary model, permitted to delegate explicitly to cloud review.
@@ -224,18 +226,33 @@ This repository pins and tests its controller plugin against OpenClaw
    - `cloud-review`: Kimi K3 with a read-only sandbox.
    - The MCP server using `CONTROLLER_AUTH_TOKEN` and a bounded tool list.
 
-5. Start OpenClaw in its own terminal. This loads only the non-human controller
+4. Start OpenClaw in its own terminal. This loads only the non-human controller
    credential from `.env`:
 
    ```bash
    make openclaw-start
    ```
 
+   If another OpenClaw gateway is already reachable, the target stops before
+   starting a conflicting listener and tells the operator how to resolve it.
+   In particular, a separately installed systemd user service does not inherit
+   the controller credential from this repository's `.env`; stop that service
+   before using this target.
+
 The default local human credential remains `AUTH_TOKEN`. It represents
 `human:local-developer` with Development, QA, Product Owner, and Operations
 roles for every project, so one developer can perform the complete solo flow.
 OpenClaw never receives this credential and therefore cannot cross human QA or
 Product Owner gates.
+
+From a third terminal, verify the complete running integration with:
+
+```bash
+make platform-status
+```
+
+This status check fails if a running systemd user service lacks the controller
+credential, even when its listener is otherwise healthy.
 
 Current official references: [Kimi K3 in OpenClaw](https://platform.kimi.ai/docs/guide/use-kimi-in-openclaw), [OpenClaw Ollama provider](https://docs.openclaw.ai/providers/ollama), [managed Task Flows](https://docs.openclaw.ai/automation/taskflow), and [Lobster workflows](https://docs.openclaw.ai/tools/lobster).
 

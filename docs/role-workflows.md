@@ -42,12 +42,13 @@ and projection health.
 ```bash
 make env-init
 # Review .env, especially CODEGRAPH_HOST_ROOT and model settings.
-make openclaw-plugin-deps openclaw-plugin-build
-make openclaw-plugin-install
+make openclaw-setup
 make mcp-preflight
 make ops-start-gpu       # or: make ops-start
 make pull-local-model
-make ops-status
+# In a separate terminal (blocking): make openclaw-start
+# From a third terminal after OpenClaw starts:
+make platform-status
 ```
 
 Compose startup applies PostgreSQL migrations and initializes Milvus before the
@@ -57,7 +58,8 @@ gateway and worker become ready.
 
 ```bash
 make ops-start-gpu       # or: make ops-start
-make ops-status
+# In a separate terminal (blocking): make openclaw-start
+make platform-status
 make ops-logs            # optional; follows logs until interrupted
 make ops-stop            # retains all named volumes
 ```
@@ -245,7 +247,7 @@ Operations
 
 | Role | Workflow commands | Canonical/supporting commands |
 |---|---|---|
-| Operations | `ops-start`, `ops-start-gpu`, `ops-status`, `ops-logs`, `ops-stop`, `ops-doctor`, `ops-reindex` | `env-init`, `mcp-preflight`, `migrate`, `milvus-init`, `up`, `up-gpu`, `down`, `logs`, `mcp-start`, `mcp-start-gpu`, `mcp-status`, `mcp-logs`, `mcp-stop`, `doctor`, `reindex`, `pull-local-model` |
+| Operations | `ops-start`, `ops-start-gpu`, `ops-status`, `ops-logs`, `ops-stop`, `ops-doctor`, `ops-reindex` | `env-init`, `mcp-preflight`, `migrate`, `milvus-init`, `up`, `up-gpu`, `down`, `logs`, `mcp-start`, `mcp-start-gpu`, `mcp-status`, `mcp-logs`, `mcp-stop`, `doctor`, `reindex`, `pull-local-model`, `openclaw-config-plan`, `openclaw-config-apply`, `openclaw-plugin-install`, `openclaw-setup`, `openclaw-start`, `openclaw-status`, `platform-status` |
 | Development | `dev-session`, `dev-session-repo`, `dev-policy-check`, `dev-patch-verify`, `dev-check`, `dev-authz-policy-test` | `codex-login`, `codex-check`, `codex`, `codex-repo`, `preflight`, `fmt`, `test`, `check`, `build`, `workpacket-build`, `workpacket-evaluate`, `workpacket-verify`, `authz-policy-test`, `diagram-review-loop`, `diagram-agentic-workflow`, `clean`, plus MCP retrieval/capture/review tools |
 | QA | `qa-session`, `qa-session-repo`, `qa-patch-verify`, `qa-check`, `qa-authz-policy-test`, `qa-candidates`, `qa-candidate-get` | `candidate-list`, `candidate-get`, `codex-check`, `test`, `check`, `workpacket-verify`, `authz-policy-test`, plus MCP `review_record` |
 | Product Owner | `po-candidates`, `po-candidate-get`, `po-approve`, `po-reject` | `candidate-list`, `candidate-get`, `candidate-approve`, `candidate-reject` |
