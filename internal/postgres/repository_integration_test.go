@@ -223,14 +223,23 @@ func TestRepositoryWorkflowIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(codeEvents) != 1 || codeEvents[0].Topic != "code_entity.upsert" {
+	if len(codeEvents) != 2 {
 		t.Fatalf("code outbox events = %#v", codeEvents)
 	}
-	if codeEvents[0].AggregateID != symbols[0].ID {
-		t.Fatalf("Milvus projection ID %q does not match PostgreSQL entity ID %q", codeEvents[0].AggregateID, symbols[0].ID)
+	codeEntityEventFound, graphEventFound := false, false
+	for _, event := range codeEvents {
+		if event.Topic == "code_entity.upsert" && event.AggregateID == symbols[0].ID {
+			codeEntityEventFound = true
+		}
+		if event.Topic == "code_graph.project" && event.AggregateID == analysis.ID {
+			graphEventFound = true
+		}
+		if err := repository.CompleteOutbox(ctx, event.ID); err != nil {
+			t.Fatal(err)
+		}
 	}
-	if err := repository.CompleteOutbox(ctx, codeEvents[0].ID); err != nil {
-		t.Fatal(err)
+	if !codeEntityEventFound || !graphEventFound {
+		t.Fatalf("missing code projection events: %#v", codeEvents)
 	}
 
 	// A later revision reuses the logical entity UUID. Milvus therefore
@@ -264,7 +273,19 @@ func TestRepositoryWorkflowIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(updatedEvents) != 1 || updatedEvents[0].AggregateID != symbols[0].ID {
+	if len(updatedEvents) != 2 {
 		t.Fatalf("updated projection events = %#v", updatedEvents)
+	}
+	codeEntityEventFound, graphEventFound = false, false
+	for _, event := range updatedEvents {
+		if event.Topic == "code_entity.upsert" && event.AggregateID == symbols[0].ID {
+			codeEntityEventFound = true
+		}
+		if event.Topic == "code_graph.project" && event.AggregateID == secondAnalysis.ID {
+			graphEventFound = true
+		}
+	}
+	if !codeEntityEventFound || !graphEventFound {
+		t.Fatalf("missing updated code projection events: %#v", updatedEvents)
 	}
 }

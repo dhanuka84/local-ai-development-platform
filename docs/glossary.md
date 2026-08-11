@@ -27,12 +27,14 @@ Use this page when a design or operations document uses an unfamiliar term.
 | Milvus | The vector database used to find approved items with similar meaning. It is not the official source of truth. |
 | Ollama | The local model server used for coding, maintenance, and embeddings. |
 | Outbox | A PostgreSQL table of work that must happen after a successful database change, such as updating Milvus. A worker retries this work safely. |
+| Apache AGE | A PostgreSQL extension used here as a rebuildable active property-graph projection for bounded Cypher traversal. |
+| GraphRAG | Retrieval that combines Milvus semantic seeds, exact AGE/PostgreSQL topology, and authoritative PostgreSQL hydration. |
 | PostgreSQL authority | PostgreSQL holds the official workflow, approval, provenance, repository, and code-graph records. |
 | Principal | An authenticated person or service identity. |
 | Projection | A searchable copy derived from official data. Milvus is a projection and can be rebuilt from PostgreSQL. |
 | Provenance | Information about where a result came from: model, provider, repository revision, prompt, tools, and reviewer. |
 | Semantic search | Search by similar meaning instead of only exact words. |
-| Stable ID | A PostgreSQL UUID reused across systems so a Milvus result can be loaded from the official SQL record. |
+| Stable ID | A PostgreSQL UUID reused across systems so an AGE or Milvus result can be loaded from the official SQL record. |
 | Transaction | A group of database changes that all succeed together or all fail together. This prevents half-finished approvals and indexing requests. |
 | Vector embedding | A list of numbers representing meaning. Milvus compares these lists to find similar items. |
 | Work packet | A bounded task description containing the repository revision, allowed files, checks, risk, disclosure rules, and execution limits. |

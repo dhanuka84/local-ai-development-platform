@@ -34,6 +34,49 @@ type Repository interface {
 	SearchCodeEntitiesLexical(context.Context, string, string, string, int) ([]CodeEntity, error)
 	GetCodeGraph(context.Context, string, string, string, int) (CodeGraph, error)
 	RequeueCodeEntities(context.Context) (int64, error)
+	GetSemanticGraphEdge(context.Context, string) (SemanticGraphEdge, bool, error)
+	GetSemanticGraphEdgesMany(context.Context, []string) ([]SemanticGraphEdge, error)
+	GetSemanticGraphEdgesForKnowledge(context.Context, string) ([]SemanticGraphEdge, error)
+	RequeueSemanticGraphEdges(context.Context) (int64, error)
+}
+
+type RepositoryGraphRequest struct {
+	ProjectID string
+	Root      string
+	MaxHops   int
+}
+
+type CodeGraphRequest struct {
+	ProjectID      string
+	RepositoryRoot string
+	SymbolRoot     string
+	MaxHops        int
+}
+
+type KnowledgeGraphRequest struct {
+	ProjectID         string
+	KnowledgeSeedIDs  []string
+	CodeSeedIDs       []string
+	RepositorySeedIDs []string
+	MaxHops           int
+	MaxNodes          int
+	MaxEdges          int
+}
+
+type GraphStore interface {
+	ExpandRepositoryGraph(context.Context, RepositoryGraphRequest) ([]RepositoryRelation, error)
+	ExpandCodeGraph(context.Context, CodeGraphRequest) (CodeGraph, error)
+	ExpandKnowledgeGraph(context.Context, KnowledgeGraphRequest) (KnowledgeSubgraph, error)
+}
+
+type GraphProjector interface {
+	ProjectRepositoryRelation(context.Context, RepositoryRelation) error
+	ProjectCodeGraph(context.Context, string) error
+	ProjectKnowledge(context.Context, string) error
+}
+
+type HealthChecker interface {
+	Ping(context.Context) error
 }
 
 type ArtifactStore interface {
@@ -53,6 +96,8 @@ type VectorStore interface {
 	SearchRelations(context.Context, string, []float32, int) ([]VectorHit, error)
 	UpsertCodeEntity(context.Context, CodeEntity, []float32) error
 	SearchCodeEntities(context.Context, string, string, []float32, int) ([]VectorHit, error)
+	UpsertGraphEdge(context.Context, SemanticGraphEdge, []float32) error
+	SearchGraphEdges(context.Context, string, string, []float32, int) ([]VectorHit, error)
 	Ping(context.Context) error
 	Close(context.Context) error
 }

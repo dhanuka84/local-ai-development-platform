@@ -124,6 +124,16 @@ func (f *fakeRepository) GetCodeGraph(context.Context, string, string, string, i
 	return domain.CodeGraph{Entities: f.codeEntities}, nil
 }
 func (f *fakeRepository) RequeueCodeEntities(context.Context) (int64, error) { return 0, nil }
+func (f *fakeRepository) GetSemanticGraphEdge(context.Context, string) (domain.SemanticGraphEdge, bool, error) {
+	return domain.SemanticGraphEdge{}, false, nil
+}
+func (f *fakeRepository) GetSemanticGraphEdgesMany(context.Context, []string) ([]domain.SemanticGraphEdge, error) {
+	return nil, nil
+}
+func (f *fakeRepository) GetSemanticGraphEdgesForKnowledge(context.Context, string) ([]domain.SemanticGraphEdge, error) {
+	return nil, nil
+}
+func (f *fakeRepository) RequeueSemanticGraphEdges(context.Context) (int64, error) { return 0, nil }
 
 type fakeArtifacts struct{ count int }
 
@@ -166,6 +176,12 @@ func (f *fakeVectors) UpsertCodeEntity(context.Context, domain.CodeEntity, []flo
 func (f *fakeVectors) SearchCodeEntities(_ context.Context, _, repositoryID string, _ []float32, _ int) ([]domain.VectorHit, error) {
 	f.codeRepo = repositoryID
 	return f.codeHits, nil
+}
+func (f *fakeVectors) UpsertGraphEdge(context.Context, domain.SemanticGraphEdge, []float32) error {
+	return nil
+}
+func (f *fakeVectors) SearchGraphEdges(context.Context, string, string, []float32, int) ([]domain.VectorHit, error) {
+	return nil, nil
 }
 func (f *fakeVectors) Ping(context.Context) error  { return nil }
 func (f *fakeVectors) Close(context.Context) error { return nil }

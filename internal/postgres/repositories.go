@@ -96,6 +96,37 @@ func upsertSoftwareRepository(ctx context.Context, tx pgx.Tx, projectID string, 
 	return id, nil
 }
 
+// UpsertSoftwareRepository registers repository identity independently from a
+// relationship or code-analysis run. This keeps documentation-only and other
+// unsupported-language repositories in the authoritative catalog even when
+// they do not produce a code graph.
+func (r *Repository) UpsertSoftwareRepository(ctx context.Context, projectID string, repository domain.SoftwareRepository) (domain.SoftwareRepository, error) {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return domain.SoftwareRepository{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if _, err := tx.Exec(ctx, `INSERT INTO projects(id,display_name) VALUES($1,$1) ON CONFLICT (id) DO NOTHING`, projectID); err != nil {
+		return domain.SoftwareRepository{}, err
+	}
+	id, err := upsertSoftwareRepository(ctx, tx, projectID, repository)
+	if err != nil {
+		return domain.SoftwareRepository{}, err
+	}
+	var result domain.SoftwareRepository
+	if err := tx.QueryRow(ctx, `SELECT id::text,project_id,name,canonical_url,default_branch,revision,created_at,updated_at
+      FROM software_repositories WHERE id::text=$1`, id).Scan(
+		&result.ID, &result.ProjectID, &result.Name, &result.CanonicalURL,
+		&result.DefaultBranch, &result.Revision, &result.CreatedAt, &result.UpdatedAt,
+	); err != nil {
+		return domain.SoftwareRepository{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return domain.SoftwareRepository{}, err
+	}
+	return result, nil
+}
+
 func (r *Repository) GetRepositoryRelation(ctx context.Context, id string) (domain.RepositoryRelation, error) {
 	relation, err := scanRelation(r.pool.QueryRow(ctx, `SELECT `+relationColumns+`
       FROM repository_relations r
@@ -171,4 +202,89 @@ func (r *Repository) RequeueRepositoryRelations(ctx context.Context) (int64, err
 	result, err := r.pool.Exec(ctx, `INSERT INTO outbox_events(aggregate_id,topic)
         SELECT id,'repository_relation.upsert' FROM repository_relations`)
 	return result.RowsAffected(), err
+}
+
+func (r *Repository) ResolveSoftwareRepository(ctx context.Context, projectID, root string) (domain.SoftwareRepository, error) {
+	var repository domain.SoftwareRepository
+	err := r.pool.QueryRow(ctx, `SELECT id::text,project_id,name,canonical_url,default_branch,revision,created_at,updated_at
+      FROM software_repositories
+      WHERE project_id=$1 AND (id::text=$2 OR canonical_url=$2 OR name=$2)`, projectID, root).Scan(
+		&repository.ID, &repository.ProjectID, &repository.Name, &repository.CanonicalURL,
+		&repository.DefaultBranch, &repository.Revision, &repository.CreatedAt, &repository.UpdatedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return repository, fmt.Errorf("repository %q not found in project %q", root, projectID)
+	}
+	return repository, err
+}
+
+func (r *Repository) GetSoftwareRepositoriesMany(ctx context.Context, projectID string, ids []string) ([]domain.SoftwareRepository, error) {
+	if len(ids) == 0 {
+		return []domain.SoftwareRepository{}, nil
+	}
+	rows, err := r.pool.Query(ctx, `SELECT id::text,project_id,name,canonical_url,default_branch,revision,created_at,updated_at
+      FROM software_repositories WHERE project_id=$1 AND id::text=ANY($2) ORDER BY name,id`, projectID, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := make([]domain.SoftwareRepository, 0, len(ids))
+	for rows.Next() {
+		var repository domain.SoftwareRepository
+		if err := rows.Scan(&repository.ID, &repository.ProjectID, &repository.Name, &repository.CanonicalURL,
+			&repository.DefaultBranch, &repository.Revision, &repository.CreatedAt, &repository.UpdatedAt); err != nil {
+			return nil, err
+		}
+		result = append(result, repository)
+	}
+	return result, rows.Err()
+}
+
+func (r *Repository) GetRepositoryRelationsForNodes(ctx context.Context, projectID string, ids []string) ([]domain.RepositoryRelation, error) {
+	if len(ids) == 0 {
+		return []domain.RepositoryRelation{}, nil
+	}
+	rows, err := r.pool.Query(ctx, `SELECT `+relationColumns+`
+      FROM repository_relations r
+      JOIN software_repositories f ON f.id=r.from_repository_id
+      JOIN software_repositories t ON t.id=r.to_repository_id
+      WHERE r.project_id=$1 AND r.from_repository_id::text=ANY($2) AND r.to_repository_id::text=ANY($2)
+      ORDER BY f.name,r.relation_type,t.name`, projectID, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := make([]domain.RepositoryRelation, 0)
+	for rows.Next() {
+		relation, err := scanRelation(rows)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, relation)
+	}
+	return result, rows.Err()
+}
+
+func (r *Repository) RepositoryProjectionCurrent(ctx context.Context, projectID string, ids []string) (bool, error) {
+	if len(ids) == 0 {
+		return false, nil
+	}
+	var current bool
+	err := r.pool.QueryRow(ctx, `SELECT
+        count(*) = cardinality($2::text[])
+        AND COALESCE(bool_and(head.status='ready' AND head.backend='apache-age'
+                     AND head.revision=repository.revision
+                     AND head.source_updated_at >= repository.updated_at),false)
+        AND NOT EXISTS (
+          SELECT 1 FROM repository_relations relation
+          LEFT JOIN graph_projection_relations projected ON projected.relation_id=relation.id
+          WHERE relation.project_id=$1
+            AND (relation.from_repository_id::text=ANY($2) OR relation.to_repository_id::text=ANY($2))
+            AND (projected.relation_id IS NULL OR projected.backend <> 'apache-age'
+                 OR projected.status <> 'ready' OR projected.source_updated_at < relation.updated_at)
+        )
+      FROM software_repositories repository
+      LEFT JOIN graph_repository_projection_heads head ON head.repository_id=repository.id
+      WHERE repository.project_id=$1 AND repository.id::text=ANY($2)`, projectID, ids).Scan(&current)
+	return current, err
 }

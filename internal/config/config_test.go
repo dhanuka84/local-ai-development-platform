@@ -135,3 +135,20 @@ func TestLoadDisablesSynchronousCodeAnalysisByDefaultInEnterprise(t *testing.T) 
 		t.Fatal("enterprise mode enabled synchronous filesystem analysis")
 	}
 }
+
+func TestLoadParsesGraphBackend(t *testing.T) {
+	t.Setenv("GRAPH_BACKEND", "apache-age")
+	t.Setenv("GRAPH_FALLBACK_ENABLED", "false")
+	t.Setenv("AGE_GRAPH_NAME", "product_graph")
+	cfg, err := LoadCLI()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.GraphBackend != "apache-age" || cfg.GraphFallbackEnabled || cfg.AgeGraphName != "product_graph" {
+		t.Fatalf("graph config = %#v", cfg)
+	}
+	t.Setenv("GRAPH_BACKEND", "neo4j")
+	if _, err := LoadCLI(); err == nil {
+		t.Fatal("LoadCLI accepted an unsupported graph backend")
+	}
+}

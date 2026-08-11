@@ -5,6 +5,15 @@ MCP_URL := $(MCP_BASE_URL)/mcp
 PROJECT ?=
 LIMIT ?= 25
 ID ?=
+MCP_TOOL ?=
+MCP_ARGUMENTS ?= {}
+GITHUB_ORG ?= SL-Tantra-AI
+REPOSITORY_PROJECT ?= local-development
+REPOSITORY_ROOT ?= $(shell sed -n 's/^[[:space:]]*CODEGRAPH_HOST_ROOT[[:space:]]*=[[:space:]]*//p' .env 2>/dev/null | tail -n 1)
+REPOSITORY_BRANCH_OVERRIDES ?= flowable-engine=java-25
+FORCE ?= false
+WAIT_TIMEOUT ?= 3600
+WORKER_REPLICAS ?= 1
 CODEX_LOCAL_MODEL ?= $(shell sed -n 's/^[[:space:]]*LOCAL_CHAT_MODEL[[:space:]]*=[[:space:]]*//p' .env 2>/dev/null | tail -n 1)
 ifeq ($(strip $(CODEX_LOCAL_MODEL)),)
 CODEX_LOCAL_MODEL := qwen3.6:35b
@@ -33,7 +42,7 @@ CODEX_LOCAL_ARGS := \
 	-c 'model_catalog_json="$(CODEX_LOCAL_MODEL_CATALOG)"' \
 	-c 'model_reasoning_effort="$(CODEX_LOCAL_REASONING_EFFORT)"'
 
-.PHONY: help help-operations help-development help-qa help-product-owner env-init mcp-preflight preflight fmt check check-all test build migrate milvus-init doctor reindex candidate-list candidate-get candidate-approve candidate-reject up up-gpu down logs mcp-start mcp-start-gpu mcp-status mcp-logs mcp-stop codex-login codex-check codex-route codex-local-check codex-local-smoke codex codex-repo codex-local codex-local-repo workpacket-build workpacket-evaluate workpacket-verify authz-policy-test contracts-check openclaw-plugin-deps openclaw-plugin-check openclaw-config-check openclaw-config-plan openclaw-config-apply openclaw-plugin-build openclaw-plugin-install openclaw-plugin-doctor openclaw-setup openclaw-start openclaw-status platform-status diagram-review-loop diagram-agentic-workflow pull-local-model clean ops-start ops-start-gpu ops-status ops-logs ops-stop ops-doctor ops-reindex dev-session dev-session-repo dev-session-local dev-session-local-repo dev-policy-check dev-patch-verify dev-check dev-authz-policy-test qa-session qa-session-repo qa-session-local qa-session-local-repo qa-patch-verify qa-check qa-authz-policy-test qa-candidates qa-candidate-get po-candidates po-candidate-get po-approve po-reject
+.PHONY: help help-operations help-development help-qa help-product-owner env-init mcp-preflight preflight fmt fmt-container check check-container check-all test build migrate age-rebuild milvus-init doctor reindex compact-code-outbox worker-refresh-postgres-fallback worker-scale-postgres-fallback candidate-list candidate-get candidate-approve candidate-reject mcp-call repository-org-sync repository-org-catalog repository-org-index repository-org-queue-status repository-org-wait repository-org-verify repository-org-index-all up up-gpu down logs mcp-start mcp-start-gpu mcp-status mcp-logs mcp-stop codex-login codex-check codex-route codex-local-check codex-local-smoke codex codex-repo codex-local codex-local-repo workpacket-build workpacket-evaluate workpacket-verify authz-policy-test contracts-check openclaw-plugin-deps openclaw-plugin-check openclaw-config-check openclaw-config-plan openclaw-config-apply openclaw-plugin-build openclaw-plugin-install openclaw-plugin-doctor openclaw-setup openclaw-start openclaw-status platform-status diagram-review-loop diagram-agentic-workflow pull-local-model clean ops-start ops-start-gpu ops-status ops-logs ops-stop ops-doctor ops-reindex dev-session dev-session-repo dev-session-local dev-session-local-repo dev-policy-check dev-patch-verify dev-check dev-authz-policy-test qa-session qa-session-repo qa-session-local qa-session-local-repo qa-patch-verify qa-check qa-authz-policy-test qa-candidates qa-candidate-get po-candidates po-candidate-get po-approve po-reject
 
 help: ## Show all commands plus role-specific workflow guides
 	@printf '%s\n' \
@@ -66,7 +75,7 @@ help-operations: ## Show the Operations workflow and commands
 		'  5. make ops-stop' \
 		'' \
 		'Administration:' \
-		'  make migrate | make milvus-init | make ops-doctor | make ops-reindex'
+		'  make migrate | make age-rebuild | make milvus-init | make ops-doctor | make ops-reindex'
 
 help-development: ## Show the Development workflow and commands
 	@printf '%s\n' \
@@ -164,10 +173,16 @@ preflight: mcp-preflight codex-check ## Validate both MCP platform and Codex cli
 fmt: ## Format Go sources
 	gofmt -w cmd components internal migrations
 
+fmt-container: ## Format Go sources with the local build-check image
+	docker run --rm -v "$(CURDIR):/src" -w /src local-ai-platform-buildcheck make fmt
+
 check: ## Run formatting, vet, and unit tests
 	test -z "$$(gofmt -l cmd components internal migrations)"
 	go vet ./...
 	go test -race ./...
+
+check-container: ## Run make check with the local build-check image
+	docker run --rm -v "$(CURDIR):/src" -w /src local-ai-platform-buildcheck make check
 
 check-all: check authz-policy-test contracts-check openclaw-plugin-check openclaw-config-check ## Run Go, Cerbos, contracts, and OpenClaw checks
 
@@ -273,6 +288,9 @@ build: ## Build all binaries into ./bin
 migrate: mcp-preflight ## Apply PostgreSQL migrations through the Compose admin image
 	$(COMPOSE) run --rm migrate migrate
 
+age-rebuild: mcp-preflight ## Deterministically rebuild the Apache AGE graph from PostgreSQL
+	$(COMPOSE) run --rm migrate age-rebuild
+
 milvus-init: mcp-preflight ## Create the Milvus collection through the Compose admin image
 	$(COMPOSE) run --rm milvus-init milvus-init
 
@@ -281,6 +299,131 @@ doctor: mcp-preflight ## Test PostgreSQL, Ollama, and Milvus from the Compose ne
 
 reindex: mcp-preflight ## Requeue approved knowledge for Milvus indexing
 	$(COMPOSE) run --rm migrate reindex
+
+compact-code-outbox: mcp-preflight ## Complete superseded code-embedding events while retaining active entities
+	@$(COMPOSE) build migrate >/dev/null
+	$(COMPOSE) run --rm --no-deps migrate compact-code-outbox
+
+worker-refresh-postgres-fallback: mcp-preflight ## Rebuild only the worker and keep an existing PostgreSQL-only database online
+	$(COMPOSE) -f deploy/compose/compose.postgres-fallback.yaml build worker
+	$(COMPOSE) -f deploy/compose/compose.postgres-fallback.yaml up -d --no-deps --force-recreate worker
+
+worker-scale-postgres-fallback: mcp-preflight ## Scale batched workers without restarting PostgreSQL; optional WORKER_REPLICAS
+	@case "$(WORKER_REPLICAS)" in ''|*[!0-9]*) echo "WORKER_REPLICAS must be a positive integer" >&2; exit 1;; esac
+	@test "$(WORKER_REPLICAS)" -ge 1 || { echo "WORKER_REPLICAS must be at least 1" >&2; exit 1; }
+	$(COMPOSE) -f deploy/compose/compose.postgres-fallback.yaml up -d --no-deps --scale worker=$(WORKER_REPLICAS) worker
+
+mcp-call: mcp-preflight ## Call one MCP tool non-interactively; requires MCP_TOOL and optional MCP_ARGUMENTS JSON
+	@command -v jq >/dev/null 2>&1 || { echo "jq is required" >&2; exit 1; }
+	@test -n "$(MCP_TOOL)" || { echo "usage: make mcp-call MCP_TOOL=<tool> MCP_ARGUMENTS='<json-object>'" >&2; exit 1; }
+	@printf '%s' '$(MCP_ARGUMENTS)' | jq -e 'type == "object"' >/dev/null || { echo "MCP_ARGUMENTS must be a JSON object" >&2; exit 1; }
+	@auth_token_value=$$(sed -n 's/^[[:space:]]*AUTH_TOKEN[[:space:]]*=[[:space:]]*//p' .env | tail -n 1); \
+	request_body=$$(jq -cn --arg tool "$(MCP_TOOL)" --argjson arguments '$(MCP_ARGUMENTS)' \
+		'{jsonrpc:"2.0",id:1,method:"tools/call",params:{name:$$tool,arguments:$$arguments}}'); \
+	curl --fail-with-body --silent --show-error --max-time 1800 \
+		-H "Authorization: Bearer $$auth_token_value" \
+		-H 'Content-Type: application/json' \
+		-H 'Accept: application/json, text/event-stream' \
+		--data "$$request_body" "$(MCP_URL)"
+
+repository-org-sync: ## Clone or fast-forward every clean default-branch checkout in GITHUB_ORG
+	@command -v gh >/dev/null 2>&1 || { echo "gh is required" >&2; exit 1; }
+	@command -v jq >/dev/null 2>&1 || { echo "jq is required" >&2; exit 1; }
+	@case "$(GITHUB_ORG)" in ''|*[!A-Za-z0-9_.-]*) echo "invalid GITHUB_ORG" >&2; exit 1;; esac
+	@test -n "$(REPOSITORY_ROOT)" || { echo "CODEGRAPH_HOST_ROOT or REPOSITORY_ROOT is required" >&2; exit 1; }
+	@mkdir -p "$(REPOSITORY_ROOT)/$(GITHUB_ORG)"
+	@inventory=$$(gh repo list "$(GITHUB_ORG)" --limit 1000 \
+		--json name,url,isArchived,isEmpty,defaultBranchRef \
+		--jq '.[] | select(.isArchived == false and .isEmpty == false) | [.name,.url,.defaultBranchRef.name] | @tsv'); \
+	test -n "$$inventory" || { echo "no eligible repositories found in $(GITHUB_ORG)" >&2; exit 1; }; \
+	printf '%s\n' "$$inventory" | while IFS=$$(printf '\t') read -r name url default_branch; do \
+		case "$$name" in ''|*[!A-Za-z0-9_.-]*) echo "unsafe repository name: $$name" >&2; exit 1;; esac; \
+		branch="$$default_branch"; \
+		for override in $(REPOSITORY_BRANCH_OVERRIDES); do \
+			case "$$override" in "$$name="*) branch=$${override#*=};; esac; \
+		done; \
+		case "$$branch" in ''|*[!A-Za-z0-9_./-]*) echo "unsafe index branch for $$name: $$branch" >&2; exit 1;; esac; \
+		path="$(REPOSITORY_ROOT)/$(GITHUB_ORG)/$$name"; \
+		if test -e "$$path" && test ! -d "$$path/.git"; then echo "refusing non-Git path: $$path" >&2; exit 1; fi; \
+		if test ! -d "$$path/.git"; then gh repo clone "$(GITHUB_ORG)/$$name" "$$path"; fi; \
+		test -z "$$(git -C "$$path" status --porcelain=v1 --untracked-files=normal)" || { echo "refusing dirty checkout: $$path" >&2; exit 1; }; \
+		git -C "$$path" fetch --prune origin; \
+		git -C "$$path" switch "$$branch" >/dev/null 2>&1 || git -C "$$path" switch --track -c "$$branch" "origin/$$branch"; \
+		git -C "$$path" merge --ff-only "origin/$$branch"; \
+		printf 'synced\t%s\tdefault=%s\tindex=%s\trevision=%s\n' "$$name" "$$default_branch" "$$branch" "$$(git -C "$$path" rev-parse HEAD)"; \
+	done
+
+repository-org-catalog: mcp-preflight ## Register every eligible GITHUB_ORG repository in PostgreSQL
+	@case "$(REPOSITORY_PROJECT)" in ''|*[!A-Za-z0-9_.-]*) echo "invalid REPOSITORY_PROJECT" >&2; exit 1;; esac
+	@$(COMPOSE) build migrate >/dev/null
+	@for path in "$(REPOSITORY_ROOT)/$(GITHUB_ORG)"/*; do \
+		test -d "$$path/.git" || continue; \
+		name=$$(basename "$$path"); \
+		url=$$(git -C "$$path" remote get-url origin); \
+		branch=$$(git -C "$$path" symbolic-ref --quiet --short HEAD 2>/dev/null || printf detached); \
+		default_branch=$$(git -C "$$path" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||'); \
+		test -n "$$default_branch" || default_branch="$$branch"; \
+		revision=$$(git -C "$$path" rev-parse HEAD); \
+		$(COMPOSE) run --rm --no-deps migrate repository-upsert \
+			"$(REPOSITORY_PROJECT)" "$$name" "$$url" "$$default_branch" "$$revision"; \
+	done
+
+repository-org-index: mcp-preflight ## Index stale supported-language repositories from GITHUB_ORG; FORCE=true reindexes current snapshots
+	@case "$(FORCE)" in true|false) ;; *) echo "FORCE must be true or false" >&2; exit 1;; esac
+	@failures=0; \
+	for path in "$(REPOSITORY_ROOT)/$(GITHUB_ORG)"/*; do \
+		test -d "$$path/.git" || continue; \
+		name=$$(basename "$$path"); \
+		url=$$(git -C "$$path" remote get-url origin); \
+		branch=$$(git -C "$$path" symbolic-ref --quiet --short HEAD 2>/dev/null || printf detached); \
+		default_branch=$$(git -C "$$path" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||'); \
+		test -n "$$default_branch" || default_branch="$$branch"; \
+		revision=$$(git -C "$$path" rev-parse HEAD); \
+		workspace_path="/workspace/$(GITHUB_ORG)/$$name"; \
+		if ! find "$$path" -path "$$path/.git" -prune -o -type f \
+			\( -name '*.go' -o -name '*.java' -o -name '*.kt' -o -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' -o -name '*.py' \) -print -quit | grep -q .; then \
+			echo "catalog-only (no supported source): $$name@$$revision"; \
+			continue; \
+		fi; \
+		active=$$($(COMPOSE) exec -T postgres psql -U hybrid -d hybrid -Atc \
+			"SELECT run.branch || ':' || run.revision FROM software_repositories repository JOIN code_repository_heads head ON head.repository_id=repository.id JOIN code_analysis_runs run ON run.id=head.analysis_run_id WHERE repository.project_id='$(REPOSITORY_PROJECT)' AND repository.name='$$name'" 2>/dev/null || true); \
+		if test "$(FORCE)" = false && test "$$active" = "$$branch:$$revision"; then \
+			echo "current: $$name@$$revision"; \
+			continue; \
+		fi; \
+		arguments=$$(jq -cn --arg project "$(REPOSITORY_PROJECT)" --arg name "$$name" --arg url "$$url" \
+			--arg default_branch "$$default_branch" --arg path "$$workspace_path" --arg branch "$$branch" --arg revision "$$revision" \
+			'{project_id:$$project,repository:{name:$$name,canonical_url:$$url,default_branch:$$default_branch},repository_path:$$path,branch:$$branch,revision:$$revision,allow_dirty:false}'); \
+		echo "indexing: $$name@$$revision"; \
+		if ! $(MAKE) --no-print-directory mcp-call MCP_TOOL=code_repository_index MCP_ARGUMENTS="$$arguments"; then failures=$$((failures + 1)); fi; \
+	done; \
+	test "$$failures" -eq 0 || { echo "$$failures repository index operation(s) failed" >&2; exit 1; }
+
+repository-org-queue-status: mcp-preflight ## Report outstanding repository indexing events and failures
+	@$(COMPOSE) exec -T postgres psql -U hybrid -d hybrid -P pager=off -F '|' -Atc \
+		"SELECT topic,count(*) FILTER (WHERE completed_at IS NULL),count(*) FILTER (WHERE completed_at IS NOT NULL),COALESCE(max(attempts) FILTER (WHERE completed_at IS NULL),0),COALESCE(max(last_error) FILTER (WHERE completed_at IS NULL AND last_error<>''),'') FROM outbox_events WHERE topic LIKE 'code_%' GROUP BY topic ORDER BY topic"
+
+repository-org-wait: mcp-preflight ## Wait for the code indexing outbox to drain; optional WAIT_TIMEOUT seconds
+	@case "$(WAIT_TIMEOUT)" in ''|*[!0-9]*) echo "WAIT_TIMEOUT must be a positive integer" >&2; exit 1;; esac
+	@start=$$(date +%s); \
+	while :; do \
+		pending=$$($(COMPOSE) exec -T postgres psql -U hybrid -d hybrid -Atc \
+			"SELECT count(*) FROM outbox_events WHERE topic LIKE 'code_%' AND completed_at IS NULL"); \
+		failed=$$($(COMPOSE) exec -T postgres psql -U hybrid -d hybrid -Atc \
+			"SELECT count(*) FROM outbox_events WHERE topic LIKE 'code_%' AND completed_at IS NULL AND last_error<>''"); \
+		elapsed=$$(($$(date +%s) - start)); \
+		printf 'repository-index-queue pending=%s failed=%s elapsed=%ss\n' "$$pending" "$$failed" "$$elapsed"; \
+		test "$$failed" -eq 0 || exit 1; \
+		test "$$pending" -eq 0 && break; \
+		test "$$elapsed" -lt "$(WAIT_TIMEOUT)" || { echo "repository indexing queue did not drain before timeout" >&2; exit 1; }; \
+		sleep 30; \
+	done
+
+repository-org-verify: mcp-preflight ## Report catalog and active code-index state for GITHUB_ORG
+	@$(COMPOSE) exec -T postgres psql -U hybrid -d hybrid -P pager=off -F '|' -Atc \
+		"SELECT repository.name,repository.default_branch,repository.revision,COALESCE(run.branch,'catalog-only'),COALESCE(run.revision,''),(SELECT count(*) FROM code_occurrences occurrence WHERE occurrence.analysis_run_id=run.id),(SELECT count(*) FROM code_relations relation WHERE relation.analysis_run_id=run.id) FROM software_repositories repository LEFT JOIN code_repository_heads head ON head.repository_id=repository.id LEFT JOIN code_analysis_runs run ON run.id=head.analysis_run_id WHERE repository.project_id='$(REPOSITORY_PROJECT)' AND repository.canonical_url LIKE '%/$(GITHUB_ORG)/%' ORDER BY repository.name"
+
+repository-org-index-all: repository-org-sync repository-org-catalog repository-org-index repository-org-queue-status repository-org-verify ## Sync, catalog, index, and verify all GITHUB_ORG repositories
 
 candidate-list: mcp-preflight ## List pending candidates; optional PROJECT and LIMIT=25
 	@case "$(LIMIT)" in ''|*[!0-9]*) echo "LIMIT must be an integer from 1 to 100" >&2; exit 1;; esac

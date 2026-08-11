@@ -158,6 +158,38 @@ func (s *Store) UpsertCodeEntity(ctx context.Context, codeEntity domain.CodeEnti
 	return nil
 }
 
+func (s *Store) UpsertCodeEntities(ctx context.Context, codeEntities []domain.CodeEntity, embeddings [][]float32) error {
+	if len(codeEntities) != len(embeddings) {
+		return fmt.Errorf("code entity count %d does not match embedding count %d", len(codeEntities), len(embeddings))
+	}
+	if len(codeEntities) == 0 {
+		return nil
+	}
+	ids := make([]string, len(codeEntities))
+	projectIDs := make([]string, len(codeEntities))
+	repositoryIDs := make([]string, len(codeEntities))
+	documentTypes := make([]string, len(codeEntities))
+	for index, codeEntity := range codeEntities {
+		if len(embeddings[index]) != s.dimension {
+			return fmt.Errorf("embedding dimension %d does not match configured dimension %d", len(embeddings[index]), s.dimension)
+		}
+		ids[index] = codeEntity.ID
+		projectIDs[index] = codeEntity.ProjectID
+		repositoryIDs[index] = codeEntity.RepositoryID
+		documentTypes[index] = "code_entity"
+	}
+	_, err := s.client.Upsert(ctx, milvusclient.NewColumnBasedInsertOption(s.collection).
+		WithVarcharColumn("id", ids).
+		WithVarcharColumn("project_id", projectIDs).
+		WithVarcharColumn("repository_id", repositoryIDs).
+		WithVarcharColumn("document_type", documentTypes).
+		WithFloatVectorColumn("embedding", s.dimension, embeddings))
+	if err != nil {
+		return fmt.Errorf("batch upsert %d Milvus code entities: %w", len(codeEntities), err)
+	}
+	return nil
+}
+
 func (s *Store) SearchCodeEntities(ctx context.Context, projectID, repositoryID string, embedding []float32, limit int) ([]domain.VectorHit, error) {
 	if len(embedding) != s.dimension {
 		return nil, fmt.Errorf("embedding dimension %d does not match configured dimension %d", len(embedding), s.dimension)
@@ -172,6 +204,60 @@ func (s *Store) SearchCodeEntities(ctx context.Context, projectID, repositoryID 
 	sets, err := s.client.Search(ctx, option)
 	if err != nil {
 		return nil, fmt.Errorf("search Milvus code entities: %w", err)
+	}
+	if len(sets) == 0 {
+		return []domain.VectorHit{}, nil
+	}
+	set := sets[0]
+	if set.Err != nil {
+		return nil, set.Err
+	}
+	result := make([]domain.VectorHit, 0, set.Len())
+	for i := 0; i < set.Len(); i++ {
+		id, err := set.IDs.GetAsString(i)
+		if err != nil {
+			return nil, err
+		}
+		score := float32(0)
+		if i < len(set.Scores) {
+			score = set.Scores[i]
+		}
+		result = append(result, domain.VectorHit{ID: id, Score: score})
+	}
+	return result, nil
+}
+
+func (s *Store) UpsertGraphEdge(ctx context.Context, edge domain.SemanticGraphEdge, embedding []float32) error {
+	if len(embedding) != s.dimension {
+		return fmt.Errorf("embedding dimension %d does not match configured dimension %d", len(embedding), s.dimension)
+	}
+	_, err := s.client.Upsert(ctx, milvusclient.NewColumnBasedInsertOption(s.collection).
+		WithVarcharColumn("id", []string{edge.ID}).
+		WithVarcharColumn("project_id", []string{edge.ProjectID}).
+		WithVarcharColumn("repository_id", []string{edge.RepositoryID}).
+		WithVarcharColumn("document_type", []string{"graph_edge"}).
+		WithVarcharColumn("edge_type", []string{edge.Type}).
+		WithFloatVectorColumn("embedding", s.dimension, [][]float32{embedding}))
+	if err != nil {
+		return fmt.Errorf("upsert Milvus graph edge %s: %w", edge.ID, err)
+	}
+	return nil
+}
+
+func (s *Store) SearchGraphEdges(ctx context.Context, projectID, repositoryID string, embedding []float32, limit int) ([]domain.VectorHit, error) {
+	if len(embedding) != s.dimension {
+		return nil, fmt.Errorf("embedding dimension %d does not match configured dimension %d", len(embedding), s.dimension)
+	}
+	option := milvusclient.NewSearchOption(
+		s.collection, limit, []entity.Vector{entity.FloatVector(embedding)},
+	).WithANNSField("embedding").WithFilter("project_id == {project_id} && document_type == 'graph_edge'").WithTemplateParam("project_id", projectID)
+	if repositoryID != "" {
+		option = option.WithFilter("project_id == {project_id} && repository_id == {repository_id} && document_type == 'graph_edge'").
+			WithTemplateParam("repository_id", repositoryID)
+	}
+	sets, err := s.client.Search(ctx, option)
+	if err != nil {
+		return nil, fmt.Errorf("search Milvus graph edges: %w", err)
 	}
 	if len(sets) == 0 {
 		return []domain.VectorHit{}, nil

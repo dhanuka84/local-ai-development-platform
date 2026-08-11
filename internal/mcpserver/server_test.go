@@ -43,8 +43,8 @@ func TestServerPublishesValidatedToolSchemasAndSafetyHints(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(result.Tools) != 16 {
-		t.Fatalf("tool count = %d, want 16", len(result.Tools))
+	if len(result.Tools) != 17 {
+		t.Fatalf("tool count = %d, want 17", len(result.Tools))
 	}
 	tools := make(map[string]*mcp.Tool, len(result.Tools))
 	for _, tool := range result.Tools {
@@ -64,5 +64,8 @@ func TestServerPublishesValidatedToolSchemasAndSafetyHints(t *testing.T) {
 	}
 	if !tools["code_graph_get"].Annotations.ReadOnlyHint {
 		t.Fatal("code_graph_get is not marked read-only")
+	}
+	if !tools["graph_context_search"].Annotations.ReadOnlyHint {
+		t.Fatal("graph_context_search is not marked read-only")
 	}
 }

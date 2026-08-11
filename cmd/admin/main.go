@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/dhanuka84/hybrid-ai-platform/internal/age"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/authorization"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/config"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/domain"
@@ -28,7 +29,7 @@ func main() {
 
 func run(ctx context.Context, args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: admin <migrate|milvus-init|doctor|reindex|candidates|get|approve|reject> [arguments]")
+		return errors.New("usage: admin <migrate|age-rebuild|milvus-init|doctor|reindex|compact-code-outbox|repository-upsert|candidates|get|approve|reject> [arguments]")
 	}
 	cfg, err := config.LoadCLI()
 	if err != nil {
@@ -41,11 +42,38 @@ func run(ctx context.Context, args []string) error {
 			return err
 		}
 		defer repository.Close()
+		if cfg.GraphBackend == "apache-age" {
+			graphStore, err := age.New(repository.Pool(), repository, cfg.AgeGraphName)
+			if err != nil {
+				return err
+			}
+			if err := graphStore.Ensure(ctx); err != nil {
+				return err
+			}
+		}
 		if err := migrations.Apply(ctx, repository.Pool()); err != nil {
 			return err
 		}
 		fmt.Println("PostgreSQL migrations applied")
 		return nil
+	case "age-rebuild":
+		repository, err := openRepository(ctx, cfg)
+		if err != nil {
+			return err
+		}
+		defer repository.Close()
+		graphStore, err := age.New(repository.Pool(), repository, cfg.AgeGraphName)
+		if err != nil {
+			return err
+		}
+		if err := graphStore.Ensure(ctx); err != nil {
+			return err
+		}
+		stats, err := graphStore.Rebuild(ctx)
+		if err != nil {
+			return err
+		}
+		return json.NewEncoder(os.Stdout).Encode(stats)
 	case "milvus-init":
 		store, err := milvus.Open(ctx, cfg.MilvusAddress, cfg.MilvusDatabase, cfg.MilvusAPIKey, cfg.MilvusCollection, cfg.EmbeddingDimension)
 		if err != nil {
@@ -77,8 +105,41 @@ func run(ctx context.Context, args []string) error {
 		if err != nil {
 			return err
 		}
-		fmt.Printf("queued %d approved knowledge items, %d repository relations, and %d code entities for indexing\n", knowledgeCount, relationCount, codeEntityCount)
+		edgeCount, err := repository.RequeueSemanticGraphEdges(ctx)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("queued %d approved knowledge items, %d repository relations, %d code entities, and %d semantic graph edges for indexing\n", knowledgeCount, relationCount, codeEntityCount, edgeCount)
 		return nil
+	case "repository-upsert":
+		if len(args) != 6 {
+			return errors.New("usage: admin repository-upsert <project-id> <name> <canonical-url> <default-branch> <revision>")
+		}
+		repository, err := openRepository(ctx, cfg)
+		if err != nil {
+			return err
+		}
+		defer repository.Close()
+		item, err := repository.UpsertSoftwareRepository(ctx, args[1], domain.SoftwareRepository{
+			Name: args[2], CanonicalURL: args[3], DefaultBranch: args[4], Revision: args[5],
+		})
+		if err != nil {
+			return err
+		}
+		return json.NewEncoder(os.Stdout).Encode(item)
+	case "compact-code-outbox":
+		repository, err := openRepository(ctx, cfg)
+		if err != nil {
+			return err
+		}
+		defer repository.Close()
+		count, err := repository.CompactCodeEntityOutbox(ctx)
+		if err != nil {
+			return err
+		}
+		return json.NewEncoder(os.Stdout).Encode(struct {
+			Completed int64 `json:"completed"`
+		}{Completed: count})
 	case "candidates":
 		if len(args) > 3 {
 			return errors.New("usage: admin candidates [project-id] [limit]")
@@ -224,6 +285,16 @@ func doctor(ctx context.Context, cfg config.Config) error {
 			status["postgres"] = err.Error()
 		} else {
 			status["postgres"] = "ok"
+		}
+		if cfg.GraphBackend == "apache-age" {
+			graphStore, graphErr := age.New(repository.Pool(), repository, cfg.AgeGraphName)
+			if graphErr != nil {
+				status["apache-age"] = graphErr.Error()
+			} else if graphErr := graphStore.Ping(ctx); graphErr != nil {
+				status["apache-age"] = graphErr.Error()
+			} else {
+				status["apache-age"] = "ok"
+			}
 		}
 	}
 	if err := ollama.New(cfg.OllamaURL, cfg.EmbeddingModel).Ping(ctx); err != nil {

@@ -237,7 +237,7 @@ make mcp-logs       # optional; follows logs until interrupted
 gateway health, controller plugin provenance, configured agents, MCP registry,
 and an authenticated OpenClaw-to-MCP capability probe. The underlying
 `healthz` proves that the MCP gateway process can answer; `readyz` checks
-PostgreSQL, Ollama, Milvus, and Cerbos with a three-second request budget.
+PostgreSQL, Apache AGE, Ollama, Milvus, and Cerbos with a three-second request budget.
 
 ## Start and stop
 
@@ -326,6 +326,23 @@ make ops-reindex
 
 Monitor worker logs until the outbox drains. Reindex includes approved knowledge, Git-repository relationships, and selected first-party code entities from every active repository snapshot.
 
+## Rebuild Apache AGE
+
+AGE is derived from PostgreSQL. After enabling AGE, restoring PostgreSQL,
+changing the graph schema, or detecting projection drift, run:
+
+```bash
+make migrate
+make age-rebuild
+make ops-reindex
+```
+
+`age-rebuild` removes only the configured derived AGE graph contents and
+recreates repository, active code, approved knowledge, and cross-domain edges.
+It does not modify PostgreSQL source records or Milvus. During an AGE outage,
+set or retain `GRAPH_FALLBACK_ENABLED=true`; requests report AGE as degraded
+and use recursive PostgreSQL traversal.
+
 ## Analyze a repository
 
 Set `CODEGRAPH_HOST_ROOT` in `.env` to the host repository or a narrow parent directory exposed read-only to the Compose gateway, then rebuild/restart the gateway. Invoke `code_repository_index` through Codex/OpenClaw with `repository_path=/workspace` (or a child path) and an explicit write approval. Supply both the expected checked-out `branch` and commit `revision` whenever possible, and leave `allow_dirty=false` for reproducible snapshots. Every stored analysis and returned symbol reports its repository name, branch, and revision.
@@ -372,7 +389,7 @@ of OpenAI.
 ## Recovery order
 
 1. Restore PostgreSQL and artifacts.
-2. Apply any newer migrations.
+2. Apply any newer migrations and rebuild AGE.
 3. Start Ollama and verify the exact embedding model.
 4. Start Milvus and initialize the configured collection.
 5. Reindex and start workers.
@@ -399,9 +416,10 @@ of OpenAI.
 | OpenClaw emits raw tool JSON | Ollama configured with `/v1` | Use native `baseUrl: http://host:11434` and `api: ollama`. |
 | Codex MCP tools report a missing token | Token env not exported to the Codex process | Start with `make codex` or export `HYBRID_AI_MCP_TOKEN`; do not put the token value in TOML. |
 | Repository graph is empty | Root does not exactly match UUID/URL/name | Use the canonical URL returned by relation upsert. |
+| `apache-age` is unavailable or graph calls use PostgreSQL fallback | Extension/graph is absent, projection heads are stale, or AGE is unhealthy | Run `make migrate && make age-rebuild`; inspect projection/outbox state before disabling fallback. |
 | Code analysis path is rejected | Path is outside the resolved allowlist or its bind mount | Update `CODEGRAPH_HOST_ROOT`/`CODEGRAPH_ALLOWED_ROOTS`; never expose a broad filesystem root. |
 | Code analysis reports package/build errors | A required toolchain, dependency, or build configuration is unavailable | Inspect gateway logs; populate the relevant cache/vendor tree and confirm Maven/Gradle, tsconfig/package metadata, or Python source roots are valid. |
-| Symbol search uses lexical fallback | Symbol vectors are queued or Ollama/Milvus is down | Inspect `code_entity.upsert` events and worker logs; SQL graph traversal remains authoritative. |
+| Symbol search uses lexical fallback | Symbol vectors are queued or Ollama/Milvus is down | Inspect `code_entity.upsert` events and worker logs; PostgreSQL remains authoritative and AGE/recursive SQL provide topology. |
 
 ## Cloud-disclosure checks
 

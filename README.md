@@ -11,8 +11,8 @@ The platform never sends work to them as a hidden fallback.
 2. A local Ollama model or Codex works on the task and runs checks.
 3. Codex or Kimi may review a small, sanitized package when policy allows it.
 4. A person reviews the result before it becomes reusable knowledge.
-5. PostgreSQL saves the official record. Milvus makes approved records easy to
-   find by meaning.
+5. PostgreSQL saves the official record. Apache AGE expands exact topology and
+   Milvus makes approved records easy to find by meaning.
 
 Maintenance always uses local Ollama models. A single developer can perform
 the Development, QA, Product Owner, and Operations roles. Larger teams can
@@ -22,8 +22,9 @@ The repository implements:
 
 - A Go MCP server over Streamable HTTP or STDIO.
 - PostgreSQL for durable workflow state, provenance, review gates, Git-repository graphs, and a transactional outbox.
+- Apache AGE for a rebuildable property-graph projection and bounded Cypher traversal.
 - A headless, compiler-aware Go analyzer for revisioned symbols, calls, references, implementations, imports, and tests.
-- Milvus for derived semantic indexes of approved knowledge, repository relationships, and selected code symbols.
+- Milvus for derived semantic indexes of approved knowledge, repository relationships, selected code symbols, and graph edges.
 - Ollama for local embeddings and local coding inference.
 - Immutable SHA-256 prompt/output artifacts.
 - An asynchronous indexing worker and administrative CLI.
@@ -43,12 +44,13 @@ for implementation detail.
 
 ## The key design rule
 
-PostgreSQL holds the official records. Milvus is a search index that can be
-rebuilt.
+PostgreSQL holds the official records. Apache AGE and Milvus are indexes that
+can be rebuilt.
 
 - PostgreSQL answers: “What is true, approved, and current?”
+- Apache AGE answers: “What is connected to it?”
 - Milvus answers: “Which approved item is most similar to this question?”
-- Stable PostgreSQL IDs connect every Milvus result to its official record.
+- Stable PostgreSQL IDs connect every AGE/Milvus result to its official record.
 
 Every generated solution starts as a pending candidate. It includes the
 original problem, reusable steps, test evidence, model and repository details,
@@ -72,6 +74,7 @@ before following calls, references, implementations, imports, or tests.
 |---|---|---|
 | MCP and data plane | Go 1.25 | Small services, good concurrency, and an official MCP SDK. |
 | Workflow and graph authority | PostgreSQL | Safe multi-step writes, strong rules, graph queries, and audit history. |
+| Property-graph traversal | Apache AGE 1.6 / PostgreSQL 17 | Cypher traversal without a separate graph authority or service. |
 | Semantic/hybrid index | Milvus | Vector search that can grow from one machine to a distributed cluster. |
 | Local inference | Ollama | Simple local model serving and local embeddings. |
 | Local coding on GBX100/GB10 | `qwen3.6:35b` | Current open-weight agentic coding model with ample memory headroom on 128 GB. |
@@ -624,7 +627,7 @@ percentage is claimed before the documented benchmark gates pass.
 The usual software-development loop is:
 
 ```text
-knowledge_search + repository_graph_get + code_symbol_search
+knowledge_search + graph_context_search + repository_graph_get + code_symbol_search
   -> local implementation and validation
   -> generation_capture (pending)
   -> optional Kimi/Codex review_record (may revise pending content)
@@ -638,7 +641,7 @@ Available tools:
 
 | Tool | Effect |
 |---|---|
-| `platform_status` | Check dependency health. |
+| `platform_status` | Check PostgreSQL, AGE, Ollama, Milvus, and authorization dependency health. |
 | `knowledge_search` | Search approved project knowledge; lexical fallback is reported explicitly. |
 | `knowledge_get` | Fetch one approved item. |
 | `generation_capture` | Store a run, immutable artifacts, provenance, procedure, validation, and pending candidate. |
@@ -646,11 +649,12 @@ Available tools:
 | `knowledge_candidates_list` | List the review queue. |
 | `knowledge_candidate_decide` | Approve or reject; approval queues vector indexing. |
 | `repository_relation_upsert` | Store a typed, approved Git-repository edge and queue its vector projection. |
-| `repository_graph_get` | Traverse exact SQL relationships to depth 1–5. |
+| `repository_graph_get` | Traverse AGE repository topology to depth 1–5 with stale/unavailable fallback to recursive SQL. |
 | `repository_relation_search` | Semantically search relationship evidence in Milvus. |
 | `code_repository_index` | Analyze an allowlisted local Go, Java, Kotlin, TypeScript, JavaScript, or Python repository and atomically publish a repository-, branch-, and revision-mapped SQL graph snapshot. |
 | `code_symbol_search` | Discover selected symbols through Milvus, then hydrate the active PostgreSQL entity. |
-| `code_graph_get` | Traverse the exact active SQL graph around a symbol to depth 1–5. |
+| `code_graph_get` | Traverse the exact active AGE graph around a symbol to depth 1–5 with recursive SQL fallback. |
+| `graph_context_search` | Find Milvus seeds, hydrate them from PostgreSQL, expand bounded AGE topology, and re-hydrate authoritative context. |
 
 Supported repository edge types are `depends_on`, `provides_api_to`, `deploys_with`, `shares_contract`, `fork_of`, `upstream_of`, `successor_of`, `contains`, and `related_to`.
 
@@ -661,7 +665,7 @@ cmd/                 gateway, indexing worker, and admin CLI
 components/          code graph analyzer plus bounded-work policy/verifier
 automation/          OpenClaw controller plugin and Lobster workflows
 contracts/           versioned workflow JSON Schemas
-internal/            domain, services, PostgreSQL, Milvus, Ollama, MCP, HTTP
+internal/            domain, GraphRAG, AGE, PostgreSQL, Milvus, Ollama, MCP, HTTP
 migrations/          embedded transactional SQL migrations
 policies/            versioned Cerbos policies and allow/deny fixtures
 deploy/compose/      complete local stack and NVIDIA GPU overlay

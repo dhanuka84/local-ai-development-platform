@@ -16,4 +16,6 @@ Software products often span application, library, infrastructure, schema, and d
 - SQL is authoritative; Milvus relation matches are discovery hints.
 - Repository relation writes require evidence and an accountable actor.
 - Knowledge and relation documents share a collection but are isolated by `project_id` and `document_type` scalar filters.
-- A future graph database may be added as another projection if bounded PostgreSQL traversal becomes a measured bottleneck.
+- Apache AGE was later accepted as a rebuildable traversal projection in
+  [ADR-0009](0009-apache-age-graphrag.md); this relational representation and
+  its recursive traversal remain the authority and fallback.

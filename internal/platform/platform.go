@@ -3,14 +3,18 @@ package platform
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	golanganalyzer "github.com/dhanuka84/hybrid-ai-platform/components/codegraph/golang"
 	codegraphrouter "github.com/dhanuka84/hybrid-ai-platform/components/codegraph/router"
 	scipanalyzer "github.com/dhanuka84/hybrid-ai-platform/components/codegraph/scip"
+	"github.com/dhanuka84/hybrid-ai-platform/internal/age"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/artifacts"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/authorization"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/config"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/domain"
+	graphfallback "github.com/dhanuka84/hybrid-ai-platform/internal/graph"
+	"github.com/dhanuka84/hybrid-ai-platform/internal/graphrag"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/milvus"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/ollama"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/postgres"
@@ -18,10 +22,14 @@ import (
 )
 
 type Platform struct {
-	Repository *postgres.Repository
-	Vectors    *milvus.Store
-	Service    *service.Service
-	principals []domain.PrincipalBootstrap
+	Repository    *postgres.Repository
+	Vectors       *milvus.Store
+	Service       *service.Service
+	Graphs        domain.GraphStore
+	Projector     domain.GraphProjector
+	graphHealth   domain.HealthChecker
+	graphRequired bool
+	principals    []domain.PrincipalBootstrap
 }
 
 func Open(ctx context.Context, cfg config.Config) (*Platform, error) {
@@ -37,6 +45,33 @@ func Open(ctx context.Context, cfg config.Config) (*Platform, error) {
 	embedder := ollama.New(cfg.OllamaURL, cfg.EmbeddingModel)
 	artifactStore := artifacts.NewLocalStore(cfg.ArtifactsPath)
 	svc := service.New(repository, artifactStore, embedder, vectors, cfg.SearchFallback, cfg.AutoApproveLocal)
+	relationalGraphs := postgres.NewRecursiveGraphStore(repository)
+	var graphStore domain.GraphStore = relationalGraphs
+	var graphHealth domain.HealthChecker
+	var projector domain.GraphProjector
+	if cfg.GraphBackend == "apache-age" {
+		ageStore, err := age.New(repository.Pool(), repository, cfg.AgeGraphName)
+		if err != nil {
+			_ = vectors.Close(ctx)
+			repository.Close()
+			return nil, fmt.Errorf("configure Apache AGE: %w", err)
+		}
+		graphStore, graphHealth, projector = ageStore, ageStore, ageStore
+		if cfg.GraphFallbackEnabled {
+			graphStore = graphfallback.WithFallback(ageStore, relationalGraphs, slog.Default())
+		}
+	}
+	graphRAG, err := graphrag.New(repository, embedder, vectors, graphStore)
+	if err != nil {
+		_ = vectors.Close(ctx)
+		repository.Close()
+		return nil, err
+	}
+	if err := svc.ConfigureGraphs(graphStore, graphHealth, graphRAG); err != nil {
+		_ = vectors.Close(ctx)
+		repository.Close()
+		return nil, err
+	}
 	var authorizer domain.Authorizer = authorization.Disabled{}
 	reportAuthorizer := false
 	if cfg.AuthorizationMode == "cerbos" {
@@ -104,16 +139,28 @@ func Open(ctx context.Context, cfg config.Config) (*Platform, error) {
 		}
 	}
 	return &Platform{
-		Repository: repository,
-		Vectors:    vectors,
-		Service:    svc,
-		principals: cfg.AuthPrincipals,
+		Repository:    repository,
+		Vectors:       vectors,
+		Service:       svc,
+		Graphs:        graphStore,
+		Projector:     projector,
+		graphHealth:   graphHealth,
+		graphRequired: cfg.GraphBackend == "apache-age" && !cfg.GraphFallbackEnabled,
+		principals:    cfg.AuthPrincipals,
 	}, nil
 }
 
 func (p *Platform) Initialize(ctx context.Context) error {
 	if err := p.Repository.Ping(ctx); err != nil {
 		return fmt.Errorf("PostgreSQL unavailable: %w", err)
+	}
+	if p.graphHealth != nil {
+		if err := p.graphHealth.Ping(ctx); err != nil {
+			if p.graphRequired {
+				return fmt.Errorf("Apache AGE unavailable: %w", err)
+			}
+			slog.Warn("Apache AGE unavailable; PostgreSQL graph fallback remains active", "error", err)
+		}
 	}
 	if err := p.Repository.BootstrapPrincipals(ctx, p.principals); err != nil {
 		return fmt.Errorf("bootstrap principals: %w", err)

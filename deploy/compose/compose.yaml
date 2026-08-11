@@ -4,6 +4,9 @@ x-platform-environment: &platform-environment
   APP_ENV: local
   LOG_LEVEL: ${LOG_LEVEL:-info}
   DATABASE_URL: postgres://hybrid:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/hybrid?sslmode=disable
+  GRAPH_BACKEND: apache-age
+  GRAPH_FALLBACK_ENABLED: ${GRAPH_FALLBACK_ENABLED:-true}
+  AGE_GRAPH_NAME: ${AGE_GRAPH_NAME:-software_knowledge_graph}
   ARTIFACTS_PATH: /var/lib/hybrid-ai/artifacts
   OLLAMA_URL: http://ollama:11434
   OLLAMA_EMBEDDING_MODEL: ${OLLAMA_EMBEDDING_MODEL:-embeddinggemma}
@@ -40,7 +43,7 @@ services:
     restart: unless-stopped
 
   postgres:
-    image: postgres:17.10-alpine3.24
+    image: apache/age:release_PG17_1.6.0@sha256:fe8b33905a61549a067f8512808b88011bdcaa82ab65d8788f39fb07a04aa5be
     environment:
       POSTGRES_DB: hybrid
       POSTGRES_USER: hybrid

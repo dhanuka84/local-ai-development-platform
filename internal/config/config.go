@@ -25,6 +25,9 @@ type Config struct {
 	CerbosAddress          string
 	CerbosRequestTimeout   time.Duration
 	DatabaseURL            string
+	GraphBackend           string
+	GraphFallbackEnabled   bool
+	AgeGraphName           string
 	ArtifactsPath          string
 	OllamaURL              string
 	EmbeddingModel         string
@@ -73,6 +76,9 @@ func load(validateAuth bool) (Config, error) {
 		CerbosAddress:          env("CERBOS_ADDRESS", "127.0.0.1:3593"),
 		CerbosRequestTimeout:   durationEnv("CERBOS_REQUEST_TIMEOUT", 2*time.Second),
 		DatabaseURL:            env("DATABASE_URL", "postgres://hybrid:hybrid@127.0.0.1:5432/hybrid?sslmode=disable"),
+		GraphBackend:           env("GRAPH_BACKEND", "postgres"),
+		GraphFallbackEnabled:   boolEnv("GRAPH_FALLBACK_ENABLED", true),
+		AgeGraphName:           env("AGE_GRAPH_NAME", "software_knowledge_graph"),
 		ArtifactsPath:          env("ARTIFACTS_PATH", "./data/artifacts"),
 		OllamaURL:              strings.TrimRight(env("OLLAMA_URL", "http://127.0.0.1:11434"), "/"),
 		EmbeddingModel:         env("OLLAMA_EMBEDDING_MODEL", "embeddinggemma"),
@@ -129,6 +135,11 @@ func load(validateAuth bool) (Config, error) {
 		}
 	default:
 		return Config{}, fmt.Errorf("AUTHORIZATION_MODE must be cerbos or none, got %q", cfg.AuthorizationMode)
+	}
+	switch cfg.GraphBackend {
+	case "postgres", "apache-age":
+	default:
+		return Config{}, fmt.Errorf("GRAPH_BACKEND must be postgres or apache-age, got %q", cfg.GraphBackend)
 	}
 	if cfg.EmbeddingDimension < 1 || cfg.WorkerBatchSize < 1 || (cfg.CodeGraphEnabled &&
 		(cfg.CodeGraphMaxFiles < 1 || cfg.CodeGraphMaxEntities < 1 || cfg.CodeGraphMaxRelations < 1)) || cfg.CerbosRequestTimeout <= 0 {

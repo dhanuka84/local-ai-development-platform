@@ -129,6 +129,9 @@ func (r *Repository) StoreCodeGraph(
 		repositoryID, runID); err != nil {
 		return domain.CodeAnalysis{}, fmt.Errorf("advance code graph head: %w", err)
 	}
+	if _, err := tx.Exec(ctx, `INSERT INTO outbox_events(aggregate_id,topic) VALUES($1,'code_graph.project')`, runID); err != nil {
+		return domain.CodeAnalysis{}, fmt.Errorf("queue code graph projection: %w", err)
+	}
 	if _, err := tx.Exec(ctx, `INSERT INTO outbox_events(aggregate_id,topic)
         SELECT e.id,'code_entity.upsert'
         FROM code_entities e JOIN code_occurrences o ON o.entity_id=e.id
@@ -136,6 +139,13 @@ func (r *Repository) StoreCodeGraph(
           AND e.kind IN ('type','interface','function','method','test')
           AND COALESCE(e.metadata->>'external','false') <> 'true'`, runID); err != nil {
 		return domain.CodeAnalysis{}, fmt.Errorf("queue code entity indexing: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO outbox_events(aggregate_id,topic)
+        SELECT relation.id,'code_relation.upsert'
+        FROM code_relations relation
+        WHERE relation.analysis_run_id=$1
+          AND relation.relation_type IN ('calls','references','implements','imports','tests')`, runID); err != nil {
+		return domain.CodeAnalysis{}, fmt.Errorf("queue code relation indexing: %w", err)
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return domain.CodeAnalysis{}, err
@@ -361,4 +371,165 @@ func (r *Repository) RequeueCodeEntities(ctx context.Context) (int64, error) {
       WHERE e.kind IN ('type','interface','function','method','test')
         AND COALESCE(e.metadata->>'external','false') <> 'true'`)
 	return result.RowsAffected(), err
+}
+
+// CompactCodeEntityOutbox completes superseded pending embedding events while
+// retaining the newest event for every entity in an active repository graph.
+// Completed events remain auditable and make reindex can recreate work later.
+func (r *Repository) CompactCodeEntityOutbox(ctx context.Context) (int64, error) {
+	result, err := r.pool.Exec(ctx, `WITH active_entities AS (
+        SELECT DISTINCT occurrence.entity_id
+        FROM code_occurrences occurrence
+        JOIN code_repository_heads head ON head.analysis_run_id=occurrence.analysis_run_id
+      ), keepers AS (
+        SELECT max(event.id) AS id
+        FROM outbox_events event
+        JOIN active_entities active ON active.entity_id=event.aggregate_id
+        WHERE event.topic='code_entity.upsert' AND event.completed_at IS NULL
+        GROUP BY event.aggregate_id
+      )
+      UPDATE outbox_events event
+      SET completed_at=now(),locked_at=NULL,
+          last_error='superseded by active code snapshot'
+      WHERE event.topic='code_entity.upsert' AND event.completed_at IS NULL
+        AND event.locked_at IS NULL
+        AND NOT EXISTS (SELECT 1 FROM keepers WHERE keepers.id=event.id)`)
+	return result.RowsAffected(), err
+}
+
+func (r *Repository) GetActiveCodeAnalysis(ctx context.Context, projectID, root string) (domain.CodeAnalysis, error) {
+	return r.getActiveCodeAnalysis(ctx, projectID, root)
+}
+
+func (r *Repository) ResolveActiveCodeEntity(ctx context.Context, analysisID, symbolRoot string) (domain.CodeEntity, error) {
+	entity, err := scanCodeEntity(r.pool.QueryRow(ctx, `SELECT `+codeEntityColumns+`
+      FROM code_entities e
+      JOIN code_occurrences o ON o.entity_id=e.id AND o.analysis_run_id=$1
+      JOIN code_analysis_runs run ON run.id=o.analysis_run_id
+      JOIN software_repositories repository ON repository.id=e.repository_id
+      WHERE (e.id::text=$2 OR e.stable_key=$2 OR e.qualified_name=$2 OR e.name=$2)
+      ORDER BY CASE WHEN e.id::text=$2 THEN 0 WHEN e.stable_key=$2 THEN 1 WHEN e.qualified_name=$2 THEN 2 ELSE 3 END
+      LIMIT 1`, analysisID, symbolRoot))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return entity, fmt.Errorf("code symbol %q not found in active repository graph", symbolRoot)
+	}
+	return entity, err
+}
+
+func (r *Repository) HydrateCodeGraph(ctx context.Context, analysis domain.CodeAnalysis, ids []string) (domain.CodeGraph, error) {
+	if len(ids) == 0 {
+		return domain.CodeGraph{}, errors.New("cannot hydrate an empty code graph")
+	}
+	rows, err := r.pool.Query(ctx, `SELECT `+codeEntityColumns+`
+      FROM code_entities e
+      JOIN code_occurrences o ON o.entity_id=e.id AND o.analysis_run_id=$1
+      JOIN code_analysis_runs run ON run.id=o.analysis_run_id
+      JOIN software_repositories repository ON repository.id=e.repository_id
+      JOIN code_repository_heads head ON head.repository_id=e.repository_id AND head.analysis_run_id=o.analysis_run_id
+      WHERE e.id::text=ANY($2) ORDER BY e.qualified_name`, analysis.ID, ids)
+	if err != nil {
+		return domain.CodeGraph{}, err
+	}
+	entities := make([]domain.CodeEntity, 0, len(ids))
+	entityIDs := make([]string, 0, len(ids))
+	for rows.Next() {
+		entity, err := scanCodeEntity(rows)
+		if err != nil {
+			rows.Close()
+			return domain.CodeGraph{}, err
+		}
+		entities = append(entities, entity)
+		entityIDs = append(entityIDs, entity.ID)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return domain.CodeGraph{}, err
+	}
+	rows.Close()
+	if len(entities) == 0 {
+		return domain.CodeGraph{}, errors.New("active code graph projection returned no authoritative entities")
+	}
+	relationRows, err := r.pool.Query(ctx, `SELECT id::text,analysis_run_id::text,source_entity_id::text,target_entity_id::text,
+        relation_type,evidence,confidence,file_path,start_line,start_column,end_line,end_column,metadata
+      FROM code_relations WHERE analysis_run_id=$1
+        AND source_entity_id::text=ANY($2) AND target_entity_id::text=ANY($2)
+      ORDER BY relation_type,id`, analysis.ID, entityIDs)
+	if err != nil {
+		return domain.CodeGraph{}, err
+	}
+	defer relationRows.Close()
+	relations := make([]domain.CodeRelation, 0)
+	for relationRows.Next() {
+		relation, err := scanCodeRelation(relationRows)
+		if err != nil {
+			return domain.CodeGraph{}, err
+		}
+		relations = append(relations, relation)
+	}
+	return domain.CodeGraph{Analysis: analysis, Entities: entities, Relations: relations}, relationRows.Err()
+}
+
+func (r *Repository) GetActiveCodeGraphForRun(ctx context.Context, runID string) (domain.CodeGraph, bool, error) {
+	var projectID, repositoryID string
+	err := r.pool.QueryRow(ctx, `SELECT run.project_id,run.repository_id::text
+      FROM code_analysis_runs run
+      JOIN code_repository_heads head ON head.repository_id=run.repository_id AND head.analysis_run_id=run.id
+      WHERE run.id::text=$1`, runID).Scan(&projectID, &repositoryID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.CodeGraph{}, false, nil
+	}
+	if err != nil {
+		return domain.CodeGraph{}, false, err
+	}
+	analysis, err := r.getActiveCodeAnalysis(ctx, projectID, repositoryID)
+	if err != nil {
+		return domain.CodeGraph{}, false, err
+	}
+	rows, err := r.pool.Query(ctx, `SELECT entity_id::text FROM code_occurrences WHERE analysis_run_id=$1`, runID)
+	if err != nil {
+		return domain.CodeGraph{}, false, err
+	}
+	ids := make([]string, 0)
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return domain.CodeGraph{}, false, err
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return domain.CodeGraph{}, false, err
+	}
+	rows.Close()
+	graph, err := r.HydrateCodeGraph(ctx, analysis, ids)
+	return graph, true, err
+}
+
+func (r *Repository) CodeProjectionCurrent(ctx context.Context, repositoryID, analysisID, revision string) (bool, error) {
+	var current bool
+	err := r.pool.QueryRow(ctx, `SELECT EXISTS(
+        SELECT 1 FROM code_repository_heads active
+        JOIN graph_projection_heads projected ON projected.repository_id=active.repository_id
+        WHERE active.repository_id::text=$1 AND active.analysis_run_id::text=$2
+          AND projected.analysis_run_id=active.analysis_run_id AND projected.revision=$3
+          AND projected.backend='apache-age' AND projected.status='ready'
+      )`, repositoryID, analysisID, revision).Scan(&current)
+	return current, err
+}
+
+func (r *Repository) CodeProjectionsCurrentForEntities(ctx context.Context, projectID string, entityIDs []string) (bool, error) {
+	if len(entityIDs) == 0 {
+		return true, nil
+	}
+	var current bool
+	err := r.pool.QueryRow(ctx, `SELECT COALESCE(bool_and(projected.analysis_run_id=active.analysis_run_id
+        AND projected.revision=run.revision AND projected.backend='apache-age' AND projected.status='ready'),false)
+      FROM code_entities entity
+      JOIN code_repository_heads active ON active.repository_id=entity.repository_id
+      JOIN code_analysis_runs run ON run.id=active.analysis_run_id
+      LEFT JOIN graph_projection_heads projected ON projected.repository_id=entity.repository_id
+      WHERE entity.project_id=$1 AND entity.id::text=ANY($2)`, projectID, entityIDs).Scan(&current)
+	return current, err
 }

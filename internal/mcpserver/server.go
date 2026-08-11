@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/dhanuka84/hybrid-ai-platform/internal/domain"
+	"github.com/dhanuka84/hybrid-ai-platform/internal/graphrag"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/identity"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/service"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -34,7 +35,7 @@ func New(svc *service.Service, defaultPrincipals ...domain.Principal) *mcp.Serve
 }
 
 func (a *API) register(server *mcp.Server) {
-	mcp.AddTool(server, readTool("platform_status", "Platform status", "Check PostgreSQL, Ollama, and Milvus connectivity."), a.status)
+	mcp.AddTool(server, readTool("platform_status", "Platform status", "Check PostgreSQL, Apache AGE, Ollama, and Milvus connectivity."), a.status)
 	mcp.AddTool(server, readTool("knowledge_search", "Search approved knowledge", "Search only approved, project-scoped software-development knowledge."), a.search)
 	mcp.AddTool(server, readTool("knowledge_get", "Get knowledge", "Fetch one approved knowledge item by ID."), a.get)
 	mcp.AddTool(server, readTool("knowledge_candidates_list", "List review candidates", "List pending knowledge candidates for review."), a.listCandidates)
@@ -42,6 +43,7 @@ func (a *API) register(server *mcp.Server) {
 	mcp.AddTool(server, readTool("repository_relation_search", "Search repository relationships", "Semantically search approved Git repository relationships in Milvus."), a.repositoryRelationSearch)
 	mcp.AddTool(server, readTool("code_symbol_search", "Search code symbols", "Semantically search active, revision-specific source symbols with PostgreSQL lexical fallback."), a.codeSymbolSearch)
 	mcp.AddTool(server, readTool("code_graph_get", "Get code graph", "Traverse calls, references, implementations, imports, tests, and containment around a source symbol."), a.codeGraph)
+	mcp.AddTool(server, readTool("graph_context_search", "Search graph context", "Discover semantic seeds, expand governed repository/code/knowledge topology, and return PostgreSQL-hydrated bounded context."), a.graphContextSearch)
 	mcp.AddTool(server, writeTool("generation_capture", "Capture a generation", "Persist a prompt, generated response, provenance, and a review candidate. This is additive and does not approve the candidate."), a.capture)
 	mcp.AddTool(server, writeTool("repository_relation_upsert", "Record repository relationship", "Upsert two Git repositories and an approved, evidence-backed relationship; vector indexing is queued transactionally."), a.repositoryRelationUpsert)
 	if a.service.CodeGraphAnalysisEnabled() {
@@ -355,6 +357,32 @@ func (a *API) repositoryRelationSearch(ctx context.Context, _ *mcp.CallToolReque
 	}
 	relations, err := a.service.SearchRepositoryRelations(ctx, input.ProjectID, input.Query, input.Limit)
 	return nil, repositoryRelationsOutput{Count: len(relations), Relations: relations}, err
+}
+
+type graphContextSearchInput struct {
+	ProjectID  string `json:"project_id" jsonschema:"software product or solution namespace; required"`
+	Query      string `json:"query" jsonschema:"question used for semantic seed discovery; required"`
+	Repository string `json:"repository,omitempty" jsonschema:"optional repository UUID or exact name scope"`
+	MaxHops    int    `json:"max_hops,omitempty" jsonschema:"bounded traversal depth from 1 to 5; default 2"`
+	SeedLimit  int    `json:"seed_limit,omitempty" jsonschema:"semantic seed limit from 1 to 32; default 8"`
+	MaxNodes   int    `json:"max_nodes,omitempty" jsonschema:"context node limit from 1 to 200; default 40"`
+	MaxEdges   int    `json:"max_edges,omitempty" jsonschema:"context edge limit from 1 to 400; default 80"`
+}
+
+func (a *API) graphContextSearch(ctx context.Context, _ *mcp.CallToolRequest, input graphContextSearchInput) (*mcp.CallToolResult, graphrag.Context, error) {
+	ctx = a.context(ctx)
+	resourceID := input.Repository
+	if resourceID == "" {
+		resourceID = "graph-context"
+	}
+	if _, err := a.service.AuthorizeProjectAction(ctx, input.ProjectID, "repository_relation", resourceID, "read", nil); err != nil {
+		return nil, graphrag.Context{}, err
+	}
+	result, err := a.service.GraphContextSearch(ctx, graphrag.Request{
+		ProjectID: input.ProjectID, Query: input.Query, Repository: input.Repository,
+		MaxHops: input.MaxHops, SeedLimit: input.SeedLimit, MaxNodes: input.MaxNodes, MaxEdges: input.MaxEdges,
+	})
+	return nil, result, err
 }
 
 type codeRepositoryIndexInput struct {

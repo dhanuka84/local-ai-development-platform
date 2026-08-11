@@ -51,6 +51,7 @@ mappings because those relationships are the purpose of that view.
 - PostgreSQL is the authoritative runtime system of record for workflow, graph relationships, provenance, audit, and indexing state.
 - Git repository nodes and typed, evidence-backed relationships are authoritative in PostgreSQL and semantically projected into Milvus.
 - Revisioned code entities and every exact code edge are authoritative in PostgreSQL. Only selected first-party entity summaries are projected into Milvus, using the same stable PostgreSQL UUID.
+- Apache AGE contains only rebuildable active repository/code/approved-knowledge topology; every result is re-hydrated from PostgreSQL.
 - OpenClaw orchestrates analysis; deterministic compiler-aware analyzers produce graph evidence. LLM interpretations follow the candidate review workflow.
 - Git is the human-reviewable source for approved patterns, ADRs, policies, and runbooks.
 - Object or content-addressed storage holds large immutable artifacts and evidence.

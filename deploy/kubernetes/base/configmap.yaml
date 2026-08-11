@@ -8,6 +8,9 @@ data:
   HTTP_ADDRESS: 0.0.0.0:8080
   MCP_TRANSPORT: http
   AUTH_MODE: token
+  GRAPH_BACKEND: apache-age
+  GRAPH_FALLBACK_ENABLED: "true"
+  AGE_GRAPH_NAME: software_knowledge_graph
   ARTIFACTS_PATH: /var/lib/hybrid-ai/artifacts
   OLLAMA_URL: http://ollama.inference.svc.cluster.local:11434
   OLLAMA_EMBEDDING_MODEL: embeddinggemma

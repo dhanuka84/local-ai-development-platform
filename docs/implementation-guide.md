@@ -18,7 +18,9 @@ approved records, and Ollama runs local models and creates embeddings.
 | MCP gateway | `cmd/gateway` | Authenticates clients and exposes typed tools over HTTP or STDIO. |
 | Application service | `internal/service` | Checks requests and handles capture, search, approval, and graph operations. |
 | Code graph analyzer | `components/codegraph/golang` | Reads Go code and creates repeatable snapshots of symbols and links. |
-| PostgreSQL adapter | `internal/postgres` | Saves official state, runs safe transactions, traverses graphs, and manages the outbox. |
+| PostgreSQL adapter | `internal/postgres` | Saves official state, runs safe transactions, provides recursive graph fallback, and manages the outbox. |
+| Apache AGE adapter | `internal/age` | Projects active topology, validates projection heads, and performs bounded Cypher traversal. |
+| GraphRAG orchestration | `internal/graphrag` | Combines semantic seeds, authoritative hydration, graph expansion, ranking, and context limits. |
 | Milvus adapter | `internal/milvus` | Searches approved knowledge, repository links, and selected code symbols by meaning. |
 | Ollama adapter | `internal/ollama` | Creates local embeddings in batches through `/api/embed`. |
 | Artifact store | `internal/artifacts` | Saves exact prompts, outputs, reviews, and context manifests by SHA-256 hash. |
@@ -142,7 +144,13 @@ For exact reproduction, store a deterministic generator/template and its version
 
 Each edge requires evidence and an accountable approval identity. Evidence should identify something verifiable: a module manifest, API client import, deployment descriptor, submodule declaration, Git fork/upstream record, shared schema, or reviewed architecture decision.
 
-`repository_graph_get` uses a bounded recursive PostgreSQL CTE and accepts a repository UUID, canonical URL, or exact name. `repository_relation_search` embeds the relationship text and searches Milvus. The relation upsert and its indexing event are transactional in PostgreSQL; Milvus catches up asynchronously. Exact topology and integrity decisions must use the SQL graph, never vector similarity.
+`repository_graph_get` accepts a repository UUID, canonical URL, or exact name.
+With `GRAPH_BACKEND=apache-age`, it uses the AGE projection after checking every
+selected repository and incident relation against PostgreSQL projection state.
+Missing, stale, or unavailable AGE falls back to the existing bounded recursive
+PostgreSQL CTE when `GRAPH_FALLBACK_ENABLED=true`. `repository_relation_search`
+uses Milvus only for semantic discovery; exact topology and integrity decisions
+always return PostgreSQL-hydrated records.
 
 Both approved knowledge and repository edges share one Milvus collection with a dynamic `document_type` field. Searches always filter by `project_id` and `document_type`, preventing relation vectors from entering answer-pattern results.
 
@@ -157,14 +165,32 @@ Each successful run records the repository name, checked-out branch, and exact c
 Logical identities use a repository-scoped stable key composed from language, entity kind, and qualified name. `code_entities` reuses its UUID across analysis revisions. Milvus stores selected first-party types, interfaces, functions, methods, and tests—including signatures, source paths, and available documentation—using that UUID as the vector primary key:
 
 ```text
-semantic query → Milvus entity UUID → active PostgreSQL occurrence → exact SQL graph traversal
+semantic query → Milvus entity UUID → active PostgreSQL occurrence → AGE traversal → PostgreSQL hydration
 ```
 
-All graph edges remain in PostgreSQL. Milvus is used to discover a likely starting symbol, never to infer topology. `code_symbol_search` reports whether Milvus or PostgreSQL lexical fallback supplied the result. `code_graph_get` accepts an entity UUID, stable key, qualified name, or exact name and performs a bounded bidirectional traversal of the active snapshot.
+All graph edges remain authoritative in PostgreSQL. The active code head is
+projected into AGE and guarded by `graph_projection_heads`. Milvus discovers a
+likely starting symbol but never infers topology. `code_graph_get` accepts an
+entity UUID, stable key, qualified name, or exact name and performs bounded
+bidirectional AGE traversal with recursive SQL fallback.
+
+## GraphRAG
+
+`graph_context_search` embeds the question locally, searches Milvus for
+approved knowledge, active code symbols, repository relations, and selected
+semantic graph edges, hydrates those candidates from PostgreSQL, expands the
+unified AGE graph, and re-hydrates the selected nodes and edges from
+PostgreSQL. If Milvus is unavailable, approved PostgreSQL lexical search
+supplies seeds. If AGE is unavailable or stale, the same request uses the
+recursive PostgreSQL `GraphStore`.
+
+Defaults are two hops, eight seeds, 40 nodes, and 80 edges. Server ceilings are
+five hops, 32 seeds, 200 nodes, and 400 edges. Unrestricted Cypher is not an MCP
+tool.
 
 Milvus code searches always filter by project and `document_type`; when the caller supplies `repository_id`, that scalar filter is pushed into the vector query rather than applied only after retrieval. PostgreSQL hydration still rechecks the repository and active snapshot.
 
-The reusable analyzer boundary is isolated under `components/codegraph` and MPL-2.0. PostgreSQL, Milvus, MCP, worker, and policy integrations remain in the MIT portion of the platform.
+The reusable analyzer boundary is isolated under `components/codegraph` and MPL-2.0. PostgreSQL, AGE, Milvus, MCP, worker, and policy integrations remain in the MIT portion of the platform.
 
 ## MCP contract and safety
 
@@ -199,6 +225,9 @@ Configuration is environment-only and validated at startup. Important values:
 | `AUTHORIZATION_MODE` | `none` locally, `cerbos` otherwise | Compose sets `cerbos`; `none` is rejected outside local mode. |
 | `CERBOS_ADDRESS` | `127.0.0.1:3593` | Internal PDP address; never publish it to an untrusted network. |
 | `DATABASE_URL` | local PostgreSQL | Required for all durable operations. |
+| `GRAPH_BACKEND` | `postgres` | `apache-age` in Compose; `postgres` is the rollback path. |
+| `GRAPH_FALLBACK_ENABLED` | `true` | Use recursive PostgreSQL traversal when AGE is stale or unavailable. |
+| `AGE_GRAPH_NAME` | `software_knowledge_graph` | Valid lowercase PostgreSQL-style identifier. |
 | `OLLAMA_URL` | `http://127.0.0.1:11434` | Native API base without `/v1`. |
 | `OLLAMA_EMBEDDING_MODEL` | `embeddinggemma` | Must match the configured dimension. |
 | `EMBEDDING_DIMENSION` | `768` | A dimension change requires a new collection name/reindex. |
@@ -217,6 +246,11 @@ Configuration is environment-only and validated at startup. Important values:
 ## Schema and embedding evolution
 
 PostgreSQL migrations are embedded and transactionally recorded in `schema_migrations`. Never edit an already deployed migration; add a new numbered migration.
+
+AGE is derived. `admin migrate` enables the extension and initializes the
+configured graph when the AGE backend is selected. `admin age-rebuild`
+recreates repository, active-code, approved-knowledge, and cross-domain
+topology from PostgreSQL in one transaction.
 
 Milvus is intentionally versioned by collection name. To change the embedding model or dimension:
 

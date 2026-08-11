@@ -35,6 +35,9 @@ func main() {
 	}
 	embedder := ollama.New(cfg.OllamaURL, cfg.EmbeddingModel)
 	worker := workerpkg.New(app.Repository, embedder, app.Vectors, logger, cfg.WorkerPollInterval, cfg.WorkerBatchSize)
+	if app.Projector != nil {
+		worker.ConfigureGraphProjector(app.Projector)
+	}
 	logger.Info("starting index worker", "batch_size", cfg.WorkerBatchSize, "poll_interval", cfg.WorkerPollInterval)
 	if err := worker.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
 		fail(err)

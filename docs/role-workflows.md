@@ -51,7 +51,7 @@ make pull-local-model
 make platform-status
 ```
 
-Compose startup applies PostgreSQL migrations and initializes Milvus before the
+Compose startup applies PostgreSQL migrations, initializes Apache AGE, and initializes Milvus before the
 gateway and worker become ready.
 
 ### Normal platform session
@@ -68,12 +68,13 @@ make ops-stop            # retains all named volumes
 
 ```bash
 make migrate
+make age-rebuild
 make milvus-init
 make ops-doctor
 make ops-reindex
 ```
 
-`migrate`, `milvus-init`, `doctor`, candidate commands, and `reindex` execute
+`migrate`, `age-rebuild`, `milvus-init`, `doctor`, candidate commands, and `reindex` execute
 through the Compose admin image. They therefore use the same database password
 and service-network addresses as the running platform without exporting a
 database URL into the developer shell.
@@ -264,7 +265,7 @@ Operations
 
 | Role | Workflow commands | Canonical/supporting commands |
 |---|---|---|
-| Operations | `ops-start`, `ops-start-gpu`, `ops-status`, `ops-logs`, `ops-stop`, `ops-doctor`, `ops-reindex` | `env-init`, `mcp-preflight`, `migrate`, `milvus-init`, `up`, `up-gpu`, `down`, `logs`, `mcp-start`, `mcp-start-gpu`, `mcp-status`, `mcp-logs`, `mcp-stop`, `doctor`, `reindex`, `pull-local-model`, `openclaw-config-plan`, `openclaw-config-apply`, `openclaw-plugin-install`, `openclaw-setup`, `openclaw-start`, `openclaw-status`, `platform-status` |
+| Operations | `ops-start`, `ops-start-gpu`, `ops-status`, `ops-logs`, `ops-stop`, `ops-doctor`, `ops-reindex` | `env-init`, `mcp-preflight`, `migrate`, `age-rebuild`, `milvus-init`, `up`, `up-gpu`, `down`, `logs`, `mcp-start`, `mcp-start-gpu`, `mcp-status`, `mcp-logs`, `mcp-stop`, `doctor`, `reindex`, `pull-local-model`, `openclaw-config-check`, `openclaw-config-plan`, `openclaw-config-apply`, `openclaw-plugin-install`, `openclaw-setup`, `openclaw-start`, `openclaw-status`, `platform-status` |
 | Development | `dev-session`, `dev-session-repo`, `dev-policy-check`, `dev-patch-verify`, `dev-check`, `dev-authz-policy-test` | `codex-login`, `codex-check`, `codex`, `codex-repo`, `preflight`, `fmt`, `test`, `check`, `build`, `workpacket-build`, `workpacket-evaluate`, `workpacket-verify`, `authz-policy-test`, `diagram-review-loop`, `diagram-agentic-workflow`, `clean`, plus MCP retrieval/capture/review tools |
 | QA | `qa-session`, `qa-session-repo`, `qa-patch-verify`, `qa-check`, `qa-authz-policy-test`, `qa-candidates`, `qa-candidate-get` | `candidate-list`, `candidate-get`, `codex-check`, `test`, `check`, `workpacket-verify`, `authz-policy-test`, plus MCP `review_record` |
 | Product Owner | `po-candidates`, `po-candidate-get`, `po-approve`, `po-reject` | `candidate-list`, `candidate-get`, `candidate-approve`, `candidate-reject` |

@@ -140,6 +140,25 @@ type RepositoryRelation struct {
 	Score        float32            `json:"score,omitempty"`
 }
 
+type KnowledgeRelation struct {
+	ID           string  `json:"id"`
+	ProjectID    string  `json:"project_id"`
+	FromID       string  `json:"from_id"`
+	ToID         string  `json:"to_id"`
+	RelationType string  `json:"relation_type"`
+	Confidence   float32 `json:"confidence"`
+}
+
+type KnowledgeCodeReference struct {
+	ID            string `json:"id"`
+	ProjectID     string `json:"project_id"`
+	KnowledgeID   string `json:"knowledge_id"`
+	EntityID      string `json:"entity_id"`
+	AnalysisRunID string `json:"analysis_run_id"`
+	Role          string `json:"role"`
+	Evidence      string `json:"evidence,omitempty"`
+}
+
 func (r RepositoryRelation) RetrievalText() string {
 	return "Repository relationship: " + r.From.Name + " (" + r.From.CanonicalURL + ") " +
 		r.RelationType + " " + r.To.Name + " (" + r.To.CanonicalURL + "). Evidence: " + r.Evidence
@@ -220,4 +239,70 @@ type CodeGraph struct {
 	Analysis  CodeAnalysis   `json:"analysis"`
 	Entities  []CodeEntity   `json:"entities"`
 	Relations []CodeRelation `json:"relations"`
+}
+
+const (
+	GraphNodeRepository    = "repository"
+	GraphNodeCodeEntity    = "code_entity"
+	GraphNodeKnowledgeItem = "knowledge_item"
+)
+
+type GraphNode struct {
+	ID       string  `json:"id"`
+	Type     string  `json:"type"`
+	Distance int     `json:"distance"`
+	Score    float32 `json:"score,omitempty"`
+}
+
+type GraphEdge struct {
+	ID         string  `json:"id"`
+	Type       string  `json:"type"`
+	SourceID   string  `json:"source_id"`
+	SourceType string  `json:"source_type"`
+	TargetID   string  `json:"target_id"`
+	TargetType string  `json:"target_type"`
+	Evidence   string  `json:"evidence,omitempty"`
+	Confidence float32 `json:"confidence"`
+}
+
+type KnowledgeSubgraph struct {
+	Backend      string               `json:"backend"`
+	Nodes        []GraphNode          `json:"nodes"`
+	Edges        []GraphEdge          `json:"edges"`
+	Repositories []SoftwareRepository `json:"repositories,omitempty"`
+	CodeEntities []CodeEntity         `json:"code_entities,omitempty"`
+	Knowledge    []KnowledgeItem      `json:"knowledge_items,omitempty"`
+	Truncated    bool                 `json:"truncated"`
+}
+
+type SemanticGraphEdge struct {
+	GraphEdge
+	ProjectID    string `json:"project_id"`
+	RepositoryID string `json:"repository_id,omitempty"`
+	SourceLabel  string `json:"source_label,omitempty"`
+	TargetLabel  string `json:"target_label,omitempty"`
+}
+
+func (e SemanticGraphEdge) RetrievalText() string {
+	source, target := e.SourceLabel, e.TargetLabel
+	if source == "" {
+		source = e.SourceID
+	}
+	if target == "" {
+		target = e.TargetID
+	}
+	text := "Graph relationship: " + e.SourceType + " " + source + " " + e.Type + " " + e.TargetType + " " + target
+	if e.Evidence != "" {
+		text += ". Evidence: " + e.Evidence
+	}
+	return text
+}
+
+type GraphProjectionSnapshot struct {
+	Repositories            []SoftwareRepository
+	RepositoryRelations     []RepositoryRelation
+	CodeGraphs              []CodeGraph
+	Knowledge               []KnowledgeItem
+	KnowledgeRelations      []KnowledgeRelation
+	KnowledgeCodeReferences []KnowledgeCodeReference
 }

@@ -201,7 +201,7 @@ make doctor
 ```
 
 `mcp-status` shows the Compose services and checks both `/healthz` and
-`/readyz`. `doctor` checks PostgreSQL, Ollama, and Milvus from inside the
+`/readyz`. `doctor` checks PostgreSQL, Apache AGE, Ollama, and Milvus from inside the
 Compose network.
 
 If preflight succeeds but Compose then reports Docker socket permission denied,

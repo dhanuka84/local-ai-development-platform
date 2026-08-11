@@ -16,7 +16,7 @@ terms used below.
 
 ## Trust boundaries
 
-- Local Ollama, PostgreSQL, Milvus, artifacts, gateway, and worker are one machine trust zone in the Compose deployment.
+- Local Ollama, PostgreSQL/Apache AGE, Milvus, artifacts, gateway, and worker are one machine trust zone in the Compose deployment.
 - OpenClaw and Codex are authenticated MCP clients.
 - Kimi and OpenAI are external processing zones. Any context given to their models leaves the local boundary.
 - A generated or reviewed answer is untrusted until source inspection and

@@ -14,7 +14,7 @@ The enterprise deployment changes scale and identity, not semantics:
 
 - PostgreSQL remains authoritative.
 - Milvus remains derived and project/tenant filtered.
-- Exact revisioned code graphs remain in PostgreSQL; Milvus code vectors use the same stable entity UUIDs.
+- Exact revisioned code graphs remain in PostgreSQL; AGE projects only active topology and Milvus vectors use the same stable entity UUIDs.
 - Knowledge and repository relations require provenance and approval.
 - Maintenance remains local/private with no cloud fallback.
 - Cloud review is explicit, minimized, and audited.
@@ -59,7 +59,11 @@ data path. A PDP outage must deny protected mutations rather than bypass policy.
 
 ## Repository and code graphs at scale
 
-PostgreSQL recursive CTEs are suitable for bounded product graphs. If deep, high-rate topology traversal becomes a measured bottleneck, introduce a graph projection (for example Neo4j) behind a domain interface. PostgreSQL must remain the authority, and updates should flow through the same outbox/CDC pattern. Milvus complements the graph with semantic discovery; it does not replace edge integrity or traversal.
+Apache AGE is the selected property-graph projection behind `GraphStore`.
+Enterprise PostgreSQL must provide the compatible AGE extension before setting
+`GRAPH_BACKEND=apache-age`; otherwise use `GRAPH_BACKEND=postgres`. PostgreSQL
+remains authoritative, updates flow through the outbox/CDC pattern, and Milvus
+complements AGE with semantic discovery rather than edge integrity.
 
 Do not run repository analysis inside stateless enterprise MCP gateways. `CODEGRAPH_ENABLED=false` removes the synchronous filesystem indexing tool while retaining symbol search and exact traversal. OpenClaw or CI submits durable jobs to a separate control-plane API; sandboxed analyzer workers consume those jobs, fetch an immutable revision, emit a deterministic snapshot, and let PostgreSQL atomically advance the repository head. Use incremental changed-file analysis, repository-scoped partitioning, batched projection events, retention for old runs, and explicit per-tenant resource quotas when scaling to thousands of repositories.
 
@@ -69,7 +73,7 @@ Writes are strongly consistent in PostgreSQL. Milvus indexing is eventual. Track
 
 - Oldest pending outbox age.
 - Attempts and terminal/repeated errors.
-- PostgreSQL-to-Milvus projection delay.
+- PostgreSQL-to-AGE and PostgreSQL-to-Milvus projection delay.
 - Repository analysis queue age, duration, failures, and active-revision freshness.
 - Search fallback rate.
 - Embedding latency and dimension errors.

@@ -1,0 +1,6 @@
+services:
+  worker:
+    environment:
+      GRAPH_BACKEND: postgres
+      GRAPH_FALLBACK_ENABLED: "true"
+      WORKER_BATCH_SIZE: 100

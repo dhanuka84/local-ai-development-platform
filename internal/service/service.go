@@ -11,6 +11,7 @@ import (
 
 	"github.com/dhanuka84/hybrid-ai-platform/components/codegraph"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/domain"
+	"github.com/dhanuka84/hybrid-ai-platform/internal/graphrag"
 )
 
 var ErrInvalidInput = errors.New("invalid input")
@@ -27,6 +28,9 @@ type Service struct {
 	codeLimits                 CodeGraphLimits
 	authorizer                 domain.Authorizer
 	reportAuthorizerDependency bool
+	graphStore                 domain.GraphStore
+	graphHealth                domain.HealthChecker
+	graphRAG                   *graphrag.Service
 }
 
 func (s *Service) ConfigureAuthorization(authorizer domain.Authorizer, reportDependency bool) error {
@@ -49,6 +53,16 @@ func New(repository domain.Repository, artifacts domain.ArtifactStore, embedder 
 		repository: repository, artifacts: artifacts, embedder: embedder, vectors: vectors,
 		lexicalFallback: lexicalFallback, autoApprove: autoApprove,
 	}
+}
+
+func (s *Service) ConfigureGraphs(store domain.GraphStore, health domain.HealthChecker, graphRAG *graphrag.Service) error {
+	if store == nil || graphRAG == nil {
+		return errors.New("graph store and GraphRAG service are required")
+	}
+	s.graphStore = store
+	s.graphHealth = health
+	s.graphRAG = graphRAG
+	return nil
 }
 
 func (s *Service) CodeGraphAnalysisEnabled() bool {
@@ -229,7 +243,12 @@ func (s *Service) CodeGraph(ctx context.Context, projectID, repositoryRoot, symb
 	if depth > 5 {
 		depth = 5
 	}
-	return s.repository.GetCodeGraph(ctx, projectID, repositoryRoot, symbolRoot, depth)
+	if s.graphStore == nil {
+		return s.repository.GetCodeGraph(ctx, projectID, repositoryRoot, symbolRoot, depth)
+	}
+	return s.graphStore.ExpandCodeGraph(ctx, domain.CodeGraphRequest{
+		ProjectID: projectID, RepositoryRoot: repositoryRoot, SymbolRoot: symbolRoot, MaxHops: depth,
+	})
 }
 
 type CaptureInput struct {
@@ -425,6 +444,12 @@ func (s *Service) Dependencies(ctx context.Context) map[string]string {
 			status["cerbos"] = "unavailable"
 		}
 	}
+	if s.graphHealth != nil {
+		status["apache-age"] = "ok"
+		if s.graphHealth.Ping(ctx) != nil {
+			status["apache-age"] = "unavailable"
+		}
+	}
 	return status
 }
 
@@ -460,7 +485,24 @@ func (s *Service) RepositoryGraph(ctx context.Context, projectID, root string, d
 	if depth > 5 {
 		depth = 5
 	}
-	return s.repository.GetRepositoryGraph(ctx, strings.TrimSpace(projectID), strings.TrimSpace(root), depth)
+	projectID, root = strings.TrimSpace(projectID), strings.TrimSpace(root)
+	if s.graphStore == nil {
+		return s.repository.GetRepositoryGraph(ctx, projectID, root, depth)
+	}
+	return s.graphStore.ExpandRepositoryGraph(ctx, domain.RepositoryGraphRequest{
+		ProjectID: projectID, Root: root, MaxHops: depth,
+	})
+}
+
+func (s *Service) GraphContextSearch(ctx context.Context, request graphrag.Request) (graphrag.Context, error) {
+	if s.graphRAG == nil {
+		return graphrag.Context{}, errors.New("GraphRAG is not configured")
+	}
+	context, err := s.graphRAG.Search(ctx, request)
+	if err != nil {
+		return graphrag.Context{}, err
+	}
+	return context, nil
 }
 
 func (s *Service) SearchRepositoryRelations(ctx context.Context, projectID, query string, limit int) ([]domain.RepositoryRelation, error) {

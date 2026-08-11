@@ -8,3 +8,4 @@
 - [0006 — Bounded local execution with advisory cloud review](0006-bounded-local-execution-and-cloud-review.md)
 - [0007 — OpenClaw managed agentic workflows](0007-openclaw-managed-agentic-workflows.md)
 - [0008 — Cerbos contextual authorization](0008-cerbos-contextual-authorization.md)
+- [0009 — Apache AGE projection and governed GraphRAG](0009-apache-age-graphrag.md)
