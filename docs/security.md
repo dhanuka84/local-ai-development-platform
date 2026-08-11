@@ -57,6 +57,18 @@ agent's auth store or environment.
 - MCP tool hints and Codex approval settings distinguish reads from writes.
 - PostgreSQL outbox transactions prevent an approval without a durable indexing request.
 - Code analysis resolves symlinks, enforces explicit filesystem roots and size caps, checks revisions, and rejects dirty worktrees by default.
+- Organization synchronization enumerates repositories through the authenticated
+  GitHub CLI, validates repository/branch names, refuses non-Git destinations,
+  and fails instead of changing a dirty checkout.
+- A non-default analysis branch must be an explicit
+  `REPOSITORY_BRANCH_OVERRIDES` entry. PostgreSQL stores the forge default
+  branch and active analysis branch separately so verification can detect
+  branch confusion.
+- Repository catalog registration accepts metadata only; it never treats a
+  documentation-only repository as an empty successful code analysis.
+- Batched workers coordinate with `FOR UPDATE SKIP LOCKED`; outbox compaction
+  marks superseded work complete without deleting audit rows or active-entity
+  projection intent.
 
 Local bearer credentials authenticate distinct principals. Cerbos is the
 internal contextual policy decision point. The Go gateway remains the
@@ -95,11 +107,15 @@ Before internet or enterprise exposure, add:
 | Cerbos is unavailable or returns an unreadable decision | Fail protected writes closed; preserve workflow state and expose a retryable operational error. |
 | Repository graph poisoning | Evidence required, constrained edge vocabulary, prompted upsert, SQL authority. |
 | Repository prompt injection changes graph truth | Compiler-aware extraction is authoritative; OpenClaw/LLM interpretations are stored only as reviewable knowledge candidates. |
+| Forge default branch is not the intended analysis branch | Require an explicit repository-to-branch override and verify catalog default, active branch, and full revision independently. |
+| Organization sync overwrites local work | Refuse every dirty checkout and every existing non-Git destination; require manual disposition before retry. |
+| Client timeout causes a duplicate repository scan | Treat timeout as ambiguous, inspect the active head, rerun the idempotent Make workflow, and compact only superseded outbox events. |
 | Analyzer reads unrelated host files | Read-only narrow bind mount plus canonical-path allowlist; never mount a home directory or filesystem root. |
 | Malicious or oversized repository exhausts resources | File/entity/relation caps locally; enterprise analyzers require sandbox CPU, memory, process, network, and deadline controls. |
 | Token disclosure in Git | Environment references, `.env` ignored, examples contain placeholders only. |
 | DNS rebinding/cross-origin local attack | SDK localhost protection plus Go cross-origin protection. |
 | Worker crash loses indexing | Durable outbox, reclaimable locks, retries, idempotent Milvus upsert. |
+| Multiple workers duplicate vector publication | PostgreSQL row locking with `SKIP LOCKED`, stable UUID primary keys, batched idempotent Milvus upserts, and active-head hydration. |
 | Cloud fallback leaks maintenance data | Strict per-agent local model and empty fallbacks. |
 
 See [Remote Review and Local Learning](remote-review-learning.md) for the full

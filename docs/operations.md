@@ -176,6 +176,7 @@ overrides. The target repository's trusted Codex configuration still applies.
 | `make mcp-logs` | Follow gateway and worker logs. |
 | `make codex-login` | Start the interactive ChatGPT sign-in flow. |
 | `make codex-check` | Show Codex login status and MCP registration. |
+| `make hybrid-verify` | Prove local development and cloud review fail closed; write hashed audit evidence under `reports/hybrid-verification/`. |
 | `make codex` | Start Codex in this checkout with the local bearer token. |
 | `make codex-repo REPO=/abs/path` | Start Codex in another repository with this HTTP MCP server. |
 | `make workpacket-evaluate PACKET=...` | Evaluate classification, risk, disclosure, scope, and limits. |
@@ -191,6 +192,18 @@ overrides. The target repository's trusted Codex configuration still applies.
 | `make openclaw-status` | Verify the gateway, plugin, agents, and authenticated MCP probe. |
 | `make platform-status` | Verify the complete Docker/MCP and OpenClaw integration. |
 | `make pull-local-model` | Pull the configured Ollama coding model. |
+| `make repository-sync-one REPO=<path> REPOSITORY_URL=<url> REPOSITORY_BRANCH=<branch>` | Clone or fast-forward one clean repository at an explicit branch. |
+| `make repository-index-one-all REPO=<path>` | Index one repository, wait for semantic projection, and print its active snapshot. |
+| `make repository-verify-one REPO=<path>` | Report one repository's catalog default and active branch/revision/counts. |
+| `make repository-org-index-all GITHUB_ORG=<owner>` | Synchronize, catalog, index stale repositories, and print verification state. |
+| `make repository-org-wait` | Wait for every code-index projection event; fail on retrying events. |
+| `make repository-org-verify` | Report catalog and active branch/revision/entity/relation state. |
+| `make compact-code-outbox` | Mark superseded code-vector events complete while retaining active entity work. |
+| `make rebuild-fresh CONFIRM_DESTROY=all-platform-data` | Destructively rebuild and start fresh CPU images and volumes. |
+| `make rebuild-fresh-gpu CONFIRM_DESTROY=all-platform-data` | Destructively rebuild and start fresh GPU images and volumes. |
+| `make models-list` | List locally installed Ollama models. |
+| `make worker-scale-postgres-fallback WORKER_REPLICAS=N` | Temporarily scale batched workers without restarting PostgreSQL. |
+| `make migrate-postgres-fallback` | Apply migrations to an existing PostgreSQL-only volume without requiring AGE. |
 | `make mcp-stop` | Stop the platform while retaining named volumes. |
 
 ## OpenClaw client operation
@@ -249,7 +262,10 @@ make mcp-stop        # retains named volumes
 
 `make up-gpu` and `make up` are equivalent general stack-start aliases. `make mcp-start-gpu` and `make mcp-start` make the two-terminal intent explicit.
 
-Do not use `docker compose down -v` unless deletion of all local database, vector, model, and artifact data is explicitly intended and independently backed up.
+Do not bypass the guarded Make workflow for destructive resets. If deletion of
+all local database, vector, model, and artifact data is explicitly intended and
+independently backed up, use `make rebuild-fresh` or
+`make rebuild-fresh-gpu` with the documented confirmation value.
 
 ## Candidate approval
 
@@ -322,9 +338,14 @@ Milvus is derived. After restoring or replacing it:
 ```bash
 make milvus-init
 make ops-reindex
+make repository-org-wait
 ```
 
-Monitor worker logs until the outbox drains. Reindex includes approved knowledge, Git-repository relationships, and selected first-party code entities from every active repository snapshot.
+Monitor worker logs until the outbox drains. Reindex includes approved knowledge,
+Git-repository relationships, semantic graph edges, and selected first-party
+code entities from every active repository snapshot. Workers embed claimed code
+entities and upsert Milvus in batches; multiple replicas coordinate with
+`FOR UPDATE SKIP LOCKED`.
 
 ## Rebuild Apache AGE
 
@@ -343,15 +364,64 @@ It does not modify PostgreSQL source records or Milvus. During an AGE outage,
 set or retain `GRAPH_FALLBACK_ENABLED=true`; requests report AGE as degraded
 and use recursive PostgreSQL traversal.
 
-## Analyze a repository
+Do not replace a running PostgreSQL image with an older AGE-bundled PostgreSQL
+minor release merely to enable the extension. Preserve the existing volume,
+run `make migrate-postgres-fallback`, and continue with
+`GRAPH_BACKEND=postgres` until a tested dump/restore or in-place extension plan
+can move the data into an equal-or-newer AGE-capable PostgreSQL deployment.
 
-Set `CODEGRAPH_HOST_ROOT` in `.env` to the host repository or a narrow parent directory exposed read-only to the Compose gateway, then rebuild/restart the gateway. Invoke `code_repository_index` through Codex/OpenClaw with `repository_path=/workspace` (or a child path) and an explicit write approval. Supply both the expected checked-out `branch` and commit `revision` whenever possible, and leave `allow_dirty=false` for reproducible snapshots. Every stored analysis and returned symbol reports its repository name, branch, and revision.
+## Analyze repositories
+
+Set `CODEGRAPH_HOST_ROOT` in `.env` to a narrow parent directory exposed
+read-only to the Compose gateway, then rebuild/restart the gateway. For one
+repository, invoke `code_repository_index` through Codex/OpenClaw with an
+explicit write approval. Supply the remote default branch, checked-out analysis
+branch, and exact commit revision; leave `allow_dirty=false` for reproducible
+snapshots.
+
+For an entire GitHub organization, use the idempotent Make workflow:
+
+```bash
+make repository-org-index-all \
+  GITHUB_ORG=example-organization \
+  REPOSITORY_PROJECT=local-development \
+  REPOSITORY_BRANCH_OVERRIDES='large-engine=java-25'
+make repository-org-wait
+make repository-org-verify
+```
+
+The sync target refuses dirty checkouts. Catalog registration includes
+documentation-only or unsupported-language repositories, which appear as
+`catalog-only` and do not receive an empty active graph. Current
+branch/revision pairs are retained; only missing or stale supported repositories
+are analyzed. Branch overrides are explicit `repository=branch` pairs and do
+not change the recorded forge default branch.
 
 The [local indexing runbook](local-setup-and-indexing.md) provides a complete
 request body, a safe order for sibling repositories, active-snapshot SQL, and
 outbox monitoring commands.
 
-For an organization cloned as sibling directories, mount its parent directory once and index one repository per call. For example, set `CODEGRAPH_HOST_ROOT=/home/user/projects/repositories`, restart with `make mcp-stop && make mcp-start-gpu`, then use child paths such as `/workspace/service-a` and `/workspace/web-app`. The router automatically selects and combines Go, Java/Kotlin, TypeScript/JavaScript, and Python providers. Large compiler-backed scans can take several minutes; the gateway allows 20 minutes for a response, so MCP clients should use a matching tool timeout while keeping ordinary network health checks short.
+Organization checkouts live below
+`$CODEGRAPH_HOST_ROOT/<organization>/<repository>` and appear inside the
+gateway as `/workspace/<organization>/<repository>`. The router automatically
+selects and combines Go, Java/Kotlin, TypeScript/JavaScript, and Python
+providers. Large compiler-backed scans can take several minutes; the gateway
+allows 20 minutes for a response, so MCP clients should use a matching tool
+timeout while keeping ordinary network health checks short. A client timeout
+does not prove server cancellation; rerun the idempotent Make workflow and
+verify the active branch/revision before starting another analysis.
+
+After a repeated or corrected scan, inspect and compact the queue when needed:
+
+```bash
+make repository-org-queue-status
+make compact-code-outbox
+make repository-org-wait WAIT_TIMEOUT=3600
+```
+
+Compaction never deletes outbox audit rows. It completes superseded/non-active
+events and preserves one pending event for every entity in the active code
+heads. `make reindex` recreates projection work if required.
 
 The source mount is read-only. Java/Kotlin, TypeScript/JavaScript, and Python analysis is performed in disposable copies inside the gateway. Maven and Gradle dependency resolution/build plugins can run in that container; npm lifecycle scripts are disabled; Python dependencies are not installed. Network access may therefore improve JVM/TypeScript resolution but should be disabled or proxied for restricted source. `scip-java` supports Kotlin through Gradle, not Maven-only Kotlin projects. Maven analysis activates a root `deploy` profile when one exists so source modules commonly omitted from the default reactor are included; it still runs `install`, never `deploy`, and disables release signing, source archives, and Javadoc generation. When local Maven projects depend on sibling artifacts, index the foundational/BOM repository first; its disposable Maven build installs artifacts into the dedicated `analyzer-cache` volume for later scans.
 
@@ -403,7 +473,7 @@ of OpenAI.
 | `codex login status` reports signed out | No valid Codex session | Run `codex login` and complete ChatGPT browser sign-in; no OpenAI API key is needed. |
 | Codex is billed through the OpenAI API | Codex was deliberately signed in using an API key | Run `codex logout`, then `codex login` and choose ChatGPT sign-in if subscription/workspace access is intended. |
 | `codex mcp list` says `enabled`, but tools do not work | The command confirmed registration only | Start the gateway, launch with `make codex`, and inspect `/mcp verbose`. |
-| Codex fails during startup/resume on `hybrid_knowledge` | The required MCP server is down, unreachable, or rejected its token | Start Terminal 1 first; check `curl http://127.0.0.1:8080/healthz`, then verify the token mapping and gateway logs. |
+| Codex fails during startup/resume on `hybrid_knowledge` | The required MCP server is down, unreachable, or rejected its token | Start Terminal 1 first; run `make mcp-status`, then verify the token mapping and gateway logs. |
 | `make codex` reports missing `.env` or `AUTH_TOKEN` | Local configuration is absent or still contains `CHANGE_ME` | Copy `.env.example`, set real secrets, and retry. |
 | `AUTH_TOKEN is required` | HTTP mode without a token | Set a long random token in `.env`; export the matching client variable. |
 | `CONTROLLER_AUTH_TOKEN is required` | OpenClaw controller credential is absent | Run `make env-init` or set a second random token that differs from `AUTH_TOKEN`, recreate the gateway, and restart OpenClaw. |
@@ -420,6 +490,8 @@ of OpenAI.
 | Code analysis path is rejected | Path is outside the resolved allowlist or its bind mount | Update `CODEGRAPH_HOST_ROOT`/`CODEGRAPH_ALLOWED_ROOTS`; never expose a broad filesystem root. |
 | Code analysis reports package/build errors | A required toolchain, dependency, or build configuration is unavailable | Inspect gateway logs; populate the relevant cache/vendor tree and confirm Maven/Gradle, tsconfig/package metadata, or Python source roots are valid. |
 | Symbol search uses lexical fallback | Symbol vectors are queued or Ollama/Milvus is down | Inspect `code_entity.upsert` events and worker logs; PostgreSQL remains authoritative and AGE/recursive SQL provide topology. |
+| Organization indexing selects the wrong branch | Forge default differs from the intended analysis line | Set `REPOSITORY_BRANCH_OVERRIDES='repository=branch'`, rerun `make repository-org-index-all`, and verify both catalog default and active analysis branch. |
+| Pending code-vector events doubled after a corrected scan | Both snapshots queued stable entity IDs before the correction completed | Run `make compact-code-outbox`; then drain and verify the queue. |
 
 ## Cloud-disclosure checks
 

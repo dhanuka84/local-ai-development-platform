@@ -67,6 +67,26 @@ complements AGE with semantic discovery rather than edge integrity.
 
 Do not run repository analysis inside stateless enterprise MCP gateways. `CODEGRAPH_ENABLED=false` removes the synchronous filesystem indexing tool while retaining symbol search and exact traversal. OpenClaw or CI submits durable jobs to a separate control-plane API; sandboxed analyzer workers consume those jobs, fetch an immutable revision, emit a deterministic snapshot, and let PostgreSQL atomically advance the repository head. Use incremental changed-file analysis, repository-scoped partitioning, batched projection events, retention for old runs, and explicit per-tenant resource quotas when scaling to thousands of repositories.
 
+The local `repository-org-*` Make workflow defines the enterprise ingestion
+contract even though an enterprise deployment replaces local checkouts with
+forge webhooks and durable jobs:
+
+- enumerate only repositories visible to an authenticated organization
+  identity;
+- catalog metadata-only repositories without fabricating empty code graphs;
+- record forge default branch, intended analysis branch, and immutable commit
+  independently;
+- require reviewed branch-policy overrides for non-default analysis lines;
+- retain current active heads and enqueue only missing/stale revisions;
+- declare completion only after relational publication and semantic projection
+  lag reach zero.
+
+At scale, store branch overrides as reviewed policy data rather than process
+arguments. Workers should batch embeddings and Milvus upserts, use queue
+partitions plus `SKIP LOCKED`-equivalent claiming, and compact superseded events
+without deleting audit history. Scale worker replicas independently from
+gateway and analyzer capacity.
+
 ## Availability and consistency
 
 Writes are strongly consistent in PostgreSQL. Milvus indexing is eventual. Track:
@@ -75,6 +95,10 @@ Writes are strongly consistent in PostgreSQL. Milvus indexing is eventual. Track
 - Attempts and terminal/repeated errors.
 - PostgreSQL-to-AGE and PostgreSQL-to-Milvus projection delay.
 - Repository analysis queue age, duration, failures, and active-revision freshness.
+- Catalog-only repository count, branch-override inventory, and divergence
+  between forge defaults and active analysis branches.
+- Code-entity outbox backlog, batch size, compaction count, worker throughput,
+  and zero-progress intervals.
 - Search fallback rate.
 - Embedding latency and dimension errors.
 - Candidate approval/rejection/revision rates.

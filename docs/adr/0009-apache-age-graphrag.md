@@ -26,6 +26,8 @@ and never unrestricted Cypher.
   active code heads, and every graph source record.
 - AGE contains `Repository`, active `CodeEntity`, and approved `KnowledgeItem`
   vertices plus typed topology edges.
+- Repository vertices include catalog-only repositories even when no supported
+  source analyzer can publish a code head.
 - Projection-head tables record repository relation versions, active analysis
   runs, and approved knowledge versions. AGE results are rejected when these
   do not match PostgreSQL.
@@ -42,5 +44,9 @@ and never unrestricted Cypher.
 - `admin age-rebuild` deterministically recreates the complete AGE projection.
 - AGE can be rolled back by setting `GRAPH_BACKEND=postgres`; no authoritative
   data migration is required.
+- A running PostgreSQL-only data directory must not be started with an older
+  AGE-bundled PostgreSQL minor release. Relational migrations may proceed in
+  fallback mode; AGE cutover requires an equal-or-newer compatible server plus
+  tested backup/restore and projection parity.
 - AGE may become the unconditional default only after workload benchmarks and
   operational acceptance; the fallback remains available during that period.

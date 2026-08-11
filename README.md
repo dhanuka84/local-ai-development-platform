@@ -38,8 +38,8 @@ The repository implements:
 
 ![Local-first implementation, remote review, and approved learning](docs/diagrams/hybrid-ai-review-learning-explainer.png)
 
-See the [exact review-learning diagram](docs/diagrams/hybrid-ai-review-learning-loop.svg)
-and the [full local deployment architecture](docs/diagrams/hybrid-ai-local-architecture.svg)
+See the [exact review-learning diagram](docs/diagrams/hybrid-ai-review-learning-loop.png)
+and the [full local deployment architecture](docs/diagrams/hybrid-ai-local-architecture.png)
 for implementation detail.
 
 ## The key design rule
@@ -118,8 +118,22 @@ Prerequisites: Docker Compose v2, Git, and approximately 16 GB free RAM for the 
    make mcp-status
    ```
 
+5. Synchronize and index a GitHub organization with the reproducible Make
+   workflow:
+
+   ```bash
+   make repository-org-index-all GITHUB_ORG=example-organization
+   make repository-org-wait
+   ```
+
+   The workflow refuses dirty checkouts, registers documentation-only
+   repositories in the PostgreSQL catalog, skips empty code graphs, retains
+   already-current snapshots, and indexes stale supported-language revisions.
+   Use `REPOSITORY_BRANCH_OVERRIDES='repository=branch'` when an intentional
+   analysis branch differs from the forge default branch.
+
 For Docker permission repair, a deliberately volume-free rebuild, cloning and
-indexing multiple repositories, exact MCP request examples, SQL verification,
+indexing multiple repositories, exact MCP request examples, Make-based verification,
 and timing guidance, follow the
 [local setup and multi-repository indexing runbook](docs/local-setup-and-indexing.md).
 
@@ -240,6 +254,22 @@ Ollama rejects the `xhigh` value that may be valid for the configured cloud
 model. `codex-local-smoke` performs a real ephemeral Qwen response and requires
 the exact `LOCAL_QWEN_OK` result.
 
+Run the complete fail-closed routing acceptance suite before relying on the
+hybrid boundary:
+
+```bash
+make hybrid-verify
+```
+
+It proves local inference succeeds with cloud egress denied, local inference
+fails rather than falling back when its Ollama endpoint is unavailable, cloud
+review cannot change the working tree, and cloud review fails rather than
+falling back to reachable Ollama when cloud egress is denied. The suite uses a
+temporary canary repository and leaves the shared Ollama container running.
+Audit JSONL and hashed raw evidence are written below
+`reports/hybrid-verification/`. See
+[Hybrid Routing Verification](docs/hybrid-routing-verification.md).
+
 Current compatibility boundary: Codex CLI `0.147.0` always defers MCP tool
 schemas. Local Qwen inference succeeds, but Qwen did not reliably discover and
 invoke `hybrid_knowledge` tools through that deferred interface in the
@@ -337,8 +367,27 @@ Approve the MCP write prompt. Use `allow_dirty=true` only when a deliberately
 non-reproducible working-tree snapshot is required. Documentation-only or
 unsupported-language repositories may be reported as skipped rather than
 receiving an empty active graph. For request JSON, multi-repository ordering,
-and SQL verification, use the
-[multi-repository indexing runbook](docs/local-setup-and-indexing.md#8-index-repositories-through-mcp).
+and Make-based verification, use the
+[multi-repository indexing runbook](docs/local-setup-and-indexing.md#8-index-repositories-through-make-and-mcp).
+
+For an entire GitHub organization, prefer the non-interactive Make workflow:
+
+```bash
+make repository-org-index-all \
+  GITHUB_ORG=example-organization \
+  REPOSITORY_PROJECT=local-development \
+  REPOSITORY_BRANCH_OVERRIDES='special-repository=release-branch'
+make repository-org-wait
+```
+
+The branch override changes the checked-out and analyzed branch only. The
+catalog still records the remote default branch separately. Every operation
+uses the authenticated MCP code-index tool or the Compose admin boundary; the
+workflow does not write code graphs directly.
+
+The analyzed branch and exact commit are indexed. Their canonical API and SQL
+names are `branch` and `revision`; `branch_name` and `git_commit` are useful
+descriptions, but are not separate stored fields.
 
 ### 6. Retrieve context before changing files
 
@@ -511,6 +560,12 @@ so future symbol searches and graph traversals use the new repository, branch,
 and revision mapping. Never claim that an uncommitted implementation is
 represented by the previous active snapshot.
 
+For organization-managed checkouts, rerun `make repository-org-index-all`.
+Current branch/revision pairs are retained, while changed repositories are
+re-analyzed. Finish with `make repository-org-wait` and
+`make repository-org-verify` so handoff does not occur with pending semantic
+vectors.
+
 For authentication boundaries, token rotation, startup failures, and MCP
 diagnostics, follow the [operations runbook](docs/operations.md). For the concise
 Development → QA → Product Owner responsibilities, see
@@ -679,7 +734,7 @@ docs/                architecture, implementation, security, operations, ADRs
 ```bash
 make check-all
 make build
-docker compose --env-file .env.example -f deploy/compose/compose.yaml config --quiet
+make mcp-preflight
 ```
 
 Native and STDIO code analysis requires Git plus the selected language indexers and build toolchains. The local Compose `gateway-analyzer` image includes Go, Java/Maven/Gradle, Node, and pinned SCIP indexers. It keeps `/workspace` read-only and runs non-Go indexers against disposable copies. The production gateway target remains distroless; enterprise deployments should run analyzers in isolated queued workers.
@@ -701,6 +756,8 @@ See [enterprise-deployment.md](docs/enterprise-deployment.md) and the [enterpris
 
 ## Documentation
 
+- [Blog: From repository scan to a local-hybrid BPMN designer workflow](docs/blog/local-hybrid-flowable-bpmn-designer.md)
+- [Hybrid routing fail-closed verification](docs/hybrid-routing-verification.md)
 - [Plain-English glossary](docs/glossary.md)
 - [Local setup and multi-repository indexing](docs/local-setup-and-indexing.md)
 - [Implementation guide](docs/implementation-guide.md)

@@ -1,4 +1,8 @@
 services:
+  migrate:
+    environment:
+      GRAPH_BACKEND: postgres
+      GRAPH_FALLBACK_ENABLED: "true"
   worker:
     environment:
       GRAPH_BACKEND: postgres

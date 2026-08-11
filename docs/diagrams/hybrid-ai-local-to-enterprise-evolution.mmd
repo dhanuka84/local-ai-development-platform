@@ -24,10 +24,10 @@ flowchart LR
         direction TB
         LCLIENT["Codex + IDE + OpenClaw"]:::local
         LMCP["One MCP gateway"]:::local
-        LANALYZER["Headless code analyzer<br/>compiler-aware · synchronous"]:::local
+        LANALYZER["Organization catalog + code analyzer<br/>explicit branch override · compiler-aware"]:::local
         LAGENT["Local agent and workers"]:::local
         LMODEL["Ollama<br/>coding · embeddings · reranking"]:::local
-        LPG[("Single PostgreSQL<br/><b>graph truth</b><br/>repository + revisioned code graph · outbox")]:::localData
+        LPG[("Single PostgreSQL<br/><b>graph truth</b><br/>full repository catalog · active branch/revision<br/>revisioned code graph · outbox")]:::localData
         LMILVUS[("Milvus Standalone<br/><b>semantic discovery</b><br/>knowledge + selected code entity UUIDs")]:::localData
         LSTORE[("Product/knowledge Git + local artifact store<br/>raw reviews · disclosure manifests")]:::localData
 
@@ -45,7 +45,7 @@ flowchart LR
         direction TB
         C1["MCP tool schemas<br/>versioned and backward compatible"]:::contract
         C2["Knowledge IDs + revisions<br/>tenant · project · classification"]:::contract
-        C3["PostgreSQL transaction + outbox<br/>idempotent event processing"]:::contract
+        C3["PostgreSQL transaction + outbox<br/>SKIP LOCKED · batched idempotent projection"]:::contract
         C4["VectorIndex interface<br/>Milvus hidden behind retrieval service"]:::contract
         C5["ModelProvider interface<br/>local · private · cloud adapters"]:::contract
         C6["Canonical rebuild sources<br/>PostgreSQL graph + Git + object artifacts<br/>review evidence linked by SHA-256"]:::contract
@@ -59,7 +59,7 @@ flowchart LR
         EMCP["Stateless MCP/API gateway replicas"]:::enterprise
         EAGENT["Durable workflows + event bus<br/>sandboxed agent + analyzer worker pools"]:::enterprise
         EMODEL["Private GPU inference cluster<br/>policy-gated Kimi/OpenAI review"]:::enterprise
-        EPG[("PostgreSQL HA<br/>workflow + repository/code graph truth<br/>partitioned · multi-zone + DR")]:::enterpriseData
+        EPG[("PostgreSQL HA<br/>catalog + default/analysis branch policy<br/>repository/code graph truth · multi-zone + DR")]:::enterpriseData
         EMILVUS[("Milvus Distributed<br/>knowledge + code entity discovery<br/>scaled query + ingestion")]:::enterpriseData
         ESTORE[("Enterprise Git + versioned object storage<br/>review evidence · regional replication")]:::enterpriseData
 

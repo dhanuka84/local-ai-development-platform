@@ -50,10 +50,11 @@ OpenClaw's task database helps it coordinate work. It is not the official
 product workflow or knowledge database. Every important change is also written
 to PostgreSQL with retry protection and a version check.
 
-![OpenClaw agentic automation workflow](diagrams/openclaw-agentic-automation-workflow.svg)
+![OpenClaw agentic automation workflow](diagrams/openclaw-agentic-automation-workflow.png)
 
-Downloads: [high-resolution PNG](diagrams/openclaw-agentic-automation-workflow.png)
-and [editable Mermaid source](diagrams/openclaw-agentic-automation-workflow.mmd).
+The editable source is retained as
+`diagrams/openclaw-agentic-automation-workflow.mmd`; documentation links use
+the high-resolution PNG above.
 
 ## 2. Why these OpenClaw mechanisms
 
@@ -715,7 +716,8 @@ Recommended events:
 - issue labeled `agent-ready`;
 - pull request opened/updated for QA;
 - CI completion for workflow resume;
-- repository default-branch update for code graph refresh.
+- repository update on the policy-selected analysis branch for code graph
+  refresh; forge default-branch metadata remains a separate catalog field.
 
 ### PostgreSQL outbox
 

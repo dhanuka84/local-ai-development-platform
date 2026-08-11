@@ -7,18 +7,17 @@ the local, review-learning, and enterprise deployment profiles.
 
 | View | Mermaid source | PNG | SVG |
 |---|---|---|---|
-| Quick review-learning explainer | [generation prompt](hybrid-ai-review-learning-explainer.prompt.md) | `hybrid-ai-review-learning-explainer.png` | Not applicable |
-| Local GBX100 architecture | `hybrid-ai-local-architecture.mmd` | `hybrid-ai-local-architecture.png` | `hybrid-ai-local-architecture.svg` |
-| Remote review and local learning loop | `hybrid-ai-review-learning-loop.mmd` | `hybrid-ai-review-learning-loop.png` | `hybrid-ai-review-learning-loop.svg` |
-| Enterprise distributed architecture | `hybrid-ai-enterprise-architecture.mmd` | `hybrid-ai-enterprise-architecture.png` | `hybrid-ai-enterprise-architecture.svg` |
-| Local-to-enterprise evolution | `hybrid-ai-local-to-enterprise-evolution.mmd` | `hybrid-ai-local-to-enterprise-evolution.png` | `hybrid-ai-local-to-enterprise-evolution.svg` |
-| OpenClaw agentic automation and Cerbos governance | [Mermaid](openclaw-agentic-automation-workflow.mmd) | [PNG](openclaw-agentic-automation-workflow.png) | [SVG](openclaw-agentic-automation-workflow.svg) |
+| Quick review-learning explainer | [generation prompt](hybrid-ai-review-learning-explainer.prompt.md) | [PNG](hybrid-ai-review-learning-explainer.png) | Not applicable |
+| Local GBX100 architecture | `hybrid-ai-local-architecture.mmd` | [PNG](hybrid-ai-local-architecture.png) | `hybrid-ai-local-architecture.svg` |
+| Remote review and local learning loop | `hybrid-ai-review-learning-loop.mmd` | [PNG](hybrid-ai-review-learning-loop.png) | `hybrid-ai-review-learning-loop.svg` |
+| Enterprise distributed architecture | `hybrid-ai-enterprise-architecture.mmd` | [PNG](hybrid-ai-enterprise-architecture.png) | `hybrid-ai-enterprise-architecture.svg` |
+| Local-to-enterprise evolution | `hybrid-ai-local-to-enterprise-evolution.mmd` | [PNG](hybrid-ai-local-to-enterprise-evolution.png) | `hybrid-ai-local-to-enterprise-evolution.svg` |
+| OpenClaw agentic automation and Cerbos governance | `openclaw-agentic-automation-workflow.mmd` | [PNG](openclaw-agentic-automation-workflow.png) | `openclaw-agentic-automation-workflow.svg` |
 
-SVG is the main format for documentation and presentations because it remains
-sharp at any zoom level. PNG is an optional compatibility export for tools,
-chat systems, and fixed-format documents that cannot display SVG. Mermaid PNGs
-are rendered at high resolution. The editable `.mmd` file remains the source
-for each Mermaid diagram.
+PNG is the standard format for documentation links and embeds. Mermaid PNGs
+are rendered at high resolution for presentations and fixed-format tools. SVG
+exports remain available as unlinked build artifacts when lossless scaling is
+needed, and the editable `.mmd` file remains the source for each diagram.
 
 ## Flow numbering and colors
 
@@ -51,38 +50,31 @@ mappings because those relationships are the purpose of that view.
 - PostgreSQL is the authoritative runtime system of record for workflow, graph relationships, provenance, audit, and indexing state.
 - Git repository nodes and typed, evidence-backed relationships are authoritative in PostgreSQL and semantically projected into Milvus.
 - Revisioned code entities and every exact code edge are authoritative in PostgreSQL. Only selected first-party entity summaries are projected into Milvus, using the same stable PostgreSQL UUID.
+- The repository catalog includes metadata-only repositories. Forge default
+  branch, intended analysis branch, and exact revision remain distinct.
 - Apache AGE contains only rebuildable active repository/code/approved-knowledge topology; every result is re-hydrated from PostgreSQL.
 - OpenClaw orchestrates analysis; deterministic compiler-aware analyzers produce graph evidence. LLM interpretations follow the candidate review workflow.
 - Git is the human-reviewable source for approved patterns, ADRs, policies, and runbooks.
 - Object or content-addressed storage holds large immutable artifacts and evidence.
 - Milvus is a derived vector and hybrid-search index that can be rebuilt from authoritative sources.
 - Cloud review is policy-gated. Maintenance is local-only and fails closed without local inference.
-- The PostgreSQL outbox and idempotent workers prevent unsafe dual writes between PostgreSQL, Git, object storage, and Milvus.
+- The PostgreSQL outbox and idempotent workers prevent unsafe dual writes between PostgreSQL, Git, object storage, and Milvus. Workers claim with `SKIP LOCKED` and batch both embeddings and Milvus upserts.
 
 ## Rendering
 
 The diagrams were validated with Mermaid CLI 11.16.0. A local Chrome executable is configured in `puppeteer-config.json`.
 
-Render a diagram as SVG:
+Render the local architecture as SVG and high-resolution PNG:
 
 ```bash
-npx -y @mermaid-js/mermaid-cli \
-  -p docs/diagrams/puppeteer-config.json \
-  -i docs/diagrams/hybrid-ai-local-architecture.mmd \
-  -o docs/diagrams/hybrid-ai-local-architecture.svg \
-  -b '#ffffff'
+make diagram-local-architecture
 ```
 
-Render a high-resolution PNG:
+The enterprise and evolution views have matching reproducible targets:
 
 ```bash
-npx -y @mermaid-js/mermaid-cli \
-  -p docs/diagrams/puppeteer-config.json \
-  -i docs/diagrams/hybrid-ai-local-architecture.mmd \
-  -o docs/diagrams/hybrid-ai-local-architecture.png \
-  -b '#ffffff' \
-  -w 6400 \
-  -s 3
+make diagram-enterprise-architecture
+make diagram-local-to-enterprise
 ```
 
 For a diagram whose natural Mermaid layout is narrower, increase `-s` to `4` to produce a comparable 12K-class export.

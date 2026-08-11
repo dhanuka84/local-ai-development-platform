@@ -74,6 +74,54 @@ make ops-doctor
 make ops-reindex
 ```
 
+### Organization repository indexing
+
+Operations owns checkout cleanliness, catalog completeness, projection lag,
+and worker capacity. Development owns the meaning of an intentional
+non-default branch override.
+
+```bash
+make repository-org-index-all \
+  GITHUB_ORG=example-organization \
+  REPOSITORY_PROJECT=local-development \
+  REPOSITORY_BRANCH_OVERRIDES='large-engine=java-25'
+make repository-org-wait
+make repository-org-verify
+```
+
+The workflow catalogs documentation-only repositories without creating empty
+code graphs, retains snapshots already at the exact branch/revision, and
+indexes only stale supported source. If a corrected scan leaves superseded
+vector events, Operations runs:
+
+```bash
+make compact-code-outbox
+make worker-scale-postgres-fallback WORKER_REPLICAS=3
+make repository-org-wait
+make worker-scale-postgres-fallback WORKER_REPLICAS=1
+```
+
+Scaling is temporary. The final handoff requires zero pending and zero failed
+code-index events plus a semantic result hydrated from the intended active
+branch and revision.
+
+For a single repository, Operations can use the same guarded path without
+enumerating an organization:
+
+```bash
+make repository-sync-one \
+  REPO=/absolute/path/to/source-repositories/large-engine \
+  REPOSITORY_URL=https://github.com/example-organization/large-engine.git \
+  REPOSITORY_BRANCH=java-25
+make repository-index-one-all \
+  REPO=/absolute/path/to/source-repositories/large-engine \
+  REPOSITORY_PROJECT=local-development
+```
+
+The single-repository workflow refuses a dirty checkout, validates its origin
+and active branch, derives the exact revision, waits for semantic projection,
+and reports the forge default separately from the analyzed branch.
+
 `migrate`, `age-rebuild`, `milvus-init`, `doctor`, candidate commands, and `reindex` execute
 through the Compose admin image. They therefore use the same database password
 and service-network addresses as the running platform without exporting a
@@ -139,6 +187,11 @@ QA. Development may record Codex/Kimi output with `review_record`. In `team` or
 `regulated` mode, policy can prevent the implementing principal from performing
 later decisions. In `solo` mode, the same person may continue only by entering
 the separate QA and Product Owner transitions with the required evidence.
+
+When Development requests a branch that differs from the forge default, it
+must state the repository, intended branch, reason, and expected commit. The
+Make workflow stores the forge default in the catalog and the analyzed branch
+on the code run, so QA can verify both independently.
 
 ## QA
 
@@ -265,7 +318,7 @@ Operations
 
 | Role | Workflow commands | Canonical/supporting commands |
 |---|---|---|
-| Operations | `ops-start`, `ops-start-gpu`, `ops-status`, `ops-logs`, `ops-stop`, `ops-doctor`, `ops-reindex` | `env-init`, `mcp-preflight`, `migrate`, `age-rebuild`, `milvus-init`, `up`, `up-gpu`, `down`, `logs`, `mcp-start`, `mcp-start-gpu`, `mcp-status`, `mcp-logs`, `mcp-stop`, `doctor`, `reindex`, `pull-local-model`, `openclaw-config-check`, `openclaw-config-plan`, `openclaw-config-apply`, `openclaw-plugin-install`, `openclaw-setup`, `openclaw-start`, `openclaw-status`, `platform-status` |
+| Operations | `ops-start`, `ops-start-gpu`, `ops-status`, `ops-logs`, `ops-stop`, `ops-doctor`, `ops-reindex` | `env-init`, `mcp-preflight`, `migrate`, `migrate-postgres-fallback`, `age-rebuild`, `milvus-init`, `repository-org-sync`, `repository-org-catalog`, `repository-org-index`, `repository-org-wait`, `repository-org-verify`, `compact-code-outbox`, `worker-scale-postgres-fallback`, `up`, `up-gpu`, `rebuild-fresh`, `rebuild-fresh-gpu`, `down`, `logs`, `mcp-start`, `mcp-start-gpu`, `mcp-status`, `mcp-logs`, `mcp-stop`, `doctor`, `reindex`, `pull-local-model`, `models-list`, `openclaw-config-check`, `openclaw-config-plan`, `openclaw-config-apply`, `openclaw-plugin-install`, `openclaw-setup`, `openclaw-start`, `openclaw-status`, `platform-status` |
 | Development | `dev-session`, `dev-session-repo`, `dev-policy-check`, `dev-patch-verify`, `dev-check`, `dev-authz-policy-test` | `codex-login`, `codex-check`, `codex`, `codex-repo`, `preflight`, `fmt`, `test`, `check`, `build`, `workpacket-build`, `workpacket-evaluate`, `workpacket-verify`, `authz-policy-test`, `diagram-review-loop`, `diagram-agentic-workflow`, `clean`, plus MCP retrieval/capture/review tools |
 | QA | `qa-session`, `qa-session-repo`, `qa-patch-verify`, `qa-check`, `qa-authz-policy-test`, `qa-candidates`, `qa-candidate-get` | `candidate-list`, `candidate-get`, `codex-check`, `test`, `check`, `workpacket-verify`, `authz-policy-test`, plus MCP `review_record` |
 | Product Owner | `po-candidates`, `po-candidate-get`, `po-approve`, `po-reject` | `candidate-list`, `candidate-get`, `candidate-approve`, `candidate-reject` |

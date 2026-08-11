@@ -7,19 +7,28 @@ LIMIT ?= 25
 ID ?=
 MCP_TOOL ?=
 MCP_ARGUMENTS ?= {}
-GITHUB_ORG ?= SL-Tantra-AI
+REPO ?=
+REPOSITORY_URL ?=
+REPOSITORY_BRANCH ?=
+GITHUB_ORG ?= example-organization
 REPOSITORY_PROJECT ?= local-development
 REPOSITORY_ROOT ?= $(shell sed -n 's/^[[:space:]]*CODEGRAPH_HOST_ROOT[[:space:]]*=[[:space:]]*//p' .env 2>/dev/null | tail -n 1)
 REPOSITORY_BRANCH_OVERRIDES ?= flowable-engine=java-25
 FORCE ?= false
 WAIT_TIMEOUT ?= 3600
 WORKER_REPLICAS ?= 1
+CONFIRM_DESTROY ?=
 CODEX_LOCAL_MODEL ?= $(shell sed -n 's/^[[:space:]]*LOCAL_CHAT_MODEL[[:space:]]*=[[:space:]]*//p' .env 2>/dev/null | tail -n 1)
 ifeq ($(strip $(CODEX_LOCAL_MODEL)),)
 CODEX_LOCAL_MODEL := qwen3.6:35b
 endif
 CODEX_LOCAL_REASONING_EFFORT ?= high
 CODEX_LOCAL_MODEL_CATALOG ?= $(CURDIR)/examples/codex/qwen-model-catalog.json
+CODEX_REVIEW_MODEL ?=
+HYBRID_VERIFY_IMAGE ?= hybrid-ai-codex-verify:local
+HYBRID_VERIFY_BUILD_FLAGS ?= --pull --no-cache
+HYBRID_VERIFY_AUDIT_ROOT ?= $(CURDIR)/reports/hybrid-verification
+HYBRID_VERIFY_TIMEOUT ?= 180
 CERBOS_IMAGE ?= ghcr.io/cerbos/cerbos:0.54.0@sha256:211c261f6031675522a35c6055b13fd719c4aff13747307e4bcb6907326537ef
 OPENCLAW_PLUGIN_DIR := automation/openclaw-plugin
 OPENCLAW_PLUGIN_ID := hybrid-workflow-controller
@@ -42,7 +51,7 @@ CODEX_LOCAL_ARGS := \
 	-c 'model_catalog_json="$(CODEX_LOCAL_MODEL_CATALOG)"' \
 	-c 'model_reasoning_effort="$(CODEX_LOCAL_REASONING_EFFORT)"'
 
-.PHONY: help help-operations help-development help-qa help-product-owner env-init mcp-preflight preflight fmt fmt-container check check-container check-all test build migrate age-rebuild milvus-init doctor reindex compact-code-outbox worker-refresh-postgres-fallback worker-scale-postgres-fallback candidate-list candidate-get candidate-approve candidate-reject mcp-call repository-org-sync repository-org-catalog repository-org-index repository-org-queue-status repository-org-wait repository-org-verify repository-org-index-all up up-gpu down logs mcp-start mcp-start-gpu mcp-status mcp-logs mcp-stop codex-login codex-check codex-route codex-local-check codex-local-smoke codex codex-repo codex-local codex-local-repo workpacket-build workpacket-evaluate workpacket-verify authz-policy-test contracts-check openclaw-plugin-deps openclaw-plugin-check openclaw-config-check openclaw-config-plan openclaw-config-apply openclaw-plugin-build openclaw-plugin-install openclaw-plugin-doctor openclaw-setup openclaw-start openclaw-status platform-status diagram-review-loop diagram-agentic-workflow pull-local-model clean ops-start ops-start-gpu ops-status ops-logs ops-stop ops-doctor ops-reindex dev-session dev-session-repo dev-session-local dev-session-local-repo dev-policy-check dev-patch-verify dev-check dev-authz-policy-test qa-session qa-session-repo qa-session-local qa-session-local-repo qa-patch-verify qa-check qa-authz-policy-test qa-candidates qa-candidate-get po-candidates po-candidate-get po-approve po-reject
+.PHONY: help help-operations help-development help-qa help-product-owner env-init mcp-preflight preflight fmt fmt-container check check-container check-all test build migrate migrate-postgres-fallback age-rebuild milvus-init doctor reindex compact-code-outbox worker-refresh-postgres-fallback worker-scale-postgres-fallback candidate-list candidate-get candidate-approve candidate-reject mcp-call repository-sync-one repository-index-one repository-verify-one repository-index-one-all repository-org-sync repository-org-catalog repository-org-index repository-org-queue-status repository-org-wait repository-org-verify repository-org-index-all up up-gpu rebuild-fresh rebuild-fresh-gpu down logs mcp-start mcp-start-gpu mcp-status mcp-logs mcp-stop codex-login codex-check codex-route codex-local-check codex-local-smoke hybrid-verify-static hybrid-verify-image hybrid-verify codex codex-repo codex-local codex-local-repo workpacket-build workpacket-evaluate workpacket-verify authz-policy-test contracts-check openclaw-plugin-deps openclaw-plugin-check openclaw-config-check openclaw-config-plan openclaw-config-apply openclaw-plugin-build openclaw-plugin-install openclaw-plugin-doctor openclaw-setup openclaw-start openclaw-status platform-status diagram-local-architecture diagram-enterprise-architecture diagram-local-to-enterprise diagram-review-loop diagram-agentic-workflow pull-local-model models-list clean ops-start ops-start-gpu ops-status ops-logs ops-stop ops-doctor ops-reindex dev-session dev-session-repo dev-session-local dev-session-local-repo dev-policy-check dev-patch-verify dev-check dev-authz-policy-test qa-session qa-session-repo qa-session-local qa-session-local-repo qa-patch-verify qa-check qa-authz-policy-test qa-candidates qa-candidate-get po-candidates po-candidate-get po-approve po-reject
 
 help: ## Show all commands plus role-specific workflow guides
 	@printf '%s\n' \
@@ -75,7 +84,17 @@ help-operations: ## Show the Operations workflow and commands
 		'  5. make ops-stop' \
 		'' \
 		'Administration:' \
-		'  make migrate | make age-rebuild | make milvus-init | make ops-doctor | make ops-reindex'
+		'  make migrate | make age-rebuild | make milvus-init | make ops-doctor | make ops-reindex' \
+		'  Destructive fresh images: make rebuild-fresh-gpu CONFIRM_DESTROY=all-platform-data' \
+		'' \
+		'GitHub organization indexing:' \
+		'  make repository-org-index-all GITHUB_ORG=<owner>' \
+		'  make repository-org-wait && make repository-org-verify' \
+		'  Optional: REPOSITORY_BRANCH_OVERRIDES="repository=branch"' \
+		'' \
+		'One repository:' \
+		'  make repository-sync-one REPO=/absolute/path REPOSITORY_URL=<git-url> REPOSITORY_BRANCH=<branch>' \
+		'  make repository-index-one-all REPO=/absolute/path'
 
 help-development: ## Show the Development workflow and commands
 	@printf '%s\n' \
@@ -184,7 +203,7 @@ check: ## Run formatting, vet, and unit tests
 check-container: ## Run make check with the local build-check image
 	docker run --rm -v "$(CURDIR):/src" -w /src local-ai-platform-buildcheck make check
 
-check-all: check authz-policy-test contracts-check openclaw-plugin-check openclaw-config-check ## Run Go, Cerbos, contracts, and OpenClaw checks
+check-all: check authz-policy-test contracts-check openclaw-plugin-check openclaw-config-check hybrid-verify-static ## Run Go, Cerbos, contracts, OpenClaw, and hybrid-verifier checks
 
 authz-policy-test: ## Compile and test the Cerbos policy-as-code contract
 	docker run --rm -v "$(CURDIR)/policies/cerbos:/policies:ro" $(CERBOS_IMAGE) compile /policies
@@ -288,6 +307,10 @@ build: ## Build all binaries into ./bin
 migrate: mcp-preflight ## Apply PostgreSQL migrations through the Compose admin image
 	$(COMPOSE) run --rm migrate migrate
 
+migrate-postgres-fallback: mcp-preflight ## Apply migrations without requiring AGE on an existing PostgreSQL-only volume
+	@$(COMPOSE) -f deploy/compose/compose.postgres-fallback.yaml build migrate >/dev/null
+	$(COMPOSE) -f deploy/compose/compose.postgres-fallback.yaml run --rm --no-deps migrate migrate
+
 age-rebuild: mcp-preflight ## Deterministically rebuild the Apache AGE graph from PostgreSQL
 	$(COMPOSE) run --rm migrate age-rebuild
 
@@ -325,6 +348,60 @@ mcp-call: mcp-preflight ## Call one MCP tool non-interactively; requires MCP_TOO
 		-H 'Content-Type: application/json' \
 		-H 'Accept: application/json, text/event-stream' \
 		--data "$$request_body" "$(MCP_URL)"
+
+repository-sync-one: ## Clone or fast-forward one clean repository at REPOSITORY_BRANCH
+	@test -n "$(REPO)" || { echo "REPO=/absolute/path/to/repository is required" >&2; exit 1; }
+	@test -n "$(REPOSITORY_URL)" || { echo "REPOSITORY_URL=<git-url> is required" >&2; exit 1; }
+	@case "$(REPOSITORY_BRANCH)" in ''|*[!A-Za-z0-9_./-]*) echo "REPOSITORY_BRANCH is required and must be a safe Git branch" >&2; exit 1;; esac
+	@repo_path="$(REPO)"; \
+	if test -e "$$repo_path" && test ! -d "$$repo_path/.git"; then echo "refusing non-Git path: $$repo_path" >&2; exit 1; fi; \
+	if test ! -d "$$repo_path/.git"; then mkdir -p "$$(dirname "$$repo_path")"; git clone --branch "$(REPOSITORY_BRANCH)" --single-branch "$(REPOSITORY_URL)" "$$repo_path"; fi; \
+	test -z "$$(git -C "$$repo_path" status --porcelain=v1 --untracked-files=normal)" || { echo "refusing dirty checkout: $$repo_path" >&2; exit 1; }; \
+	actual_url=$$(git -C "$$repo_path" remote get-url origin); \
+	test "$$actual_url" = "$(REPOSITORY_URL)" || { echo "origin mismatch: expected $(REPOSITORY_URL), found $$actual_url" >&2; exit 1; }; \
+	git -C "$$repo_path" fetch --prune origin "$(REPOSITORY_BRANCH)"; \
+	git -C "$$repo_path" switch "$(REPOSITORY_BRANCH)" >/dev/null 2>&1 || git -C "$$repo_path" switch --track -c "$(REPOSITORY_BRANCH)" "origin/$(REPOSITORY_BRANCH)"; \
+	git -C "$$repo_path" merge --ff-only "origin/$(REPOSITORY_BRANCH)"; \
+	printf 'synced\t%s\tbranch=%s\trevision=%s\n' "$$(basename "$$repo_path")" "$(REPOSITORY_BRANCH)" "$$(git -C "$$repo_path" rev-parse HEAD)"
+
+repository-index-one: mcp-preflight ## Index one clean REPO through the authenticated MCP boundary
+	@test -n "$(REPO)" || { echo "REPO=/absolute/path/to/repository is required" >&2; exit 1; }
+	@case "$(REPOSITORY_PROJECT)" in ''|*[!A-Za-z0-9_.-]*) echo "invalid REPOSITORY_PROJECT" >&2; exit 1;; esac
+	@case "$(FORCE)" in true|false) ;; *) echo "FORCE must be true or false" >&2; exit 1;; esac
+	@root=$$(cd "$(REPOSITORY_ROOT)" 2>/dev/null && pwd -P) || { echo "CODEGRAPH_HOST_ROOT or REPOSITORY_ROOT is not accessible" >&2; exit 1; }; \
+	path=$$(cd "$(REPO)" 2>/dev/null && pwd -P) || { echo "REPO is not accessible: $(REPO)" >&2; exit 1; }; \
+	test -d "$$path/.git" || { echo "REPO is not a Git checkout: $$path" >&2; exit 1; }; \
+	case "$$path/" in "$$root/"*) ;; *) echo "REPO must be below CODEGRAPH_HOST_ROOT: $$root" >&2; exit 1;; esac; \
+	test -z "$$(git -C "$$path" status --porcelain=v1 --untracked-files=normal)" || { echo "refusing dirty checkout: $$path" >&2; exit 1; }; \
+	name=$$(basename "$$path"); \
+	case "$$name" in ''|*[!A-Za-z0-9_.-]*) echo "unsafe repository name: $$name" >&2; exit 1;; esac; \
+	url=$$(git -C "$$path" remote get-url origin); \
+	branch=$$(git -C "$$path" symbolic-ref --quiet --short HEAD 2>/dev/null) || { echo "detached HEAD is not supported by this convenience target" >&2; exit 1; }; \
+	default_branch=$$(git -C "$$path" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||'); \
+	test -n "$$default_branch" || default_branch="$$branch"; \
+	revision=$$(git -C "$$path" rev-parse HEAD); \
+	relative_path=$${path#"$$root/"}; \
+	workspace_path="/workspace/$$relative_path"; \
+	active=$$($(COMPOSE) exec -T postgres psql -U hybrid -d hybrid -Atc \
+		"SELECT run.branch || ':' || run.revision FROM software_repositories repository JOIN code_repository_heads head ON head.repository_id=repository.id JOIN code_analysis_runs run ON run.id=head.analysis_run_id WHERE repository.project_id='$(REPOSITORY_PROJECT)' AND repository.name='$$name'" 2>/dev/null || true); \
+	if test "$(FORCE)" = false && test "$$active" = "$$branch:$$revision"; then echo "current: $$name@$$revision"; exit 0; fi; \
+	arguments=$$(jq -cn --arg project "$(REPOSITORY_PROJECT)" --arg name "$$name" --arg url "$$url" \
+		--arg default_branch "$$default_branch" --arg path "$$workspace_path" --arg branch "$$branch" --arg revision "$$revision" \
+		'{project_id:$$project,repository:{name:$$name,canonical_url:$$url,default_branch:$$default_branch},repository_path:$$path,branch:$$branch,revision:$$revision,allow_dirty:false}'); \
+	echo "indexing: $$name branch=$$branch revision=$$revision"; \
+	$(MAKE) --no-print-directory mcp-call MCP_TOOL=code_repository_index MCP_ARGUMENTS="$$arguments"
+
+repository-verify-one: mcp-preflight ## Report the catalog and active code snapshot for one REPO
+	@test -n "$(REPO)" || { echo "REPO=/absolute/path/to/repository is required" >&2; exit 1; }
+	@case "$(REPOSITORY_PROJECT)" in ''|*[!A-Za-z0-9_.-]*) echo "invalid REPOSITORY_PROJECT" >&2; exit 1;; esac
+	@name=$$(basename "$$(cd "$(REPO)" 2>/dev/null && pwd -P)") || { echo "REPO is not accessible: $(REPO)" >&2; exit 1; }; \
+	case "$$name" in ''|*[!A-Za-z0-9_.-]*) echo "unsafe repository name: $$name" >&2; exit 1;; esac; \
+	$(COMPOSE) exec -T postgres psql -U hybrid -d hybrid -P pager=off -F '|' -Atc \
+		"SELECT repository.name,repository.default_branch,repository.revision,COALESCE(run.branch,'catalog-only'),COALESCE(run.revision,''),(SELECT count(*) FROM code_occurrences occurrence WHERE occurrence.analysis_run_id=run.id),(SELECT count(*) FROM code_relations relation WHERE relation.analysis_run_id=run.id) FROM software_repositories repository LEFT JOIN code_repository_heads head ON head.repository_id=repository.id LEFT JOIN code_analysis_runs run ON run.id=head.analysis_run_id WHERE repository.project_id='$(REPOSITORY_PROJECT)' AND repository.name='$$name' ORDER BY repository.name"
+
+repository-index-one-all: repository-index-one ## Index one REPO, wait for semantic projection, and verify its active snapshot
+	@$(MAKE) --no-print-directory repository-org-wait
+	@$(MAKE) --no-print-directory repository-verify-one REPO="$(REPO)" REPOSITORY_PROJECT="$(REPOSITORY_PROJECT)"
 
 repository-org-sync: ## Clone or fast-forward every clean default-branch checkout in GITHUB_ORG
 	@command -v gh >/dev/null 2>&1 || { echo "gh is required" >&2; exit 1; }
@@ -448,6 +525,18 @@ up: ## Start the local CPU stack
 up-gpu: ## Start the local NVIDIA GPU stack
 	$(COMPOSE) -f deploy/compose/compose.gpu.yaml up --build -d
 
+rebuild-fresh: mcp-preflight ## Destroy all platform data, rebuild fresh CPU images, and start (requires confirmation)
+	@test "$(CONFIRM_DESTROY)" = "all-platform-data" || { echo "refusing destructive rebuild; set CONFIRM_DESTROY=all-platform-data" >&2; exit 1; }
+	$(COMPOSE) down --volumes --remove-orphans
+	$(COMPOSE) build --pull --no-cache
+	$(COMPOSE) up --force-recreate -d
+
+rebuild-fresh-gpu: mcp-preflight ## Destroy all platform data, rebuild fresh GPU images, and start (requires confirmation)
+	@test "$(CONFIRM_DESTROY)" = "all-platform-data" || { echo "refusing destructive rebuild; set CONFIRM_DESTROY=all-platform-data" >&2; exit 1; }
+	$(COMPOSE) -f deploy/compose/compose.gpu.yaml down --volumes --remove-orphans
+	$(COMPOSE) -f deploy/compose/compose.gpu.yaml build --pull --no-cache
+	$(COMPOSE) -f deploy/compose/compose.gpu.yaml up --force-recreate -d
+
 down: ## Stop containers while retaining named volumes
 	$(COMPOSE) down
 
@@ -515,6 +604,24 @@ codex-local-smoke: codex-local-check ## Run one ephemeral local-Qwen Codex respo
 	printf '%s\n' "$$smoke_output" | grep -Fxq 'LOCAL_QWEN_OK' || { echo "local Codex inference smoke test failed" >&2; exit 1; }; \
 	echo "Codex local inference passed: ollama/$(CODEX_LOCAL_MODEL)"
 
+hybrid-verify-static: ## Validate the hybrid fail-closed verifier without invoking a model
+	bash -n scripts/hybrid-verify.sh
+	docker build --check -f deploy/hybrid-verify/Dockerfile deploy/hybrid-verify
+
+hybrid-verify-image: ## Build a fresh isolated Codex verification runner image
+	docker build $(HYBRID_VERIFY_BUILD_FLAGS) -t "$(HYBRID_VERIFY_IMAGE)" deploy/hybrid-verify
+
+hybrid-verify: codex-local-check hybrid-verify-static hybrid-verify-image ## Prove local development and cloud review routes fail closed
+	@PROJECT_ROOT="$(CURDIR)" \
+	CODEX_LOCAL_MODEL="$(CODEX_LOCAL_MODEL)" \
+	CODEX_LOCAL_REASONING_EFFORT="$(CODEX_LOCAL_REASONING_EFFORT)" \
+	CODEX_LOCAL_MODEL_CATALOG="$(CODEX_LOCAL_MODEL_CATALOG)" \
+	CODEX_REVIEW_MODEL="$(CODEX_REVIEW_MODEL)" \
+	HYBRID_VERIFY_IMAGE="$(HYBRID_VERIFY_IMAGE)" \
+	HYBRID_VERIFY_AUDIT_ROOT="$(HYBRID_VERIFY_AUDIT_ROOT)" \
+	HYBRID_VERIFY_TIMEOUT="$(HYBRID_VERIFY_TIMEOUT)" \
+	bash scripts/hybrid-verify.sh
+
 codex: mcp-preflight ## Start Codex in this repository with the MCP bearer token loaded
 	@command -v codex >/dev/null 2>&1 || { echo "codex is required" >&2; exit 1; }
 	@codex login status >/dev/null || { echo "Codex is signed out; run 'make codex-login'" >&2; exit 1; }
@@ -561,6 +668,18 @@ workpacket-verify: workpacket-build ## Verify PATCH=/path/to/change.patch in an 
 	@test -n "$(PATCH)" || { echo "usage: make workpacket-verify PACKET=/path/to/work-packet.json PATCH=/path/to/change.patch" >&2; exit 1; }
 	./bin/workpacket verify --packet "$(PACKET)" --patch "$(PATCH)"
 
+diagram-local-architecture: ## Render the local architecture Mermaid diagram as SVG and high-resolution PNG
+	npx -y @mermaid-js/mermaid-cli@11.16.0 -p docs/diagrams/puppeteer-config.json -i docs/diagrams/hybrid-ai-local-architecture.mmd -o docs/diagrams/hybrid-ai-local-architecture.svg -b '#ffffff'
+	npx -y @mermaid-js/mermaid-cli@11.16.0 -p docs/diagrams/puppeteer-config.json -i docs/diagrams/hybrid-ai-local-architecture.mmd -o docs/diagrams/hybrid-ai-local-architecture.png -b '#ffffff' -w 6400 -s 3
+
+diagram-enterprise-architecture: ## Render the enterprise architecture Mermaid diagram as SVG and high-resolution PNG
+	npx -y @mermaid-js/mermaid-cli@11.16.0 -p docs/diagrams/puppeteer-config.json -i docs/diagrams/hybrid-ai-enterprise-architecture.mmd -o docs/diagrams/hybrid-ai-enterprise-architecture.svg -b '#ffffff'
+	npx -y @mermaid-js/mermaid-cli@11.16.0 -p docs/diagrams/puppeteer-config.json -i docs/diagrams/hybrid-ai-enterprise-architecture.mmd -o docs/diagrams/hybrid-ai-enterprise-architecture.png -b '#ffffff' -w 7680 -s 3
+
+diagram-local-to-enterprise: ## Render the local-to-enterprise Mermaid diagram as SVG and high-resolution PNG
+	npx -y @mermaid-js/mermaid-cli@11.16.0 -p docs/diagrams/puppeteer-config.json -i docs/diagrams/hybrid-ai-local-to-enterprise-evolution.mmd -o docs/diagrams/hybrid-ai-local-to-enterprise-evolution.svg -b '#ffffff'
+	npx -y @mermaid-js/mermaid-cli@11.16.0 -p docs/diagrams/puppeteer-config.json -i docs/diagrams/hybrid-ai-local-to-enterprise-evolution.mmd -o docs/diagrams/hybrid-ai-local-to-enterprise-evolution.png -b '#ffffff' -w 7680 -s 3
+
 diagram-review-loop: ## Render the review-learning Mermaid diagram as SVG and high-resolution PNG
 	npx -y @mermaid-js/mermaid-cli@11.16.0 -p docs/diagrams/puppeteer-config.json -i docs/diagrams/hybrid-ai-review-learning-loop.mmd -o docs/diagrams/hybrid-ai-review-learning-loop.svg -b '#ffffff'
 	npx -y @mermaid-js/mermaid-cli@11.16.0 -p docs/diagrams/puppeteer-config.json -i docs/diagrams/hybrid-ai-review-learning-loop.mmd -o docs/diagrams/hybrid-ai-review-learning-loop.png -b '#ffffff' -w 6400 -s 3
@@ -571,6 +690,9 @@ diagram-agentic-workflow: ## Render the OpenClaw/Cerbos workflow as SVG and high
 
 pull-local-model: ## Pull the recommended GBX100 coding model
 	docker compose --env-file .env -f deploy/compose/compose.yaml exec ollama ollama pull "$${LOCAL_CHAT_MODEL:-qwen3.6:35b}"
+
+models-list: mcp-preflight ## List locally installed Ollama models
+	$(COMPOSE) exec ollama ollama list
 
 clean: ## Remove build/test output only; persistent service data is retained
 	rm -rf bin coverage.out

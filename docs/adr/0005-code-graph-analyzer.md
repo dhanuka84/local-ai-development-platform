@@ -14,9 +14,9 @@ Bevel Software's `code-to-knowledge-graph` are isolated under
 `components/codegraph` and licensed MPL-2.0. The rest of the platform remains
 MIT. The source revision and exclusions are recorded in the component NOTICE.
 
-The initial provider analyzes Go repositories using Go package, syntax, and
-type information. Later providers may consume LSP, SCIP, or tree-sitter, but
-must emit the same snapshot contract.
+The native provider analyzes Go using package, syntax, and type information.
+SCIP adapters cover Maven/Gradle Java, Gradle Kotlin, TypeScript/JavaScript, and
+Python, and every provider emits the same snapshot contract.
 
 ## Why this boundary
 
@@ -44,11 +44,25 @@ their Milvus primary key. Semantic search therefore discovers a stable entity
 ID, which is hydrated against the active PostgreSQL occurrence before exact
 graph traversal. Edges are not inferred from or made authoritative in Milvus.
 
+Repository catalog identity is independent from code-analysis eligibility.
+Documentation-only and unsupported-language repositories are registered as
+catalog nodes without creating empty analysis runs. Remote default branch,
+checked-out analysis branch, and exact revision are distinct facts. A
+non-default branch requires an explicit orchestration override.
+
+The transactional outbox may contain repeated stable UUIDs after corrected or
+superseding analyses. Workers hydrate only active entities, batch Ollama
+embeddings and Milvus upserts, and coordinate replicas through PostgreSQL row
+locking. Administrative compaction completes superseded events without
+deleting audit history or the newest active projection intent.
+
 ## Consequences
 
 - Local analysis is headless and can run without a cloud model.
 - Exact impact analysis is deterministic and revision-aware.
 - Milvus may be dropped and rebuilt from active PostgreSQL entities.
+- Organization-wide indexing is idempotent at the catalog and active-head
+  boundary; asynchronous semantic completion remains separately observable.
 - Old snapshots require an explicit retention policy at enterprise scale.
 - Language servers and future build-aware analyzers must run with filesystem,
   process, time, and memory limits because repositories are untrusted input.

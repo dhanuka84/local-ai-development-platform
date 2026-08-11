@@ -53,9 +53,9 @@ flowchart LR
             RELAY["Transactional outbox relay"]:::service
             BUS["Durable event / job bus<br/>partitioned by tenant and workload"]:::event
             WORKERS["Sandboxed agent workers<br/>repository tools · build · test"]:::worker
-            ANALYZERS["Sandboxed analyzer workers<br/>compiler-aware · incremental · bounded<br/>partitioned by tenant/repository"]:::worker
+            ANALYZERS["Sandboxed analyzer workers<br/>catalog + default/analysis branch policy<br/>compiler-aware · incremental · bounded"]:::worker
             CAPTURE["Capture and redaction workers<br/>normalize · classify · hash"]:::worker
-            INDEXER["Embedding and indexing workers<br/>chunk · embed · revisioned upsert"]:::worker
+            INDEXER["Embedding and indexing workers<br/>SKIP LOCKED partitions · batched embed/upsert<br/>revisioned idempotent projection"]:::worker
             EVAL["Evaluation workers<br/>retrieval quality · regression · safety"]:::worker
     end
 
@@ -79,7 +79,7 @@ flowchart LR
     subgraph RECORD["PRIMARY REGION · AUTHORITATIVE DATA AND KNOWLEDGE PLANE"]
             direction LR
             PGBOUNCER["PgBouncer<br/>write/read pools"]:::database
-            PGHA[("PostgreSQL HA<br/><b>graph truth</b><br/>repository + revisioned code graph<br/>workflow · provenance · audit · outbox")]:::database
+            PGHA[("PostgreSQL HA<br/><b>graph truth</b><br/>full repository catalog · default/analysis branches<br/>revisioned code graph · provenance · audit · outbox")]:::database
             GIT[("Enterprise Git<br/>product source + approved knowledge<br/>patterns · ADRs · policies · runbooks")]:::knowledge
             OBJECT[("Versioned object storage<br/>raw reviews · disclosure manifests<br/>artifacts · evidence · exports · WAL/PITR")]:::storage
     end

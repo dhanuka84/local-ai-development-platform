@@ -17,15 +17,15 @@ approved records, and Ollama runs local models and creates embeddings.
 |---|---|---|
 | MCP gateway | `cmd/gateway` | Authenticates clients and exposes typed tools over HTTP or STDIO. |
 | Application service | `internal/service` | Checks requests and handles capture, search, approval, and graph operations. |
-| Code graph analyzer | `components/codegraph/golang` | Reads Go code and creates repeatable snapshots of symbols and links. |
+| Code graph analyzers | `components/codegraph` | Route Go, Java/Kotlin, TypeScript/JavaScript, and Python source to deterministic language-aware indexers and create repeatable symbol/link snapshots. |
 | PostgreSQL adapter | `internal/postgres` | Saves official state, runs safe transactions, provides recursive graph fallback, and manages the outbox. |
 | Apache AGE adapter | `internal/age` | Projects active topology, validates projection heads, and performs bounded Cypher traversal. |
 | GraphRAG orchestration | `internal/graphrag` | Combines semantic seeds, authoritative hydration, graph expansion, ranking, and context limits. |
 | Milvus adapter | `internal/milvus` | Searches approved knowledge, repository links, and selected code symbols by meaning. |
 | Ollama adapter | `internal/ollama` | Creates local embeddings in batches through `/api/embed`. |
 | Artifact store | `internal/artifacts` | Saves exact prompts, outputs, reviews, and context manifests by SHA-256 hash. |
-| Index worker | `cmd/worker` | Reads approved outbox events, creates embeddings, and updates Milvus. |
-| Admin CLI | `cmd/admin` | Runs setup, health checks, candidate decisions, and full reindexing. |
+| Index worker | `cmd/worker` | Claims outbox events safely across replicas, batches embeddings and code-entity upserts, and updates Milvus/graph projections. |
+| Admin CLI | `cmd/admin` | Runs setup, health checks, candidate decisions, repository catalog registration, outbox compaction, and full reindexing. |
 | Work-packet verifier | `cmd/workpacket`, `components/workpacket` | Checks task policy and validates a patch in a disposable clone. |
 | Authorization | `internal/authorization`, `policies/cerbos` | Asks Cerbos whether an authenticated identity may perform an action. |
 | Workflow controller | `automation/openclaw-plugin` | Mirrors managed OpenClaw tasks through MCP without direct database access. |
@@ -112,7 +112,18 @@ Raw review artifacts are never sent to Milvus. `knowledge_candidate_decide` is
 the explicit gate. Approval, its audit review row, and the `knowledge.upsert`
 outbox event commit in one transaction.
 
-The worker claims outbox rows using `FOR UPDATE SKIP LOCKED`. Failed events retain the error and use bounded incremental backoff. A lock older than five minutes is reclaimable after a crashed worker. Milvus can be dropped and rebuilt with `admin reindex`.
+The worker claims outbox rows using `FOR UPDATE SKIP LOCKED`. Multiple replicas
+therefore drain one queue without duplicate claims. Consecutive code-entity
+events are hydrated from the active PostgreSQL heads, embedded as one Ollama
+batch, and written as one Milvus columnar upsert. Failed events retain the
+error and use bounded incremental backoff. A lock older than five minutes is
+reclaimable after a crashed worker. Milvus can be dropped and rebuilt with
+`make reindex`.
+
+Repeated or corrected analysis runs can enqueue the same stable entity UUID
+more than once. `make compact-code-outbox` completes superseded and non-active
+pending events while retaining the newest event for every entity in an active
+snapshot. It preserves audit rows and is recoverable through `make reindex`.
 
 ## Regenerating similar outputs locally
 
@@ -152,11 +163,51 @@ PostgreSQL CTE when `GRAPH_FALLBACK_ENABLED=true`. `repository_relation_search`
 uses Milvus only for semantic discovery; exact topology and integrity decisions
 always return PostgreSQL-hydrated records.
 
+Repository catalog membership does not require a code graph or a repository
+relationship. `make repository-org-catalog` invokes the bounded catalog upsert
+to record name, canonical URL, remote default branch, and observed revision in
+authoritative PostgreSQL. The organization Make workflow uses it for
+documentation-only and unsupported-language repositories, which remain
+visible as `catalog-only` without publishing an empty active graph. A full AGE
+rebuild includes these repository vertices.
+
+Repository and active-snapshot identity uses these canonical properties:
+
+| Property | Canonical field/storage | Meaning |
+|---|---|---|
+| Project | `project_id` | Authorization and retrieval namespace. |
+| Repository ID | `software_repositories.id` | Stable PostgreSQL UUID used by SQL, AGE, and Milvus hydration. |
+| Repository name | `name` | Forge repository name. |
+| Canonical remote | `canonical_url` | Normalized Git remote identity; unique within a project. |
+| Forge default branch | `default_branch` | Remote catalog metadata; an analysis override never rewrites it. |
+| Catalog revision | `software_repositories.revision` | Full commit observed while synchronizing/cataloging the checkout. |
+| Analysis branch | `code_analysis_runs.branch`, MCP `branch` | Checked-out branch actually analyzed, including an explicit override. |
+| Analysis commit | `code_analysis_runs.revision`, MCP `revision` | Exact full Git commit analyzed, or the explicit dirty-worktree fingerprint. |
+| Active snapshot | `code_repository_heads.analysis_run_id` | Atomic pointer to the one run used by search and traversal. |
+
+The platform therefore indexes the concepts often called `branch_name` and
+`git_commit`, but the implemented contract names are `branch` and `revision`.
+There are no duplicate `branch_name` or `git_commit` columns.
+
 Both approved knowledge and repository edges share one Milvus collection with a dynamic `document_type` field. Searches always filter by `project_id` and `document_type`, preventing relation vectors from entering answer-pattern results.
 
 ## Source-code graph
 
 `code_repository_index` analyzes checked-out Go, Java, Kotlin, TypeScript, JavaScript, and Python repositories below `CODEGRAPH_ALLOWED_ROOTS`. A language router runs every applicable provider for a mixed-language repository. The service resolves symlinks before checking the allowlist, verifies the requested Git branch and revision, rejects a dirty worktree unless explicitly permitted, and applies file/entity/relation caps. The analyzers do not use an LLM or execute the repository's application entry points.
+
+`make repository-org-index-all` is the repeatable bulk orchestration layer. It
+enumerates non-empty/non-archived GitHub repositories, refuses dirty paths,
+separately records the remote default branch and checked-out analysis branch,
+registers the full catalog, retains exact current heads, and calls the
+authenticated MCP tool for missing/stale supported source. Overrides use
+`REPOSITORY_BRANCH_OVERRIDES='repository=branch'`; they never rewrite what the
+forge advertises as its default branch.
+
+`make repository-index-one-all REPO=/absolute/path` is the corresponding
+single-repository orchestration layer. It validates that the checkout is clean
+and below `CODEGRAPH_HOST_ROOT`, derives its canonical URL and exact Git
+identity, calls the same authenticated MCP tool, waits for semantic projection,
+and reports catalog and active-snapshot identity separately.
 
 Go uses compiler APIs directly. The other providers import the official SCIP protocol: `scip-java` covers Maven/Gradle Java and Gradle Kotlin, `scip-typescript` covers TypeScript and JavaScript, and `scip-python` covers Python. They run on a disposable copy so generated files, downloaded dependencies, and build output cannot modify the allowlisted checkout. Maven and Gradle may execute build plugins inside the analyzer container; TypeScript dependency installation disables lifecycle scripts, and Python indexing does not install repository packages. Kotlin projects built only with Maven are not supported by `scip-java`. Maven indexing activates a root `deploy` profile when present to cover modules outside the default reactor, but executes the `install` lifecycle rather than publishing artifacts and skips release signing, source archives, and Javadoc generation. A dedicated named volume caches downloaded dependencies; successful Maven analysis also installs the disposable build's artifacts there so dependent sibling repositories can be indexed afterward.
 
@@ -189,6 +240,12 @@ five hops, 32 seeds, 200 nodes, and 400 edges. Unrestricted Cypher is not an MCP
 tool.
 
 Milvus code searches always filter by project and `document_type`; when the caller supplies `repository_id`, that scalar filter is pushed into the vector query rather than applied only after retrieval. PostgreSQL hydration still rechecks the repository and active snapshot.
+
+Bulk semantic publication is explicitly eventual. `make repository-org-wait`
+does not declare completion until no `code_%` outbox event is pending, and it
+fails when any pending event has an error. `make repository-org-verify` reports
+the catalog default branch alongside the active analysis branch/revision so a
+non-default branch cannot be mistaken for drift.
 
 The reusable analyzer boundary is isolated under `components/codegraph` and MPL-2.0. PostgreSQL, AGE, Milvus, MCP, worker, and policy integrations remain in the MIT portion of the platform.
 
@@ -251,6 +308,13 @@ AGE is derived. `admin migrate` enables the extension and initializes the
 configured graph when the AGE backend is selected. `admin age-rebuild`
 recreates repository, active-code, approved-knowledge, and cross-domain
 topology from PostgreSQL in one transaction.
+
+An existing PostgreSQL-only volume may be migrated with
+`make migrate-postgres-fallback`. This applies relational/projection-ledger
+migrations with `GRAPH_BACKEND=postgres` and does not attempt to load AGE. Do
+not boot a data directory with an older PostgreSQL minor release merely because
+an AGE image bundles it; keep recursive SQL fallback until an equal-or-newer
+AGE-capable deployment has passed backup/restore and parity checks.
 
 Milvus is intentionally versioned by collection name. To change the embedding model or dimension:
 

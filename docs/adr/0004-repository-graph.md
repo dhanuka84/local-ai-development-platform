@@ -5,7 +5,10 @@
 
 ## Decision
 
-Store typed, evidence-backed Git-repository nodes and edges in PostgreSQL. Project each edge as an embedding in Milvus using the transactional outbox.
+Store the complete Git-repository catalog plus typed, evidence-backed edges in
+PostgreSQL. Project each edge as an embedding in Milvus using the transactional
+outbox. Keep forge default branch metadata distinct from the branch and exact
+revision selected for code analysis.
 
 ## Rationale
 
@@ -14,6 +17,10 @@ Software products often span application, library, infrastructure, schema, and d
 ## Consequences
 
 - SQL is authoritative; Milvus relation matches are discovery hints.
+- Catalog membership does not require supported source. Documentation-only or
+  unsupported repositories remain visible without manufacturing an empty code
+  graph.
+- Code-analysis branch overrides do not rewrite forge default-branch metadata.
 - Repository relation writes require evidence and an accountable actor.
 - Knowledge and relation documents share a collection but are isolated by `project_id` and `document_type` scalar filters.
 - Apache AGE was later accepted as a rebuildable traversal projection in

@@ -15,9 +15,9 @@ explicitly approves it.
 ![Remote review and local learning explainer](diagrams/hybrid-ai-review-learning-explainer.png)
 
 The exact technical flow is available as a
-[high-resolution PNG](diagrams/hybrid-ai-review-learning-loop.png),
-[scalable SVG](diagrams/hybrid-ai-review-learning-loop.svg), and editable
-[Mermaid source](diagrams/hybrid-ai-review-learning-loop.mmd). The poster's
+[high-resolution PNG](diagrams/hybrid-ai-review-learning-loop.png). Its
+editable source is retained at
+`diagrams/hybrid-ai-review-learning-loop.mmd`. The poster's
 [generation prompt](diagrams/hybrid-ai-review-learning-explainer.prompt.md) is
 retained for reproducibility.
 

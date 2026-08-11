@@ -45,8 +45,8 @@ flowchart LR
             RETRIEVAL["Knowledge retrieval<br/>hybrid search · ACL · graph expansion · rerank"]:::service
             CAPTURE["Capture worker<br/>normalize · redact · hash · extract patterns"]:::service
             REVIEW["Review and promotion<br/>raw evidence → reproduce → candidate → approve"]:::service
-            INDEXER["Knowledge indexer<br/>chunk · embed · idempotent upsert"]:::service
-            ANALYZER["Deterministic code analyzer<br/>Go packages · AST · types<br/>allowlisted source · revision caps"]:::service
+            INDEXER["Projection workers<br/>SKIP LOCKED claims · batched embeddings<br/>batched idempotent Milvus upsert"]:::service
+            ANALYZER["Repository catalog + deterministic analyzer<br/>organization sync · explicit branch override<br/>allowlisted source · revision caps"]:::service
             REPO["Knowledge + graph service<br/>transactions · repository + exact code edges<br/>stable entity IDs · provenance"]:::service
     end
 
@@ -59,9 +59,9 @@ flowchart LR
 
     subgraph DATA["LOCAL GBX100 · DATA PLANE"]
             direction LR
-            PG[("PostgreSQL<br/><b>graph truth</b><br/>workflow · provenance · outbox<br/>revisioned code entities + exact edges")]:::database
+            PG[("PostgreSQL<br/><b>graph truth</b><br/>full repository catalog · active branch/revision<br/>workflow · provenance · outbox · exact edges")]:::database
             MILVUS[("Milvus Standalone<br/><b>semantic discovery</b><br/>approved patterns · repository evidence<br/>selected code entities by stable SQL UUID")]:::vector
-            GIT[("Git repositories<br/><b>product source + approved knowledge</b><br/>revisions · patterns · ADRs · runbooks")]:::knowledge
+            GIT[("Git repositories<br/><b>product source + approved knowledge</b><br/>forge default + intended analysis branch<br/>revisions · patterns · ADRs · runbooks")]:::knowledge
             ARTIFACTS[("Content-addressed artifacts<br/>prompts · outputs · patches<br/>raw reviews · disclosure manifests · evidence")]:::storage
     end
 

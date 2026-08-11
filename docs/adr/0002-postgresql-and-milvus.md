@@ -18,4 +18,10 @@ SQLite remains useful for a single-process prototype, but sharing one file acros
 - Search is eventually consistent after approval.
 - Every Milvus record must be hydrated and authorized from PostgreSQL.
 - Milvus can be rebuilt from PostgreSQL through the outbox/reindex command.
+- Projection workers claim rows with `FOR UPDATE SKIP LOCKED`, embed and upsert
+  code entities in bounded batches, and use stable PostgreSQL UUIDs for
+  idempotency.
+- Corrected repository scans can leave superseded code-vector intents in the
+  audit log. Operational compaction marks only non-active intents complete; it
+  does not delete audit rows or change the authoritative graph.
 - Operational ownership includes both a relational database and a vector system.

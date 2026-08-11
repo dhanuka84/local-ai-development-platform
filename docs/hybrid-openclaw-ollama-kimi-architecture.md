@@ -13,7 +13,9 @@
 > schemas, and the earlier memory design may be stale. Use the runnable
 > [implementation guide](./implementation-guide.md), [operations runbook](./operations.md),
 > and [remote-review learning contract](./remote-review-learning.md). The
-> diagrams under [diagrams](./diagrams/) are the canonical visual overview.
+> [local architecture PNG](./diagrams/hybrid-ai-local-architecture.png) and
+> [enterprise architecture PNG](./diagrams/hybrid-ai-enterprise-architecture.png)
+> are the canonical visual overviews.
 
 ## 1. Executive summary
 
@@ -1625,7 +1627,9 @@ The system is ready for production when all of the following are true:
 
 ## 24. Future enhancements
 
-- Replace the built-in memory backend with QMD when multi-repository indexing justifies the extra component.
+- Replace the built-in memory backend with QMD when the approved knowledge
+  corpus justifies the extra component. Repository/code indexing remains in
+  PostgreSQL, AGE, and Milvus rather than the conversational memory backend.
 - Add Memory Wiki for structured claims, contradiction reports, and freshness dashboards.
 - Add cost budgets and rate limits for the cloud reviewer.
 - Add reviewer-routing evaluation that selects local-only, Kimi, Codex, or dual review from measured task characteristics.
