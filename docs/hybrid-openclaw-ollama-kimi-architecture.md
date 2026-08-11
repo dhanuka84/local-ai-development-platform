@@ -16,6 +16,11 @@
 > [local architecture PNG](./diagrams/hybrid-ai-local-architecture.png) and
 > [enterprise architecture PNG](./diagrams/hybrid-ai-enterprise-architecture.png)
 > are the canonical visual overviews.
+> For governed tasks, [ADR-0010](./adr/0010-rag-first-atomic-task-checkpoints.md)
+> supersedes the earlier selective-review sequence: tasks are FIFO queued,
+> local mode defaults to `auto`, a strong approved RAG hit skips cloud, an
+> allowed miss requires read-only Codex review without manual acceptance, and
+> Milvus read-back gates the next task.
 
 ## 1. Executive summary
 

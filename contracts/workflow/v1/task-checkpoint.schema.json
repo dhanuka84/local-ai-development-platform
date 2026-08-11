@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hybrid-ai.local/contracts/workflow/v1/task-checkpoint.schema.json",
+  "title": "RAG-first atomic task checkpoint",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id", "workflow_id", "project_id", "ordinal", "task_key", "title", "task_type", "state",
+    "route", "execution_mode", "version", "rag_query", "rag_backend",
+    "rag_hit_ids", "rag_max_score", "match_threshold",
+    "review_influence_weight", "request_artifact", "created_by", "created_at", "updated_at"
+  ],
+  "properties": {
+    "id": { "type": "string", "format": "uuid" },
+    "workflow_id": { "type": "string", "format": "uuid" },
+    "project_id": { "type": "string", "minLength": 1 },
+    "ordinal": { "type": "integer", "minimum": 1 },
+    "task_key": { "type": "string", "minLength": 1 },
+    "title": { "type": "string", "minLength": 1 },
+    "task_type": { "type": "string", "minLength": 1 },
+    "state": {
+      "enum": [
+        "queued", "local_execution", "review_approval_required",
+        "cloud_review_required", "local_revision_required",
+        "validation_required", "promotion_required", "rag_readback_required",
+        "completed", "blocked", "rejected"
+      ]
+    },
+    "route": {
+      "enum": ["pending", "rag_hit", "rag_miss_cloud_review", "rag_miss_local_only"]
+    },
+    "execution_mode": { "enum": ["auto", "manual"], "default": "auto" },
+    "version": { "type": "integer", "minimum": 1 },
+    "rag_query": { "type": "string", "minLength": 1 },
+    "rag_backend": { "type": "string", "minLength": 1 },
+    "rag_hit_ids": { "type": "array", "items": { "type": "string", "format": "uuid" }, "uniqueItems": true },
+    "rag_max_score": { "type": "number", "minimum": 0 },
+    "match_threshold": { "type": "number", "minimum": 0, "maximum": 1 },
+    "review_influence_weight": { "type": "number", "minimum": 0, "maximum": 1 },
+    "candidate_id": { "type": "string", "format": "uuid" },
+    "local_provider": { "type": "string" },
+    "local_model": { "type": "string" },
+    "cloud_provider": { "type": "string" },
+    "cloud_model": { "type": "string" },
+    "request_artifact": { "$ref": "#/$defs/artifact" },
+    "lookup_artifact": { "$ref": "#/$defs/artifact" },
+    "created_by": { "type": "string", "minLength": 1 },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "completed_at": { "type": "string", "format": "date-time" }
+  },
+  "$defs": {
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sha256", "uri", "media_type", "size_bytes"],
+      "properties": {
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "uri": { "type": "string", "minLength": 1 },
+        "media_type": { "type": "string", "minLength": 1 },
+        "size_bytes": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

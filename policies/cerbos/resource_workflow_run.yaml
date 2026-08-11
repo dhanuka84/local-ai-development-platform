@@ -20,7 +20,7 @@ resourcePolicy:
     - name: read_workflow
       actions: ["read"]
       effect: EFFECT_ALLOW
-      roles: ["controller", "development", "qa", "product_owner", "operations"]
+      roles: ["controller", "development", "qa", "product_owner", "operations", "cloud_reviewer"]
       condition:
         match:
           expr: V.localProject
@@ -44,8 +44,19 @@ resourcePolicy:
             request.resource.attr.event in [
               "CLASSIFIED", "READY", "PLAN_APPROVAL_REQUESTED",
               "IMPLEMENTATION_STARTED", "IMPLEMENTATION_COMPLETED", "IMPLEMENTATION_FAILED",
-              "VERIFICATION_PASSED", "VERIFICATION_FAILED", "REVISION_REQUESTED"
+              "VERIFICATION_PASSED", "VERIFICATION_FAILED", "REVISION_REQUESTED",
+              "TASK_QUEUED", "TASK_ACTIVATED", "LOCAL_RESULT_RECORDED",
+              "CLOUD_REVIEW_RECORDED", "LOCAL_REVISION_RECORDED",
+              "VALIDATION_PASSED", "VALIDATION_FAILED", "RAG_READBACK_VERIFIED"
             ]
+
+    - name: cloud_review_transition
+      actions: ["transition"]
+      effect: EFFECT_ALLOW
+      roles: ["cloud_reviewer"]
+      condition:
+        match:
+          expr: V.localProject && request.resource.attr.event == "CLOUD_REVIEW_RECORDED"
 
     - name: qa_coordination_transition
       actions: ["transition"]
@@ -55,7 +66,9 @@ resourcePolicy:
         match:
           expr: >-
             V.localProject &&
-            request.resource.attr.event in ["HUMAN_QA_REQUESTED", "REVISION_REQUESTED"]
+            request.resource.attr.event in [
+              "HUMAN_QA_REQUESTED", "REVISION_REQUESTED", "VALIDATION_PASSED", "VALIDATION_FAILED"
+            ]
 
     - name: product_coordination_transition
       actions: ["transition"]
@@ -66,7 +79,9 @@ resourcePolicy:
           expr: >-
             V.localProject &&
             request.resource.attr.event in [
-              "POLICY_REJECTED", "PRODUCT_APPROVAL_REQUESTED", "PROMOTION_COMPLETED"
+              "POLICY_REJECTED", "PRODUCT_APPROVAL_REQUESTED", "PROMOTION_COMPLETED",
+              "LEARNING_PROMOTED", "TASK_REJECTED",
+              "CLOUD_REVIEW_APPROVED", "CLOUD_REVIEW_REJECTED"
             ]
 
     - name: operations_cancel_transition
@@ -77,4 +92,6 @@ resourcePolicy:
         match:
           expr: >-
             V.localProject &&
-            request.resource.attr.event in ["CANCEL_REQUESTED", "CANCELLED", "BLOCKED", "FAILED"]
+            request.resource.attr.event in [
+              "CANCEL_REQUESTED", "CANCELLED", "BLOCKED", "FAILED", "TASK_REJECTED"
+            ]

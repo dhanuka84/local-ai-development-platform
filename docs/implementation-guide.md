@@ -37,7 +37,56 @@ still controls execution. The verifier only checks policy, patches, and test
 commands. It does not call a model, choose a provider, approve knowledge, or
 write to PostgreSQL or Milvus.
 
-## Bounded local execution and remote review
+## RAG-first atomic execution and remote review
+
+Migration `000007_rag_first_task_checkpoints.sql` adds the authoritative FIFO
+queue and immutable task-event ledger. `workflow_task_begin` always persists a
+submission. The first eligible task is activated automatically; later tasks
+stay queued. Activation performs the approved-knowledge search and freezes the
+result, route, score threshold, and artifact hash for audit.
+
+The service layer enforces provider and state transitions. Ollama owns local
+result, revision, and validation. OpenAI owns only read-only review. Product
+Owner approval is accepted at `promotion_required`; the outbox projects the
+approved PostgreSQL candidate to Milvus. A task completes only after a search
+from backend `milvus` returns the same UUID. Completion activates the next FIFO
+entry. Manual `TASK_REJECTED` is the only rejection path for queued work.
+
+### Checkpoint persistence and transitions
+
+Migration `000007_rag_first_task_checkpoints.sql` creates two tables:
+
+| Table | Important columns | Purpose |
+|---|---|---|
+| `workflow_task_checkpoints` | workflow/ordinal/task key, state/version, route/execution mode, RAG query/backend/hits/threshold, provider/model, candidate, request/lookup artifacts | Current authoritative FIFO position and gate. |
+| `workflow_task_events` | sequence/event/from/to, actor role, provider/model, idempotency key, payload, evidence hash, Cerbos decision | Append-only audit of every checkpoint change. |
+
+The serialized public shape is versioned as
+`contracts/workflow/v1/task-checkpoint.schema.json`; MCP input/output schemas
+are generated from the corresponding Go structs.
+
+Task submission is serialized by locking the parent workflow while assigning
+the next ordinal. Any number of tasks may remain `queued`. The activatable query
+returns only the lowest queued ordinal and only when no non-terminal task is
+active. Optimistic version checks and per-task idempotency keys handle races.
+
+The executable transitions are:
+
+| Current state | Event | Next state |
+|---|---|---|
+| `queued` | `TASK_ACTIVATED` | `local_execution` after fresh RAG lookup |
+| `queued` | `TASK_REJECTED` | `rejected` with manual evidence |
+| `local_execution` | `LOCAL_RESULT_RECORDED` | cloud review, manual review acceptance, or validation according to route/mode |
+| `review_approval_required` | `CLOUD_REVIEW_APPROVED` | `cloud_review_required` |
+| `cloud_review_required` | `CLOUD_REVIEW_RECORDED` | `local_revision_required` |
+| `local_revision_required` | `LOCAL_REVISION_RECORDED` | `validation_required` |
+| `validation_required` | `VALIDATION_PASSED` | `promotion_required` |
+| `promotion_required` | `LEARNING_PROMOTED` | `rag_readback_required` |
+| `rag_readback_required` | `RAG_READBACK_VERIFIED` | `completed`, then next FIFO activation |
+
+`execution_mode=auto` is applied in the service and the SQL default. It goes
+directly to `cloud_review_required` for an allowed miss. `manual` inserts the
+review-acceptance state. Both modes retain the later human promotion decision.
 
 For delegated patch work, OpenClaw creates a `hybrid-ai/work-packet/v1`
 document before asking the local Ollama worker to generate a patch. Evaluate it
@@ -66,17 +115,22 @@ This is local safety isolation, not a hostile-code sandbox. Run the verifier in
 an egress-denied container/VM with CPU, memory, process, and filesystem limits
 when repositories or validation commands are not fully trusted.
 
-For development packets that request remote review, OpenClaw sends only a
-sanitized context package after local verification. `review_record` captures
-Codex/Kimi findings and stores the exact response plus context manifest as
-immutable artifacts. Accepted recommendations are reproduced locally and
-captured as a pending candidate. Only an accountable approval queues embedding
-into Milvus. Maintenance packets cannot request cloud review.
+For a policy-allowed RAG miss, OpenClaw sends only a sanitized context package
+after the initial local result. `review_record` captures Codex findings and
+stores the exact response plus context manifest as immutable artifacts. Codex
+cannot write the repository or revise the candidate. The
+`CLOUD_REVIEW_RECORDED` checkpoint verifies that both SHA-256 values match the
+PostgreSQL row's candidate, workflow, provider, and model; hashes cannot be
+asserted without the underlying review record. Accepted recommendations
+are reproduced and validated by Ollama. Only an accountable approval queues
+embedding into Milvus. Maintenance and protected-data packets cannot request
+cloud review.
 
 See the [remote-review learning design](remote-review-learning.md), the
 [capability evaluation](cost-routing-evaluation.md), the
 [example packet](../examples/openclaw/work-packet.example.json), and
 [ADR-0006](adr/0006-bounded-local-execution-and-cloud-review.md).
+The durable checkpoint decision is [ADR-0010](adr/0010-rag-first-atomic-task-checkpoints.md).
 
 ## Data ownership
 
@@ -105,7 +159,7 @@ Prompt and response bytes are written to the local content-addressed store befor
 `review_record` stores reviewer/provider/model provenance. Its `raw_output`
 (falling back to `comments`) and JSON `context_manifest` are stored as
 content-addressed artifacts, while PostgreSQL stores their SHA-256 references.
-A `revise` verdict requires `improved_content` and fresh local
+A `revise` verdict requires `provider=ollama`, `improved_content`, and fresh local
 `validation_evidence`; it replaces both fields on a pending candidate and
 increments its version. It cannot mutate approved knowledge.
 Raw review artifacts are never sent to Milvus. `knowledge_candidate_decide` is
@@ -303,6 +357,11 @@ Configuration is environment-only and validated at startup. Important values:
 ## Schema and embedding evolution
 
 PostgreSQL migrations are embedded and transactionally recorded in `schema_migrations`. Never edit an already deployed migration; add a new numbered migration.
+
+Run `make integration-test-fresh` to validate every embedded migration and the
+PostgreSQL adapter against newly pulled disposable images. The target uses a
+unique Compose project and removes its containers, network, and temporary data
+after the test; it does not touch the running platform volumes.
 
 AGE is derived. `admin migrate` enables the extension and initializes the
 configured graph when the AGE backend is selected. `admin age-rebuild`

@@ -1,6 +1,6 @@
 {
   "name": "@hybrid-ai/openclaw-workflow-controller",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "OpenClaw managed Task Flow adapter for the Hybrid AI PostgreSQL workflow authority",
   "type": "module",

@@ -134,8 +134,9 @@ Operations monitors the outbox worker and projection freshness.
 
 ## Development
 
-Development owns task analysis, implementation, local checks, cloud-context
-minimization, review disposition, and candidate capture.
+Development owns FIFO task submission, local Ollama implementation, local
+checks, cloud-context minimization for a policy-allowed RAG miss, review
+disposition, and candidate capture.
 
 ### One-time Codex setup
 
@@ -167,9 +168,11 @@ tool schemas, and local Qwen did not reliably invoke those deferred tools in
 validation. Use the standard Codex session or the OpenClaw local route when the
 task requires `hybrid_knowledge` tools.
 
-Inside Codex or OpenClaw, Development searches approved knowledge, repository
-relationships, and code symbols before substantial work. For an
-OpenClaw-delegated patch:
+Inside the governed OpenClaw flow, Development calls `workflow_task_begin` for
+each atomic task. Extra tasks remain queued instead of being rejected. Only the
+head is activated, and its RAG lookup is performed at activation. The route is
+then enforced as `rag_hit`, `rag_miss_cloud_review`, or
+`rag_miss_local_only`. For an OpenClaw-delegated patch:
 
 ```bash
 make dev-policy-check PACKET=/path/to/work-packet.json
@@ -181,12 +184,20 @@ make dev-check
 make dev-authz-policy-test
 ```
 
-After successful validation, Development uses `generation_capture` through MCP
-and passes the pending candidate UUID, work packet, patch/diff, and evidence to
-QA. Development may record Codex/Kimi output with `review_record`. In `team` or
+After the initial local result, Development uses `generation_capture` through
+MCP and records `LOCAL_RESULT_RECORDED` with `provider=ollama`. A required cloud
+review runs read-only; its raw output and context manifest are evidence only.
+Development then asks Ollama to apply accepted findings, records a local
+`revise`, and reruns validation. Development passes the pending candidate UUID,
+work packet, patch/diff, and evidence to QA. In `team` or
 `regulated` mode, policy can prevent the implementing principal from performing
 later decisions. In `solo` mode, the same person may continue only by entering
 the separate QA and Product Owner transitions with the required evidence.
+
+After Product Owner approval and outbox indexing, Development records
+`RAG_READBACK_VERIFIED`. The next queued task activates automatically. Product
+Owner or Operations may explicitly reject a queued task with `TASK_REJECTED`;
+normal waiting never uses rejection.
 
 When Development requests a branch that differs from the forge default, it
 must state the repository, intended branch, reason, and expected commit. The

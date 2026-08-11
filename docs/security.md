@@ -52,6 +52,17 @@ agent's auth store or environment.
 - Exact remote-review output and the sanitized disclosure manifest are stored
   as immutable artifacts referenced by the PostgreSQL review row. They are not
   vectorized automatically.
+- Atomic tasks are FIFO-queued in PostgreSQL. Activation-time RAG routing,
+  optimistic versions, idempotency keys, and an append-only task-event ledger
+  prevent concurrent tasks from bypassing review or promotion gates.
+- Local result, revision, and validation checkpoints require an explicit
+  Ollama provider/model. Cloud review requires OpenAI provenance plus raw-review
+  and context-manifest hashes. Auto mode removes only the review-start prompt;
+  it does not remove disclosure policy or knowledge approval.
+- Cloud review runs with a read-only Codex sandbox and read-only repository
+  mount. The cloud identity cannot revise candidates or approve knowledge.
+- Milvus read-back of the promoted PostgreSQL UUID is required before the next
+  queued task activates.
 - SQL constraints enforce workflow states, relation types, confidence bounds, and no self-edges between repository records; recursive code calls remain valid graph facts.
 - Only approved knowledge is vectorized and returned.
 - MCP tool hints and Codex approval settings distinguish reads from writes.
@@ -117,6 +128,8 @@ Before internet or enterprise exposure, add:
 | Worker crash loses indexing | Durable outbox, reclaimable locks, retries, idempotent Milvus upsert. |
 | Multiple workers duplicate vector publication | PostgreSQL row locking with `SKIP LOCKED`, stable UUID primary keys, batched idempotent Milvus upserts, and active-head hydration. |
 | Cloud fallback leaks maintenance data | Strict per-agent local model and empty fallbacks. |
+| Auto mode silently removes accountability | Auto bypasses only review acceptance for policy-allowed data; provider evidence, local validation, Product Owner promotion, and Milvus read-back remain mandatory. |
+| Concurrent tasks use stale RAG or skip learning | FIFO activation and activation-time lookup; the next task stays queued until the prior promoted UUID passes Milvus read-back. |
 
 See [Remote Review and Local Learning](remote-review-learning.md) for the full
 evidence and promotion state machine.

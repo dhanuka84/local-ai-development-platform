@@ -12,7 +12,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-const Version = "0.2.0"
+const Version = "0.3.0"
 
 type API struct {
 	service          *service.Service
@@ -28,7 +28,7 @@ func New(svc *service.Service, defaultPrincipals ...domain.Principal) *mcp.Serve
 		Name: "hybrid-ai-knowledge", Title: "Hybrid AI Knowledge Gateway", Version: Version,
 		Description: "Captures reviewed software-development knowledge and retrieves approved guidance for local or cloud agents.",
 	}, &mcp.ServerOptions{
-		Instructions: "Search approved knowledge and relevant code symbols before solving a task. Use code_graph_get for exact topology after semantic discovery. Capture useful final outputs with generation_capture. Never treat pending candidates or vector similarity as authoritative facts.",
+		Instructions: "Queue atomic work with workflow_task_begin. Only the FIFO head runs: it searches approved RAG at activation, routes local Ollama work through conditional read-only cloud review, validates locally, promotes an approved lesson, and proves Milvus read-back before the next task activates. Use code_graph_get for exact topology after semantic discovery. Never treat pending candidates, raw cloud review, or vector similarity as authoritative facts.",
 	})
 	api.register(server)
 	return server
@@ -54,6 +54,9 @@ func (a *API) register(server *mcp.Server) {
 	mcp.AddTool(server, writeTool("workflow_run_create", "Create workflow run", "Create an idempotent, project-scoped agentic workflow under the authenticated principal."), a.workflowCreate)
 	mcp.AddTool(server, readTool("workflow_run_get", "Get workflow run", "Read authoritative workflow state and governance policy."), a.workflowGet)
 	mcp.AddTool(server, writeTool("workflow_run_transition", "Transition workflow run", "Request an optimistic, idempotent state transition with authorization and evidence."), a.workflowTransition)
+	mcp.AddTool(server, writeTool("workflow_task_begin", "Queue workflow task", "Queue an atomic task. The FIFO head is activated automatically and performs its governed RAG lookup at activation time."), a.workflowTaskBegin)
+	mcp.AddTool(server, readTool("workflow_task_get", "Get workflow task", "Read an atomic task checkpoint, its RAG route, provider provenance, and current gate."), a.workflowTaskGet)
+	mcp.AddTool(server, writeTool("workflow_task_transition", "Transition workflow task", "Record an evidence-backed local, cloud-review, validation, promotion, read-back, or manual rejection event."), a.workflowTaskTransition)
 }
 
 func (a *API) context(ctx context.Context) context.Context {
@@ -267,11 +270,16 @@ func (a *API) decide(ctx context.Context, _ *mcp.CallToolRequest, input decideIn
 	}
 	workflowLinked, qaValidated := candidate.WorkflowID != "", false
 	if workflowLinked {
-		workflow, workflowErr := a.service.GetWorkflow(ctx, candidate.WorkflowID)
-		if workflowErr != nil {
-			return nil, decideOutput{}, workflowErr
+		checkpoint, checkpointErr := a.service.GetWorkflowTaskByCandidate(ctx, candidate.ID)
+		if checkpointErr == nil && checkpoint.State == domain.TaskStatePromotionRequired {
+			qaValidated = true
+		} else {
+			workflow, workflowErr := a.service.GetWorkflow(ctx, candidate.WorkflowID)
+			if workflowErr != nil {
+				return nil, decideOutput{}, workflowErr
+			}
+			qaValidated = workflow.QAValidatedBy != "" && workflow.State == "promotion_pending"
 		}
-		qaValidated = workflow.QAValidatedBy != "" && workflow.State == "promotion_pending"
 	}
 	principal, err := a.service.AuthorizeProjectAction(ctx, candidate.ProjectID, "knowledge_candidate", candidate.ID, decision, map[string]any{
 		"status": candidate.Status, "workflow_id": candidate.WorkflowID,
@@ -517,4 +525,60 @@ func (a *API) workflowTransition(ctx context.Context, _ *mcp.CallToolRequest, in
 		IdempotencyKey: input.IdempotencyKey, Evidence: input.Evidence, Payload: input.Payload,
 	})
 	return nil, workflowTransitionOutput{Workflow: run, Event: event}, err
+}
+
+type workflowTaskBeginInput struct {
+	WorkflowID     string  `json:"workflow_id" jsonschema:"workflow UUID; required"`
+	TaskKey        string  `json:"task_key" jsonschema:"stable task key unique within the workflow; required"`
+	Title          string  `json:"title" jsonschema:"short atomic task title; required"`
+	TaskType       string  `json:"task_type,omitempty" jsonschema:"design, implementation, testing, debugging, or maintenance"`
+	ExecutionMode  string  `json:"execution_mode,omitempty" jsonschema:"auto bypasses manual cloud-review acceptance; manual pauses before cloud review"`
+	RAGQuery       string  `json:"rag_query" jsonschema:"semantic query checked when this task reaches the FIFO head; required"`
+	MatchThreshold float32 `json:"match_threshold,omitempty" jsonschema:"strong-hit threshold from 0 to 1; defaults to 0.75"`
+	IdempotencyKey string  `json:"idempotency_key" jsonschema:"stable queue submission key; required"`
+}
+
+type workflowTaskOutput struct {
+	Task  domain.WorkflowTaskCheckpoint `json:"task"`
+	Event domain.WorkflowTaskEvent      `json:"event"`
+}
+
+func (a *API) workflowTaskBegin(ctx context.Context, _ *mcp.CallToolRequest, input workflowTaskBeginInput) (*mcp.CallToolResult, workflowTaskOutput, error) {
+	task, event, err := a.service.BeginWorkflowTask(a.context(ctx), service.BeginWorkflowTaskInput{
+		WorkflowID: input.WorkflowID, TaskKey: input.TaskKey, Title: input.Title, TaskType: input.TaskType, ExecutionMode: input.ExecutionMode,
+		RAGQuery: input.RAGQuery, MatchThreshold: input.MatchThreshold, IdempotencyKey: input.IdempotencyKey,
+	})
+	return nil, workflowTaskOutput{Task: task, Event: event}, err
+}
+
+type workflowTaskGetInput struct {
+	TaskID string `json:"task_id" jsonschema:"workflow task UUID; required"`
+}
+
+func (a *API) workflowTaskGet(ctx context.Context, _ *mcp.CallToolRequest, input workflowTaskGetInput) (*mcp.CallToolResult, workflowTaskOutput, error) {
+	task, err := a.service.GetWorkflowTask(a.context(ctx), input.TaskID)
+	return nil, workflowTaskOutput{Task: task}, err
+}
+
+type workflowTaskTransitionInput struct {
+	TaskID                string         `json:"task_id" jsonschema:"workflow task UUID; required"`
+	ExpectedVersion       int            `json:"expected_version" jsonschema:"current optimistic task version; required"`
+	EventType             string         `json:"event_type" jsonschema:"checkpoint event; required"`
+	IdempotencyKey        string         `json:"idempotency_key" jsonschema:"stable event attempt key; required"`
+	Provider              string         `json:"provider,omitempty" jsonschema:"ollama for local work or openai for cloud review"`
+	Model                 string         `json:"model,omitempty" jsonschema:"exact model identifier"`
+	CandidateID           string         `json:"candidate_id,omitempty" jsonschema:"generation_capture candidate UUID"`
+	Evidence              string         `json:"evidence,omitempty" jsonschema:"exact JSON/text evidence stored immutably"`
+	ReviewInfluenceWeight float32        `json:"review_influence_weight,omitempty" jsonschema:"auditable cloud-review influence from 0 to 1; not a retrieval trust score"`
+	Payload               map[string]any `json:"payload,omitempty" jsonschema:"bounded event metadata; cloud review requires review and context artifact hashes"`
+}
+
+func (a *API) workflowTaskTransition(ctx context.Context, _ *mcp.CallToolRequest, input workflowTaskTransitionInput) (*mcp.CallToolResult, workflowTaskOutput, error) {
+	task, event, err := a.service.TransitionWorkflowTask(a.context(ctx), service.TransitionWorkflowTaskInput{
+		TaskID: input.TaskID, ExpectedVersion: input.ExpectedVersion, EventType: input.EventType,
+		IdempotencyKey: input.IdempotencyKey, Provider: input.Provider, Model: input.Model,
+		CandidateID: input.CandidateID, Evidence: input.Evidence,
+		ReviewInfluenceWeight: input.ReviewInfluenceWeight, Payload: input.Payload,
+	})
+	return nil, workflowTaskOutput{Task: task, Event: event}, err
 }

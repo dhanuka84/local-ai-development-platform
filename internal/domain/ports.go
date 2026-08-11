@@ -11,6 +11,11 @@ type Repository interface {
 	CreateWorkflow(context.Context, WorkflowRun, WorkflowEvent) (WorkflowRun, error)
 	GetWorkflow(context.Context, string) (WorkflowRun, error)
 	TransitionWorkflow(context.Context, WorkflowTransition) (WorkflowRun, WorkflowEvent, error)
+	CreateWorkflowTask(context.Context, WorkflowTaskCheckpoint, WorkflowTaskEvent) (WorkflowTaskCheckpoint, WorkflowTaskEvent, error)
+	GetWorkflowTask(context.Context, string) (WorkflowTaskCheckpoint, error)
+	GetWorkflowTaskByCandidate(context.Context, string) (WorkflowTaskCheckpoint, error)
+	GetActivatableWorkflowTask(context.Context, string) (WorkflowTaskCheckpoint, bool, error)
+	TransitionWorkflowTask(context.Context, WorkflowTaskTransition) (WorkflowTaskCheckpoint, WorkflowTaskEvent, error)
 	RecordGeneration(context.Context, GenerationCapture) (KnowledgeItem, error)
 	GetKnowledge(context.Context, string, bool) (KnowledgeItem, error)
 	GetKnowledgeMany(context.Context, []string) ([]KnowledgeItem, error)
@@ -19,6 +24,7 @@ type Repository interface {
 	ApproveCandidate(context.Context, string, string) (KnowledgeItem, error)
 	RejectCandidate(context.Context, string, string) (KnowledgeItem, error)
 	RecordReview(context.Context, ReviewRecord) error
+	ReviewEvidenceExists(context.Context, string, string, string, string, string, string) (bool, error)
 	ClaimOutbox(context.Context, int) ([]OutboxEvent, error)
 	CompleteOutbox(context.Context, int64) error
 	FailOutbox(context.Context, int64, string) error

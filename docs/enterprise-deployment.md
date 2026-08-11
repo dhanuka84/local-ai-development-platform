@@ -17,7 +17,11 @@ The enterprise deployment changes scale and identity, not semantics:
 - Exact revisioned code graphs remain in PostgreSQL; AGE projects only active topology and Milvus vectors use the same stable entity UUIDs.
 - Knowledge and repository relations require provenance and approval.
 - Maintenance remains local/private with no cloud fallback.
-- Cloud review is explicit, minimized, and audited.
+- Cloud review is policy-selected, minimized, read-only, and audited. Auto mode
+  removes review acceptance only; protected-data policy and promotion approval
+  remain enforced.
+- Atomic tasks remain FIFO queued, and Milvus read-back of the promoted UUID
+  gates the next task even when gateway and worker replicas scale out.
 - Exact reviewer output and disclosed-context manifests are immutable evidence;
   only approved generalized improvements enter semantic retrieval.
 - MCP is the typed client boundary.

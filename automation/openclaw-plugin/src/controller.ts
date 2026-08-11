@@ -73,6 +73,58 @@ export class WorkflowController {
     return { workflow: response.workflow, flow };
   }
 
+  async queueTask(input: {
+    workflowId: string;
+    taskKey: string;
+    title: string;
+    taskType?: string;
+    executionMode?: "auto" | "manual";
+    ragQuery: string;
+    matchThreshold?: number;
+    idempotencyKey: string;
+  }, signal?: AbortSignal): Promise<Record<string, unknown>> {
+    return await this.mcp.callTaskTool("workflow_task_begin", {
+      workflow_id: input.workflowId,
+      task_key: input.taskKey,
+      title: input.title,
+      task_type: input.taskType,
+      execution_mode: input.executionMode ?? "auto",
+      rag_query: input.ragQuery,
+      match_threshold: input.matchThreshold,
+      idempotency_key: input.idempotencyKey,
+    }, signal);
+  }
+
+  async taskStatus(taskId: string, signal?: AbortSignal): Promise<Record<string, unknown>> {
+    return await this.mcp.callTaskTool("workflow_task_get", { task_id: taskId }, signal);
+  }
+
+  async transitionTask(input: {
+    taskId: string;
+    expectedVersion: number;
+    eventType: string;
+    idempotencyKey: string;
+    provider?: string;
+    model?: string;
+    candidateId?: string;
+    evidence?: string;
+    reviewInfluenceWeight?: number;
+    payload?: Record<string, unknown>;
+  }, signal?: AbortSignal): Promise<Record<string, unknown>> {
+    return await this.mcp.callTaskTool("workflow_task_transition", {
+      task_id: input.taskId,
+      expected_version: input.expectedVersion,
+      event_type: input.eventType,
+      idempotency_key: input.idempotencyKey,
+      provider: input.provider,
+      model: input.model,
+      candidate_id: input.candidateId,
+      evidence: input.evidence,
+      review_influence_weight: input.reviewInfluenceWeight,
+      payload: input.payload,
+    }, signal);
+  }
+
   async transition(input: {
     workflowId: string;
     flowId: string;

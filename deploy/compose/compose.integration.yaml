@@ -1,0 +1,28 @@
+services:
+  postgres:
+    image: apache/age:release_PG17_1.6.0@sha256:fe8b33905a61549a067f8512808b88011bdcaa82ab65d8788f39fb07a04aa5be
+    environment:
+      POSTGRES_DB: hybrid
+      POSTGRES_USER: hybrid
+      POSTGRES_PASSWORD: integration-only
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hybrid -d hybrid"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    tmpfs:
+      - /var/lib/postgresql/data
+
+  integration-test:
+    image: golang:1.25.8-bookworm
+    working_dir: /src
+    command: ["go", "test", "-count=1", "./internal/postgres"]
+    environment:
+      TEST_DATABASE_URL: postgres://hybrid:integration-only@postgres:5432/hybrid?sslmode=disable
+      GOCACHE: /root/.cache/go-build
+      GOMODCACHE: /go/pkg/mod
+    volumes:
+      - ../..:/src:ro
+    depends_on:
+      postgres:
+        condition: service_healthy

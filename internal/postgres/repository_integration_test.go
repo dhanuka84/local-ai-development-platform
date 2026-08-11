@@ -98,6 +98,92 @@ func TestRepositoryWorkflowIntegration(t *testing.T) {
 		t.Fatal("stale transition unexpectedly succeeded")
 	}
 
+	requestTaskArtifact := domain.Artifact{
+		SHA256: "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+		URI:    "file:///task-request", MediaType: "application/json", SizeBytes: 12,
+	}
+	firstTaskID, _ := domain.NewID()
+	firstTaskEventID, _ := domain.NewID()
+	firstTask, _, err := repository.CreateWorkflowTask(ctx, domain.WorkflowTaskCheckpoint{
+		ID: firstTaskID, WorkflowID: workflow.ID, TaskKey: "design", Title: "Design tests",
+		TaskType: "design", State: domain.TaskStateQueued, Route: domain.TaskRoutePending,
+		ExecutionMode: "auto", Version: 1, RAGQuery: "validated test design", RAGBackend: "pending",
+		RAGHitIDs: []string{}, MatchThreshold: 0.75, RequestArtifact: requestTaskArtifact, CreatedBy: principal.ID,
+	}, domain.WorkflowTaskEvent{
+		ID: firstTaskEventID, TaskID: firstTaskID, EventType: "TASK_QUEUED", ToState: domain.TaskStateQueued,
+		ActorPrincipalID: principal.ID, ActorRole: "development", IdempotencyKey: "task:design",
+		Payload: map[string]any{}, AuthorizationDecision: "allow",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondTaskID, _ := domain.NewID()
+	secondTaskEventID, _ := domain.NewID()
+	secondTask, _, err := repository.CreateWorkflowTask(ctx, domain.WorkflowTaskCheckpoint{
+		ID: secondTaskID, WorkflowID: workflow.ID, TaskKey: "implement", Title: "Implement tests",
+		TaskType: "implementation", State: domain.TaskStateQueued, Route: domain.TaskRoutePending,
+		ExecutionMode: "auto", Version: 1, RAGQuery: "validated test implementation", RAGBackend: "pending",
+		RAGHitIDs: []string{}, MatchThreshold: 0.75, RequestArtifact: requestTaskArtifact, CreatedBy: principal.ID,
+	}, domain.WorkflowTaskEvent{
+		ID: secondTaskEventID, TaskID: secondTaskID, EventType: "TASK_QUEUED", ToState: domain.TaskStateQueued,
+		ActorPrincipalID: principal.ID, ActorRole: "development", IdempotencyKey: "task:implement",
+		Payload: map[string]any{}, AuthorizationDecision: "allow",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if firstTask.Ordinal != 1 || secondTask.Ordinal != 2 || firstTask.ExecutionMode != "auto" {
+		t.Fatalf("first task=%#v second task=%#v", firstTask, secondTask)
+	}
+	type concurrentTaskResult struct {
+		task domain.WorkflowTaskCheckpoint
+		err  error
+	}
+	concurrentResults := make(chan concurrentTaskResult, 2)
+	for i := 0; i < 2; i++ {
+		taskID, _ := domain.NewID()
+		eventID, _ := domain.NewID()
+		go func() {
+			task, _, createErr := repository.CreateWorkflowTask(ctx, domain.WorkflowTaskCheckpoint{
+				ID: taskID, WorkflowID: workflow.ID, TaskKey: "concurrent", Title: "Concurrent task",
+				TaskType: "testing", State: domain.TaskStateQueued, Route: domain.TaskRoutePending,
+				ExecutionMode: "auto", Version: 1, RAGQuery: "validated concurrent task", RAGBackend: "pending",
+				RAGHitIDs: []string{}, MatchThreshold: 0.75, RequestArtifact: requestTaskArtifact, CreatedBy: principal.ID,
+			}, domain.WorkflowTaskEvent{
+				ID: eventID, TaskID: taskID, EventType: "TASK_QUEUED", ToState: domain.TaskStateQueued,
+				ActorPrincipalID: principal.ID, ActorRole: "development", IdempotencyKey: "task:concurrent",
+				Payload: map[string]any{}, AuthorizationDecision: "allow",
+			})
+			concurrentResults <- concurrentTaskResult{task: task, err: createErr}
+		}()
+	}
+	concurrentA, concurrentB := <-concurrentResults, <-concurrentResults
+	if concurrentA.err != nil || concurrentB.err != nil || concurrentA.task.ID != concurrentB.task.ID || concurrentA.task.Ordinal != 3 {
+		t.Fatalf("concurrent A=%#v err=%v B=%#v err=%v", concurrentA.task, concurrentA.err, concurrentB.task, concurrentB.err)
+	}
+	head, ok, err := repository.GetActivatableWorkflowTask(ctx, workflow.ID)
+	if err != nil || !ok || head.ID != firstTask.ID {
+		t.Fatalf("activatable head=%#v ok=%v err=%v", head, ok, err)
+	}
+	rejectEventID, _ := domain.NewID()
+	firstTask, _, err = repository.TransitionWorkflowTask(ctx, domain.WorkflowTaskTransition{
+		TaskID: firstTask.ID, ExpectedVersion: firstTask.Version, ExpectedState: domain.TaskStateQueued,
+		ResultingState: domain.TaskStateRejected, Completed: true,
+		Event: domain.WorkflowTaskEvent{
+			ID: rejectEventID, TaskID: firstTask.ID, EventType: "TASK_REJECTED",
+			FromState: domain.TaskStateQueued, ToState: domain.TaskStateRejected,
+			ActorPrincipalID: principal.ID, ActorRole: "product_owner", IdempotencyKey: "task:design:reject",
+			Payload: map[string]any{"reason": "superseded"}, AuthorizationDecision: "allow",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	head, ok, err = repository.GetActivatableWorkflowTask(ctx, workflow.ID)
+	if err != nil || !ok || head.ID != secondTask.ID || firstTask.State != domain.TaskStateRejected {
+		t.Fatalf("next head=%#v first=%#v ok=%v err=%v", head, firstTask, ok, err)
+	}
+
 	generationID, err := domain.NewID()
 	if err != nil {
 		t.Fatal(err)
@@ -134,6 +220,12 @@ func TestRepositoryWorkflowIntegration(t *testing.T) {
 	}
 	if reviewArtifactSHA != reviewArtifact.SHA256 || manifestArtifactSHA != manifestArtifact.SHA256 || reviewWorkflowID != workflow.ID {
 		t.Fatalf("review refs = %q, %q, %q", reviewArtifactSHA, manifestArtifactSHA, reviewWorkflowID)
+	}
+	reviewEvidenceExists, err := repository.ReviewEvidenceExists(
+		ctx, candidate.ID, workflow.ID, "openai", "review-model", reviewArtifact.SHA256, manifestArtifact.SHA256,
+	)
+	if err != nil || !reviewEvidenceExists {
+		t.Fatalf("review evidence exists=%v err=%v", reviewEvidenceExists, err)
 	}
 	revised, err := repository.GetKnowledge(ctx, candidate.ID, true)
 	if err != nil {

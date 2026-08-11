@@ -2,33 +2,33 @@
 
 ## Outcome
 
-The normal path uses a local model for implementation. Codex, Kimi, or both may
-provide an explicit independent review when policy allows cloud use. Useful
-improvements can then move through review and approval so future local-model
-sessions can find them.
+The governed path is a FIFO queue of atomic tasks. When a task reaches the
+head, it searches approved RAG first. A strong match guides local Ollama work
+without another cloud call. An allowed RAG miss requires a read-only Codex
+cloud review, followed by an Ollama revision. Maintenance, confidential, and
+restricted work uses the local-only miss route. Every route converges on local
+validation, accountable approval, and a Milvus read-back before the next task
+is activated.
 
 The platform does **not** put raw reviewer output into Milvus. It saves the exact
 response as evidence. A recommendation becomes searchable knowledge only after
 someone applies it locally, runs checks, rewrites it as a reusable lesson, and
 explicitly approves it.
 
-![Remote review and local learning explainer](diagrams/hybrid-ai-review-learning-explainer.png)
+![RAG-first task queue, review, and learning loop](diagrams/hybrid-ai-review-learning-loop.png)
 
-The exact technical flow is available as a
-[high-resolution PNG](diagrams/hybrid-ai-review-learning-loop.png). Its
+The diagram's
 editable source is retained at
-`diagrams/hybrid-ai-review-learning-loop.mmd`. The poster's
-[generation prompt](diagrams/hybrid-ai-review-learning-explainer.prompt.md) is
-retained for reproducibility.
+`diagrams/hybrid-ai-review-learning-loop.mmd`.
 
 ## Responsibility boundaries
 
 | Component | Owns | Must not own |
 |---|---|---|
-| OpenClaw | Task classification, model routing, context minimization, reviewer selection. | Knowledge approval or vector truth. |
+| OpenClaw | FIFO task submission, model invocation, context minimization, and queue coordination. | Knowledge approval or vector truth. |
 | Ollama worker | Local implementation, local regeneration, and maintenance inference. | Cloud escalation policy. |
 | Work-packet verifier | Deterministic scope, patch, and validation enforcement in a disposable clone. | Model invocation or human approval. |
-| Codex CLI | Direct cloud-backed development or repository/diff-focused advisory review, with MCP retrieval and capture. | Direct knowledge promotion or local-only maintenance. |
+| Codex CLI | Read-only repository/diff review of a sanitized package after an allowed RAG miss. | Repository writes, candidate revision, direct knowledge promotion, or local-only maintenance. |
 | Kimi | Architecture, design, optimization, and long-context advisory review. | Direct knowledge promotion. |
 | MCP gateway | Typed retrieval, capture, evidence, review, approval, and graph operations. | Autonomous task routing. |
 | PostgreSQL | Canonical workflow, provenance, review decisions, graph edges, stable IDs, and outbox. | Approximate semantic ranking. |
@@ -37,59 +37,49 @@ retained for reproducibility.
 
 ## Development workflow
 
-1. OpenClaw classifies the task and creates a
-   `hybrid-ai/work-packet/v1` document.
-2. The policy evaluator rejects forbidden disclosure, missing approvals, or an
-   invalid maintenance/cloud combination.
-3. Ollama produces a local implementation or unified patch using approved
-   knowledge retrieved through MCP.
-4. The verifier applies the patch to a disposable Git clone, enforces its file
-   and diff budget, and runs the declared exact-argv checks.
-5. OpenClaw creates the smallest useful cloud package. It includes a task,
-   acceptance criteria, sanitized diff/snippets, relevant approved rules, test
-   evidence, and a manifest of disclosed context.
-6. Codex, Kimi, or both return advisory findings. Use Codex for repository and
-   diff correctness; use Kimi for architecture and optimization; use both only
-   when independent opinions justify the disclosure and cost.
-7. The local worker accepts or rejects each recommendation against current
-   source. Accepted changes are reproduced locally and all checks are rerun.
-8. `review_record` stores reviewer provenance and decision in PostgreSQL. The
+1. OpenClaw calls `workflow_task_begin`. PostgreSQL accepts the task into its
+   FIFO queue; active work does not cause rejection.
+2. When no earlier task is active, the controller emits `TASK_ACTIVATED`. The
+   service performs `knowledge_search` at this point and stores the exact
+   result as an immutable artifact.
+3. A strong Milvus hit selects `rag_hit`. A miss selects either
+   `rag_miss_cloud_review` for policy-allowed development or
+   `rag_miss_local_only` for maintenance or protected data.
+4. Ollama produces the local result and `generation_capture` creates a pending
+   candidate. `LOCAL_RESULT_RECORDED` accepts only `provider=ollama`.
+5. A strong RAG hit or local-only miss moves directly to local validation. An
+   allowed miss enters `cloud_review_required` and cannot silently fall back.
+   Local-model tasks default to `execution_mode=auto`, so no human acceptance
+   is requested before this review. An explicitly manual task pauses at
+   `review_approval_required` instead.
+6. Codex receives only a sanitized package and runs in a read-only sandbox
+   against a read-only repository mount. It returns findings, not edits.
+7. `review_record` stores reviewer provenance and decision in PostgreSQL. The
    exact reviewer response and sanitized context manifest are written to the
-   artifact CAS and referenced by SHA-256 from the same review transaction. A
-   `revise` verdict requires the reproduced `improved_content` plus fresh local
-   `validation_evidence` and replaces both fields on the pending candidate.
+   artifact CAS and referenced by SHA-256. The cloud record uses a non-mutating
+   verdict such as `comment`. `CLOUD_REVIEW_RECORDED` verifies the hashes
+   against that same candidate, workflow, provider, and model before the task
+   can enter local revision.
+8. Ollama accepts or rejects each finding against current source, applies the
+   accepted changes, reruns checks, and records `revise` with fresh local
+   validation. Only `provider=ollama` may revise pending content.
 9. The improved, generalized result stays a pending knowledge candidate until
    an accountable actor uses `knowledge_candidate_decide`.
 10. Approval and a `knowledge.upsert` outbox event commit atomically in
     PostgreSQL. The worker embeds the authoritative approved item with Ollama
     and upserts it into Milvus under the PostgreSQL UUID.
+11. `RAG_READBACK_VERIFIED` succeeds only when `knowledge_search` returns that
+    UUID from the Milvus backend. The checkpoint completes and automatically
+    activates the next queued task.
 
-## Codex-first development workflow
+## Direct cloud sessions are outside the governed hybrid lane
 
-Codex CLI may also perform the implementation instead of serving only as the
-second reviewer:
-
-1. Start the separate HTTP MCP platform in Terminal 1 and Codex in Terminal 2
-   with `make codex` or `make codex-repo REPO=/absolute/path`.
-2. Codex retrieves approved lessons, repository relationships, and exact code
-   graph context through MCP, then inspects the current repository directly.
-3. Codex implements the task and runs repository-local deterministic checks.
-   The work-packet contract is required when OpenClaw delegates a patch; it is
-   optional policy for an interactive Codex session unless the organization
-   mandates it for every change.
-4. Capture the validated Codex result with `generation_capture`, including the
-   provider/model, repository revision, ordered procedure, and validation
-   evidence. The exact prompt/output become immutable artifacts and the
-   reusable solution remains pending.
-5. Optionally request an independent Kimi architecture review or a separate
-   Codex review pass, using the same sanitized evidence lifecycle.
-6. After accountable approval, the outbox embeds the generalized result. A
-   future Ollama session can retrieve it and adapt the learned procedure to
-   current source.
-
-Running the CLI locally does not make Codex inference local. Treat source,
-diffs, prompts, and MCP results visible to Codex as disclosures to OpenAI. Do
-not use this workflow for the local-only maintenance identity.
+The platform still exposes general `make codex` commands for explicitly chosen
+cloud work, but those sessions are not evidence that the RAG-first hybrid loop
+ran. A governed hybrid task must show the checkpoint sequence and uses Codex
+only for read-only review. Running the CLI locally does not make Codex inference
+local; every supplied prompt, diff, snippet, or MCP result is a disclosure to
+OpenAI.
 
 ## Maintenance workflow
 
@@ -137,19 +127,18 @@ form can be hashed and retained.
   "reviewer": "codex-review",
   "provider": "openai",
   "model": "organization-approved-codex-model",
-  "verdict": "revise",
+  "verdict": "comment",
   "comments": "One correctness issue and one reusable transaction rule.",
-  "improved_content": "Generalized, locally reproduced solution text.",
-  "validation_evidence": ["go test ./internal/service passed after applying the recommendation"],
   "raw_output": "Exact reviewer response, unchanged.",
   "context_manifest": "{\"schema\":\"hybrid-ai/review-context/v1\",\"revision\":\"abc123\",\"files\":[{\"path\":\"internal/service/service.go\",\"sha256\":\"...\"}],\"checks\":[\"go test ./internal/service\"],\"data_classification\":\"internal\"}"
 }
 ```
 
-The result returns the SHA-256 and URI for each created artifact. A `revise`
-verdict requires `improved_content` and fresh local `validation_evidence`, can
-change only a pending candidate, and does not approve it. Record an unaccepted
-or not-yet-reproduced recommendation with `comment` instead.
+The result returns the SHA-256 and URI for each created artifact. The cloud
+review remains a `comment`. After Ollama applies accepted findings and reruns
+checks, a second `review_record` with `provider=ollama`, verdict `revise`,
+`improved_content`, and fresh `validation_evidence` may update the pending
+candidate. Neither record approves it.
 
 ## Designing reusable improvements
 
@@ -172,16 +161,16 @@ targets functionally equivalent, validated results.
 
 ## Failure and consistency rules
 
-- If cloud review is unavailable, the development task may remain locally
-  verified and explicitly marked unreviewed; it must not silently switch
-  provider.
+- If required cloud review is unavailable, the task remains
+  `cloud_review_required`; it neither advances nor silently switches provider.
 - If artifact storage fails, `review_record` fails before the database review
   is committed.
 - If the review transaction fails after artifact publication, the immutable
   object may be orphaned and can be garbage-collected only after a database
   reference scan and retention window.
 - If Milvus is unavailable, approval remains committed in PostgreSQL and the
-  outbox retries. Exact/lexical retrieval continues where supported.
+  outbox retries, but the task stays `rag_readback_required` and the next task
+  remains queued.
 - Deleting Milvus never deletes canonical knowledge; reindex rebuilds it from
   PostgreSQL.
 

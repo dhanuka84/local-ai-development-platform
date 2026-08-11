@@ -2,7 +2,7 @@
   "id": "hybrid-workflow-controller",
   "name": "Hybrid Workflow Controller",
   "description": "Durably mirror OpenClaw managed Task Flows to the Hybrid AI PostgreSQL workflow authority.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "activation": {
     "onStartup": true
   },
@@ -55,11 +55,17 @@
       "hybrid_workflow_start",
       "hybrid_workflow_status",
       "hybrid_workflow_transition",
-      "hybrid_workflow_cancel"
+      "hybrid_workflow_cancel",
+      "hybrid_task_queue",
+      "hybrid_task_status",
+      "hybrid_task_transition"
     ]
   },
   "toolMetadata": {
     "hybrid_workflow_status": {
+      "replaySafe": true
+    },
+    "hybrid_task_status": {
       "replaySafe": true
     }
   }

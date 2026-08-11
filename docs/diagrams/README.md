@@ -24,11 +24,12 @@ needed, and the editable `.mmd` file remains the source for each diagram.
 The arrows use color and short step numbers to make each path easier to follow.
 
 - Runtime architecture: blue `1` request, purple `2` orchestration, orange `3`
-  local execution, magenta `3C` optional cloud review, amber `4` evidence,
+  local execution, magenta `3C` conditional cloud review, amber `4` evidence,
   emerald `5` approval and commit, green `6` indexing, and cyan `7` retrieval
   and reuse.
-- Review-learning loop: green `1` local work, magenta `2` remote review,
-  indigo `3` validation and learning, and cyan `4` local reuse.
+- Review-learning loop: slate `1` durable FIFO queue, blue `2` activation-time
+  RAG routing, green/orange `3` local ownership with conditional read-only
+  cloud review, and amber `4` validation, promotion, and read-back.
 - Local-to-enterprise evolution: green `1` local profile, purple `2` stable
   contracts, blue `3` enterprise scale-out, and dashed red `3M` Milvus
   migration.

@@ -4,6 +4,13 @@ This plugin mirrors OpenClaw managed Task Flow state to the authoritative Go
 MCP/PostgreSQL workflow service. It never calls PostgreSQL, Cerbos, Milvus, or
 model providers directly.
 
+The plugin exposes workflow tools plus `hybrid_task_queue`,
+`hybrid_task_status`, and `hybrid_task_transition`. Task queueing defaults to
+`executionMode: "auto"`: an allowed RAG miss proceeds to read-only cloud review
+without a manual acceptance prompt. `manual` mode is explicit and pauses before
+review. PostgreSQL activates only the FIFO head and the MCP service enforces all
+provider, validation, promotion, and Milvus read-back gates.
+
 Build and test:
 
 ```bash

@@ -11,9 +11,10 @@ workflows without removing accountable human approval or PostgreSQL authority.
 
 OpenClaw coordinates the steps but does not become the source of truth. The Go
 service checks every workflow change, Cerbos checks permission, and PostgreSQL
-saves the official result. Local agents use Ollama. Codex or Kimi can provide
-an optional cloud review after the context is minimized and policy allows it.
-A human still makes the final knowledge decision.
+saves the official result. Local agents use Ollama. An approved RAG hit skips
+cloud; a policy-allowed miss requires a read-only Codex review. Auto mode is the
+local-model default and does not ask for manual review acceptance. A human
+still makes the final knowledge decision.
 
 The foundation is working now:
 
@@ -380,10 +381,10 @@ The policy engine, not the model alone, selects:
 
 | Condition | Review lane |
 |---|---|
+| Strong approved RAG hit | No cloud review. Local Ollama adapts and revalidates the lesson. |
+| RAG miss for policy-allowed Development | Read-only Codex review is required, then Ollama revision and local QA. |
 | Local-only maintenance or restricted data | No cloud review. Local QA only. |
-| Low-risk, small, fully tested Development change | Local QA; optional sampled remote review. |
-| Medium-risk or cross-repository change | Local QA plus Codex or Kimi according to concern. |
-| Architecture, security, migration, concurrency, or high impact | Kimi and/or Codex plus human QA. |
+| Architecture, security, migration, concurrency, or high impact | Read-only Codex review plus human QA; add another reviewer only under an explicit policy extension. |
 | Confidential data | Human disclosure approval before any cloud call. |
 
 The context packager uses allowlisted files/snippets, secret scanning, maximum
@@ -617,6 +618,29 @@ project_governance_policies
   two_person_gates, always_human_gates, version
 ```
 
+Migration `000007_rag_first_task_checkpoints.sql` extends that foundation with:
+
+```text
+workflow_task_checkpoints
+  id, workflow_id, ordinal, task_key, title, task_type, state, route,
+  execution_mode, version, rag_query, rag_backend, rag_hit_ids,
+  rag_max_score, match_threshold, review_influence_weight, candidate_id,
+  local_provider, local_model, cloud_provider, cloud_model,
+  request_artifact_sha256, lookup_artifact_sha256, created_by,
+  created_at, updated_at, completed_at
+
+workflow_task_events
+  id, task_id, sequence, event_type, from_state, to_state,
+  actor_principal_id, actor_role, provider, model, idempotency_key,
+  payload, evidence_artifact_sha256, authorization_decision,
+  cerbos_call_id, policy_version, created_at
+```
+
+Queued tasks are accepted in FIFO order. `execution_mode=auto` is the local
+default and bypasses manual acceptance only for a policy-allowed read-only
+cloud review. A task cannot complete until its approved candidate is returned
+by Milvus read-back; only then is the next queue entry activated.
+
 Constraints must enforce unique idempotency keys, monotonic event sequence,
 valid states/gates, one active approval per gate/attempt, actor/acting-role
 binding, project governance policy, and artifact foreign keys.
@@ -636,6 +660,9 @@ workflow_step_complete
 workflow_approval_request
 workflow_approval_decide
 workflow_event_append
+workflow_task_begin
+workflow_task_get
+workflow_task_transition
 ```
 
 Agent-facing tools remain narrow:
@@ -973,9 +1000,9 @@ Run the existing 30-task benchmark across:
 
 1. manual baseline;
 2. local-only automated flow;
-3. local plus Codex review;
-4. local plus Kimi review;
-5. Codex-first automated flow where allowed.
+3. RAG-hit local reuse without cloud review;
+4. RAG-miss local work plus read-only Codex review;
+5. restricted/local-only flow with cloud denied.
 
 Measure acceptance, escaped defects, human minutes, latency, retries, cloud
 usage, disclosure bytes, and regeneration quality. Do not claim savings before

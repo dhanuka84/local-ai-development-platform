@@ -4,10 +4,10 @@
 
 The platform already has a stronger knowledge and evidence foundation than a
 simple cost router, but the complete cost-routing outcome is not yet proven.
-Local Ollama execution, explicit Codex/Kimi review lanes, reviewed knowledge,
-repository graphs, and code graphs are implemented or configured. Automated
-task routing, context-package construction, and operational benchmarks still
-need end-to-end evidence.
+Local Ollama execution, RAG-first atomic checkpoint routing, read-only Codex
+review, reviewed knowledge, repository graphs, and code graphs are implemented
+or configured. Automatic context-package construction and operational
+benchmarks still need end-to-end evidence.
 
 Do not claim a 40–70% cost reduction, faster delivery, or unchanged quality
 until the evaluation protocol in this document passes on representative work.
@@ -34,29 +34,32 @@ Status meanings:
 | Bounded context and write scope | Partial | Allowed/forbidden file patterns, patch-byte, file-count, and diff-line limits are enforced; supplied review manifests are stored immutably. | Build an automatic minimal cloud context packager with secret/DLP scanning before export. |
 | Result verification | Implemented locally | Candidate patches apply in a disposable clone; exact argv checks run with timeouts; scope, diff limits, side effects, and binary patches are checked. | Run the verifier inside an egress-denied OS/container sandbox for untrusted repositories. |
 | Cheap/local worker delegation | Configured | OpenClaw is the orchestrator; Ollama is the default worker. | Add routing telemetry and end-to-end execution fixtures. |
-| Codex/Kimi final review | Configured + persistence implemented | Explicit review lanes exist; `review_record` stores reviewer/model/verdict, raw output artifact, context-manifest artifact, and may revise only a pending candidate. | Automate sanitized package issuance and record a complete live review trace. |
-| Review improvements become reusable | Implemented with approval gate | Validated improved candidate content is approved in PostgreSQL, then embedded into Milvus by the outbox worker. | Build quality/freshness evaluation for promoted review lessons. |
+| Codex final review | Configured + persistence implemented | An allowed RAG miss enters the provider-gated read-only OpenAI lane; `review_record` stores reviewer/model/verdict plus raw-output and context-manifest artifacts. Cloud cannot revise candidate content. | Automate sanitized package issuance and record a complete live review trace. |
+| Review improvements become reusable | Implemented with approval/read-back gates | Ollama-revised content is validated and approved in PostgreSQL, embedded by the outbox worker, and must pass Milvus UUID read-back before queue advancement. | Build quality/freshness evaluation for promoted review lessons. |
 | PostgreSQL knowledge authority | Implemented | Workflow state, provenance, approvals, relationships, code snapshots, and outbox are canonical. | Add enterprise tenant isolation and managed HA operation. |
 | Semantic reuse through Milvus | Implemented | Approved knowledge, repository relationships, and selected code entities use stable PostgreSQL IDs. | Measure retrieval precision and local regeneration quality. |
-| Transparent and measurable routing | Partial | Captures record provider/model/outcome; work-packet evaluation is structured JSON. | Persist route decisions, model tokens/cost, latency, validation, review disposition, and failure reasons as first-class run metrics. |
+| Transparent and measurable routing | Implemented for checkpoint provenance; usage metrics partial | PostgreSQL stores route, mode, model/provider, RAG results, influence, candidate, evidence, authorization, and every transition. | Add model tokens/cost and latency as first-class metrics. |
 | 40–70% savings | Unmeasured | No platform-specific A/B benchmark exists. | Run the protocol below; report measured distributions, not a marketing estimate. |
 | Faster delivery without lower quality | Unmeasured | Unit/integration tests cover platform controls, not representative coding-task throughput. | Compare wall time, validation rate, review findings, and accepted outcomes against Codex-only and local-only baselines. |
 
 ## Required review and learning lifecycle
 
-Remote review remains part of the development workflow. It is advisory and is
-never an automatic cloud fallback:
+Remote review is advisory and policy-selected, never a provider fallback.
+`execution_mode=auto` starts a required review without a human acceptance
+prompt; `manual` adds that prompt. Both retain human knowledge approval:
 
 ```text
-local Ollama implementation
+FIFO activation -> approved RAG lookup
+  -> local Ollama implementation
   -> deterministic work-packet verification
-  -> minimal sanitized context package
-  -> explicit Codex and/or Kimi review
+  -> on allowed RAG miss: minimal sanitized context package
+  -> read-only Codex review
   -> review_record + immutable review artifact
-  -> local reproduction and validation of accepted recommendations
+  -> Ollama reproduction and validation of accepted recommendations
   -> pending generalized knowledge candidate
   -> accountable approval in PostgreSQL
   -> outbox-driven embedding in Milvus
+  -> Milvus UUID read-back -> next FIFO task
 ```
 
 Raw review output is valuable evidence but is not automatically searchable
@@ -81,8 +84,8 @@ Build a versioned suite of at least 30 representative tasks:
 Run each eligible task through three lanes where policy permits:
 
 1. Codex-only baseline.
-2. Local Ollama implementation without remote review.
-3. Local Ollama implementation plus explicit Codex or Kimi review.
+2. Approved RAG-hit local Ollama implementation without remote review.
+3. RAG-miss local Ollama implementation plus automatic read-only Codex review.
 
 Record for every run:
 
@@ -105,7 +108,8 @@ The platform may advertise a measured optimization only when:
 - all maintenance and restricted-data cloud attempts are rejected;
 - every accepted patch passes its declared deterministic checks;
 - no accepted patch escapes its file or diff limits;
-- remote review is explicitly requested and its exported manifest is recorded;
+- every policy-required remote review records its exported manifest; auto mode
+  starts it without manual acceptance, while manual mode records that decision;
 - raw model/review output is never embedded before approval;
 - the reviewed hybrid lane has no statistically meaningful regression in final
   task acceptance compared with the Codex-only baseline;

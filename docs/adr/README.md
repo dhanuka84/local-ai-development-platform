@@ -9,3 +9,4 @@
 - [0007 — OpenClaw managed agentic workflows](0007-openclaw-managed-agentic-workflows.md)
 - [0008 — Cerbos contextual authorization](0008-cerbos-contextual-authorization.md)
 - [0009 — Apache AGE projection and governed GraphRAG](0009-apache-age-graphrag.md)
+- [0010 — RAG-first atomic task checkpoints](0010-rag-first-atomic-task-checkpoints.md)

@@ -11,7 +11,9 @@
 > described by [ADR-0001](./adr/0001-go-for-the-mcp-data-plane.md),
 > [ADR-0002](./adr/0002-postgresql-and-milvus.md), the
 > [implementation guide](./implementation-guide.md), and the
-> [remote-review learning contract](./remote-review-learning.md).
+> [remote-review learning contract](./remote-review-learning.md). Governed task
+> sequencing and default auto mode are defined by
+> [ADR-0010](./adr/0010-rag-first-atomic-task-checkpoints.md).
 
 ## 1. Historical recommendation
 

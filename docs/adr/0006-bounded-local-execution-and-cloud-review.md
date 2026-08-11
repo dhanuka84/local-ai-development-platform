@@ -16,12 +16,14 @@ in a disposable clone and never modifies the source checkout. The verifier
 rejects out-of-scope files, binary patches, excessive diffs, failed checks, and
 check processes that mutate the candidate patch.
 
-Remote Codex or Kimi review remains an explicit development step after local
-verification. The exact response and disclosed-context manifest are stored as
+For governed atomic tasks, remote Codex review is a conditional, fail-closed
+step after a RAG miss and local result. The exact response and disclosed-context manifest are stored as
 content-addressed evidence referenced by the PostgreSQL review row. A proposed
 improvement remains a pending candidate. It is embedded in Milvus only after
 local validation, generalization, and an accountable PostgreSQL approval.
 Maintenance and restricted-data packets fail closed without cloud review.
+ADR-0010 adds the durable per-task queue, provider gates, and Milvus read-back
+that enforce this sequencing.
 
 ## Why OpenClaw owns routing
 

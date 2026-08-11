@@ -278,6 +278,24 @@ func (r *Repository) RecordReview(ctx context.Context, review domain.ReviewRecor
 	return tx.Commit(ctx)
 }
 
+func (r *Repository) ReviewEvidenceExists(ctx context.Context, knowledgeID, workflowID, provider, model, reviewArtifactSHA256, contextManifestArtifactSHA256 string) (bool, error) {
+	var exists bool
+	err := r.pool.QueryRow(ctx, `SELECT EXISTS(
+		SELECT 1
+		FROM review_records
+		WHERE knowledge_id::text=$1
+		  AND workflow_id::text=$2
+		  AND provider=$3
+		  AND model=$4
+		  AND review_artifact_sha256=$5
+		  AND context_manifest_artifact_sha256=$6
+	)`, knowledgeID, workflowID, provider, model, reviewArtifactSHA256, contextManifestArtifactSHA256).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("verify review evidence: %w", err)
+	}
+	return exists, nil
+}
+
 func (r *Repository) ClaimOutbox(ctx context.Context, limit int) ([]domain.OutboxEvent, error) {
 	rows, err := r.pool.Query(ctx, `WITH picked AS (
         SELECT id FROM outbox_events

@@ -7,6 +7,11 @@ fail closed. It runs against a temporary canary Git repository, so the
 verification does not disclose the platform repository or another product
 repository to the cloud reviewer.
 
+This is the infrastructure acceptance test for default task
+`execution_mode=auto`: no human accepts the cloud-review invocation, so the
+network and sandbox controls themselves must fail closed. It does not remove
+the later knowledge-promotion approval.
+
 The suite does not stop or reconfigure the shared Ollama container. This makes
 it safe to run while another Codex session is using the local model.
 
@@ -97,4 +102,3 @@ The cloud-denial test copies only the file-backed Codex authentication record
 into the isolated temporary directory. That container has no cloud route. The
 temporary copy is removed during cleanup and is never written to the audit
 record.
-

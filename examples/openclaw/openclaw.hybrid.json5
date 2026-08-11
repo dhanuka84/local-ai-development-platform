@@ -59,6 +59,9 @@
             "hybrid_workflow_status",
             "hybrid_workflow_transition",
             "hybrid_workflow_cancel",
+            "hybrid_task_queue",
+            "hybrid_task_status",
+            "hybrid_task_transition",
             "sessions_spawn",
             "lobster"
           ]

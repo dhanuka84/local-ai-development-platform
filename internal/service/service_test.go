@@ -25,6 +25,11 @@ type fakeRepository struct {
 	workflowEvent  domain.WorkflowEvent
 	transition     domain.WorkflowTransition
 	transitioned   bool
+	tasks          []domain.WorkflowTaskCheckpoint
+	taskEvents     []domain.WorkflowTaskEvent
+	taskTransition domain.WorkflowTaskTransition
+	knowledge      map[string]domain.KnowledgeItem
+	reviewEvidence bool
 }
 
 func (f *fakeRepository) Ping(context.Context) error { return nil }
@@ -56,11 +61,90 @@ func (f *fakeRepository) TransitionWorkflow(_ context.Context, transition domain
 	}
 	return f.workflow, transition.Event, nil
 }
+func (f *fakeRepository) CreateWorkflowTask(_ context.Context, task domain.WorkflowTaskCheckpoint, event domain.WorkflowTaskEvent) (domain.WorkflowTaskCheckpoint, domain.WorkflowTaskEvent, error) {
+	for i := range f.tasks {
+		if f.tasks[i].WorkflowID == task.WorkflowID && f.tasks[i].TaskKey == task.TaskKey {
+			return f.tasks[i], event, nil
+		}
+	}
+	task.Ordinal = len(f.tasks) + 1
+	f.tasks = append(f.tasks, task)
+	f.taskEvents = append(f.taskEvents, event)
+	return task, event, nil
+}
+func (f *fakeRepository) GetWorkflowTask(_ context.Context, id string) (domain.WorkflowTaskCheckpoint, error) {
+	for _, task := range f.tasks {
+		if task.ID == id {
+			return task, nil
+		}
+	}
+	return domain.WorkflowTaskCheckpoint{}, errors.New("task not found")
+}
+func (f *fakeRepository) GetWorkflowTaskByCandidate(_ context.Context, candidateID string) (domain.WorkflowTaskCheckpoint, error) {
+	for _, task := range f.tasks {
+		if task.CandidateID == candidateID {
+			return task, nil
+		}
+	}
+	return domain.WorkflowTaskCheckpoint{}, errors.New("task not found")
+}
+func (f *fakeRepository) GetActivatableWorkflowTask(_ context.Context, workflowID string) (domain.WorkflowTaskCheckpoint, bool, error) {
+	for _, task := range f.tasks {
+		if task.WorkflowID == workflowID && task.State != domain.TaskStateQueued &&
+			task.State != domain.TaskStateCompleted && task.State != domain.TaskStateRejected {
+			return domain.WorkflowTaskCheckpoint{}, false, nil
+		}
+	}
+	for _, task := range f.tasks {
+		if task.WorkflowID == workflowID && task.State == domain.TaskStateQueued {
+			return task, true, nil
+		}
+	}
+	return domain.WorkflowTaskCheckpoint{}, false, nil
+}
+func (f *fakeRepository) TransitionWorkflowTask(_ context.Context, transition domain.WorkflowTaskTransition) (domain.WorkflowTaskCheckpoint, domain.WorkflowTaskEvent, error) {
+	f.taskTransition = transition
+	for i := range f.tasks {
+		if f.tasks[i].ID != transition.TaskID {
+			continue
+		}
+		f.tasks[i].State = transition.ResultingState
+		f.tasks[i].Version++
+		if transition.CandidateID != "" {
+			f.tasks[i].CandidateID = transition.CandidateID
+		}
+		if transition.RAGRoute != "" {
+			f.tasks[i].Route = transition.RAGRoute
+			f.tasks[i].RAGBackend = transition.RAGBackend
+			f.tasks[i].RAGHitIDs = transition.RAGHitIDs
+			f.tasks[i].RAGMaxScore = transition.RAGMaxScore
+			f.tasks[i].LookupArtifact = transition.LookupArtifact
+		}
+		if transition.LocalProvider != "" {
+			f.tasks[i].LocalProvider, f.tasks[i].LocalModel = transition.LocalProvider, transition.LocalModel
+		}
+		if transition.CloudProvider != "" {
+			f.tasks[i].CloudProvider, f.tasks[i].CloudModel = transition.CloudProvider, transition.CloudModel
+		}
+		f.tasks[i].ReviewInfluenceWeight = transition.InfluenceWeight
+		f.taskEvents = append(f.taskEvents, transition.Event)
+		return f.tasks[i], transition.Event, nil
+	}
+	return domain.WorkflowTaskCheckpoint{}, domain.WorkflowTaskEvent{}, errors.New("task not found")
+}
 func (f *fakeRepository) RecordGeneration(_ context.Context, capture domain.GenerationCapture) (domain.KnowledgeItem, error) {
 	f.recorded = capture
 	return domain.KnowledgeItem{ID: "candidate", ProjectID: capture.ProjectID, Status: domain.CandidatePending}, nil
 }
-func (f *fakeRepository) GetKnowledge(context.Context, string, bool) (domain.KnowledgeItem, error) {
+func (f *fakeRepository) GetKnowledge(_ context.Context, id string, _ bool) (domain.KnowledgeItem, error) {
+	if item, ok := f.knowledge[id]; ok {
+		return item, nil
+	}
+	for _, item := range f.items {
+		if item.ID == id {
+			return item, nil
+		}
+	}
 	return domain.KnowledgeItem{}, nil
 }
 func (f *fakeRepository) GetKnowledgeMany(context.Context, []string) ([]domain.KnowledgeItem, error) {
@@ -81,6 +165,9 @@ func (f *fakeRepository) RejectCandidate(context.Context, string, string) (domai
 func (f *fakeRepository) RecordReview(_ context.Context, review domain.ReviewRecord) error {
 	f.recordedReview = review
 	return nil
+}
+func (f *fakeRepository) ReviewEvidenceExists(context.Context, string, string, string, string, string, string) (bool, error) {
+	return f.reviewEvidence, nil
 }
 func (f *fakeRepository) ClaimOutbox(context.Context, int) ([]domain.OutboxEvent, error) {
 	return nil, nil
@@ -216,7 +303,7 @@ func TestRecordReviewStoresImmutableEvidence(t *testing.T) {
 	svc := New(repository, artifacts, &fakeEmbedder{}, &fakeVectors{}, true, false)
 
 	review, err := svc.RecordReview(context.Background(), domain.ReviewRecord{
-		KnowledgeID: " candidate ", Reviewer: " codex ", Provider: " openai ", Model: " reviewer-model ",
+		KnowledgeID: " candidate ", Reviewer: " local-developer ", Provider: " ollama ", Model: " local-model ",
 		Verdict: " REVISE ", Comments: "summary", RawOutput: "exact remote output",
 		ContextManifest: `{"revision":"abc123","paths":["internal/service/service.go"]}`,
 		ImprovedContent: "validated improvement", ValidationEvidence: []string{" go test ./internal/service passed "},
@@ -235,6 +322,18 @@ func TestRecordReviewStoresImmutableEvidence(t *testing.T) {
 	}
 	if got := repository.recordedReview.ValidationEvidence; len(got) != 1 || got[0] != "go test ./internal/service passed" {
 		t.Fatalf("validation evidence=%#v", got)
+	}
+}
+
+func TestRecordReviewPreventsCloudFromRevisingCandidate(t *testing.T) {
+	svc := New(&fakeRepository{}, &fakeArtifacts{}, &fakeEmbedder{}, &fakeVectors{}, true, false)
+	_, err := svc.RecordReview(context.Background(), domain.ReviewRecord{
+		KnowledgeID: "candidate", Reviewer: "cloud-reviewer", Provider: "openai", Model: "reviewer-model",
+		Verdict: "revise", ImprovedContent: "cloud-authored replacement",
+		ValidationEvidence: []string{"claimed validation"},
+	})
+	if !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("err=%v, want ErrInvalidInput", err)
 	}
 }
 

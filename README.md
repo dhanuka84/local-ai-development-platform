@@ -36,9 +36,9 @@ The repository implements:
 - An independent bounded-work contract and disposable-clone patch verifier for OpenClaw local execution.
 - Local Docker Compose deployment, Codex/OpenClaw examples, CI, and an enterprise migration path.
 
-![Local-first implementation, remote review, and approved learning](docs/diagrams/hybrid-ai-review-learning-explainer.png)
+![RAG-first local implementation, read-only cloud review, and approved learning](docs/diagrams/hybrid-ai-review-learning-loop.png)
 
-See the [exact review-learning diagram](docs/diagrams/hybrid-ai-review-learning-loop.png)
+See the [review-learning design](docs/remote-review-learning.md)
 and the [full local deployment architecture](docs/diagrams/hybrid-ai-local-architecture.png)
 for implementation detail.
 
@@ -156,15 +156,16 @@ mode, one person may perform all four roles. The platform still records the
 role and evidence at each approval step. Follow the complete
 [role workflows and handoffs](docs/role-workflows.md).
 
-## End-to-end development with Codex
+## End-to-end governed hybrid development
 
-Codex CLI can be the primary development session, not only a final reviewer.
-The standard `make dev-session` targets use the configured Codex provider and
-stored ChatGPT sign-in for cloud inference. The explicit
-`make dev-session-local` targets run Codex itself on the local Ollama model.
-Both routes register the same local MCP gateway. The cloud Codex route is the
-supported direct MCP workflow; the local route currently has the compatibility
-boundary documented in step 3. Neither route requires `OPENAI_API_KEY`.
+The governed hybrid route uses OpenClaw to queue atomic work, Ollama as the
+development owner, and Codex only as a conditional read-only reviewer after an
+approved RAG miss. Local-model tasks default to auto mode, so that review does
+not require manual acceptance. Direct `make dev-session` cloud development is
+still available, but it is a separate cloud session and does not prove that the
+governed hybrid loop ran. The explicit `make dev-session-local` targets run
+Codex itself on the local Ollama model. Neither route requires
+`OPENAI_API_KEY`.
 
 The local MCP bearer token is a separate, non-billable secret used only between
 Codex and the loopback gateway. The Make targets load it from `.env` without
@@ -175,13 +176,12 @@ when the OpenClaw integration is also expected to be running.
 The complete loop is:
 
 ```text
-start MCP → launch Codex in the target repository → verify MCP
-  → refresh the revisioned code graph when needed
-  → retrieve approved knowledge and exact repository/code graphs
-  → validate a bounded work packet → implement and test
-  → verify the patch in a disposable clone → capture a pending candidate
-  → independent QA review → explicit Product Owner decision
-  → local embedding and future retrieval
+start MCP/OpenClaw → queue atomic tasks (auto by default)
+  → activate FIFO head → search approved RAG
+  → Ollama design/implementation/test → capture pending candidate
+  → on allowed miss: read-only Codex review → Ollama revision
+  → local deterministic validation → explicit Product Owner decision
+  → local embedding → Milvus read-back → activate next task
 ```
 
 ### 1. Perform one-time Codex setup
@@ -277,7 +277,8 @@ end-to-end test. `/mcp verbose`, `codex-local-check`, and the inference smoke
 test must not be treated as proof of a successful MCP tool call. Until that
 client/model compatibility changes, use one of these supported paths:
 
-- `make dev-session` for Codex with direct `hybrid_knowledge` calls;
+- `make dev-session` for an explicit direct-cloud Codex session outside the
+  governed hybrid lane, with direct `hybrid_knowledge` calls;
 - `make openclaw-start` for local Qwen with the OpenClaw-managed MCP tool path;
 - `make dev-session-local` only when the task does not depend on MCP calls.
 
@@ -285,9 +286,9 @@ Codex officially supports selecting Ollama with `--oss` and
 `--local-provider`; see the
 [Codex advanced configuration guide](https://developers.openai.com/codex/config-advanced/#oss-mode-local-providers).
 
-### 4. Launch Codex in the repository being changed
+### 4. Launch an explicit direct Codex session when needed
 
-For the complete Codex-and-MCP workflow in this platform repository:
+For a direct cloud Codex-and-MCP session in this platform repository:
 
 ```bash
 make dev-session
@@ -666,12 +667,20 @@ make workpacket-evaluate PACKET=/path/to/work-packet.json
 make workpacket-verify PACKET=/path/to/work-packet.json PATCH=/path/to/change.patch
 ```
 
-Verified local results may receive a sanitized remote review. Exact review
-output and the context manifest are stored as immutable evidence; a proposed
-improvement remains pending. Only locally validated, generalized, explicitly
-approved improvements are embedded in Milvus for later local reuse.
-Maintenance remains local-only and can retrieve approved lessons without
-invoking a cloud model. See [Remote Review and Local Learning](docs/remote-review-learning.md).
+Atomic tasks enter a PostgreSQL FIFO queue. At activation, approved RAG is
+searched first. A strong hit skips cloud review; an allowed miss requires a
+read-only Codex review and then an Ollama revision; maintenance or protected
+data takes the local-only miss route. Exact review output and the context
+manifest are immutable evidence, and the checkpoint verifies both hashes
+against a matching PostgreSQL review row. Only locally validated, generalized,
+explicitly approved improvements are embedded in Milvus, and successful
+Milvus read-back is required before the next task activates. See
+[Remote Review and Local Learning](docs/remote-review-learning.md).
+
+Local-model tasks default to `execution_mode=auto`: policy-required cloud
+review starts without a manual acceptance prompt. `manual` mode is opt-in and
+adds a Product Owner review-start decision; knowledge promotion remains a
+separate accountable gate.
 
 The [capability scorecard](docs/cost-routing-evaluation.md) distinguishes what
 is implemented, configured, partial, and still unmeasured. No cost or quality
@@ -682,14 +691,16 @@ percentage is claimed before the documented benchmark gates pass.
 The usual software-development loop is:
 
 ```text
-knowledge_search + graph_context_search + repository_graph_get + code_symbol_search
-  -> local implementation and validation
+workflow_task_begin -> FIFO activation -> approved RAG lookup
+  -> local Ollama implementation
   -> generation_capture (pending)
-  -> optional Kimi/Codex review_record (may revise pending content)
+  -> conditional read-only Codex review_record on an allowed RAG miss
+  -> local Ollama revision and validation
   -> human/policy knowledge_candidate_decide
   -> PostgreSQL outbox
   -> Ollama embedding worker
   -> Milvus approved index
+  -> RAG read-back -> complete -> activate next queued task
 ```
 
 Available tools:
@@ -700,9 +711,12 @@ Available tools:
 | `knowledge_search` | Search approved project knowledge; lexical fallback is reported explicitly. |
 | `knowledge_get` | Fetch one approved item. |
 | `generation_capture` | Store a run, immutable artifacts, provenance, procedure, validation, and pending candidate. |
-| `review_record` | Save review provenance, findings, immutable raw-output/context-manifest artifacts; `revise` requires fresh local validation and updates only a pending candidate. |
+| `review_record` | Save review provenance and immutable raw-output/context-manifest artifacts; only `provider=ollama` may use `revise` with fresh local validation to update a pending candidate. |
 | `knowledge_candidates_list` | List the review queue. |
 | `knowledge_candidate_decide` | Approve or reject; approval queues vector indexing. |
+| `workflow_task_begin` | Queue an atomic task; automatically activate the FIFO head and perform RAG routing. |
+| `workflow_task_get` | Read queue position, route, checkpoint, provider/model, candidate, and evidence references. |
+| `workflow_task_transition` | Record provider-gated local, review, validation, promotion, read-back, or manual rejection events. |
 | `repository_relation_upsert` | Store a typed, approved Git-repository edge and queue its vector projection. |
 | `repository_graph_get` | Traverse AGE repository topology to depth 1–5 with stale/unavailable fallback to recursive SQL. |
 | `repository_relation_search` | Semantically search relationship evidence in Milvus. |
@@ -733,9 +747,16 @@ docs/                architecture, implementation, security, operations, ADRs
 
 ```bash
 make check-all
+make integration-test-fresh
+make hybrid-verify
 make build
 make mcp-preflight
 ```
+
+The fresh integration target uses an isolated Compose project and deletes its
+temporary database, containers, and network. The hybrid verifier builds its
+runner with `--pull --no-cache`, exercises the four fail-closed provider cases,
+and writes hashed audit evidence under `reports/hybrid-verification/`.
 
 Native and STDIO code analysis requires Git plus the selected language indexers and build toolchains. The local Compose `gateway-analyzer` image includes Go, Java/Maven/Gradle, Node, and pinned SCIP indexers. It keeps `/workspace` read-only and runs non-Go indexers against disposable copies. The production gateway target remains distroless; enterprise deployments should run analyzers in isolated queued workers.
 

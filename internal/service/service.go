@@ -390,6 +390,9 @@ func (s *Service) RecordReview(ctx context.Context, review domain.ReviewRecord) 
 			return domain.ReviewRecord{}, fmt.Errorf("%w: improved_content is valid only with a revise verdict", ErrInvalidInput)
 		}
 	case "revise":
+		if strings.ToLower(review.Provider) != "ollama" {
+			return domain.ReviewRecord{}, fmt.Errorf("%w: only the local Ollama lane may revise candidate content", ErrInvalidInput)
+		}
 		review.ImprovedContent = strings.TrimSpace(review.ImprovedContent)
 		if review.ImprovedContent == "" || len(review.ValidationEvidence) == 0 {
 			return domain.ReviewRecord{}, fmt.Errorf("%w: revise requires improved_content and fresh local validation_evidence", ErrInvalidInput)

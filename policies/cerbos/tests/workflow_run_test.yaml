@@ -31,6 +31,13 @@ principals:
       human: false
       project_ids: [project-a]
 
+  cloud_reviewer:
+    id: agent:cloud-reviewer
+    roles: [cloud_reviewer]
+    attr:
+      human: false
+      project_ids: [project-a]
+
 resources:
   project_a_intake:
     kind: workflow_run
@@ -69,6 +76,26 @@ resources:
       project_id: project-a
       current_state: qa_validated
       event: PRODUCT_APPROVAL_REQUESTED
+      risk: low
+      data_classification: internal
+
+  project_a_cloud_review:
+    kind: workflow_run
+    id: workflow-a-cloud-review
+    attr:
+      project_id: project-a
+      current_state: implementing
+      event: CLOUD_REVIEW_RECORDED
+      risk: low
+      data_classification: internal
+
+  project_a_manual_review_approval:
+    kind: workflow_run
+    id: workflow-a-manual-review
+    attr:
+      project_id: project-a
+      current_state: implementing
+      event: CLOUD_REVIEW_APPROVED
       risk: low
       data_classification: internal
 
@@ -118,6 +145,38 @@ tests:
         resource: project_a_product_request
         actions:
           transition: EFFECT_ALLOW
+
+  - name: Cloud reviewer can read and record only its review checkpoint
+    input:
+      principals: [cloud_reviewer]
+      resources: [project_a_cloud_review, project_a_classifying]
+      actions: [read, transition]
+    expected:
+      - principal: cloud_reviewer
+        resource: project_a_cloud_review
+        actions:
+          read: EFFECT_ALLOW
+          transition: EFFECT_ALLOW
+      - principal: cloud_reviewer
+        resource: project_a_classifying
+        actions:
+          read: EFFECT_ALLOW
+          transition: EFFECT_DENY
+
+  - name: Product Owner role is required for manual review acceptance
+    input:
+      principals: [local_developer, cloud_reviewer]
+      resources: [project_a_manual_review_approval]
+      actions: [transition]
+    expected:
+      - principal: local_developer
+        resource: project_a_manual_review_approval
+        actions:
+          transition: EFFECT_ALLOW
+      - principal: cloud_reviewer
+        resource: project_a_manual_review_approval
+        actions:
+          transition: EFFECT_DENY
 
   - name: QA agent cannot perform ordinary state transitions
     input:

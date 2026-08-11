@@ -177,6 +177,7 @@ overrides. The target repository's trusted Codex configuration still applies.
 | `make codex-login` | Start the interactive ChatGPT sign-in flow. |
 | `make codex-check` | Show Codex login status and MCP registration. |
 | `make hybrid-verify` | Prove local development and cloud review fail closed; write hashed audit evidence under `reports/hybrid-verification/`. |
+| `make integration-test-fresh` | Pull disposable PostgreSQL/Go images, apply every migration, run adapter integration tests, and remove the isolated stack. |
 | `make codex` | Start Codex in this checkout with the local bearer token. |
 | `make codex-repo REPO=/abs/path` | Start Codex in another repository with this HTTP MCP server. |
 | `make workpacket-evaluate PACKET=...` | Evaluate classification, risk, disclosure, scope, and limits. |
@@ -281,18 +282,31 @@ The CLI authenticates `AUTH_TOKEN`, derives the accountable human identity, and
 asks Cerbos before writing the decision. Approval queues indexing. Search may
 not return the item until the worker completes the event.
 
-## Local implementation and remote review
+## RAG-first local implementation and cloud review
 
-Two development entry points are supported:
+The governed hybrid entry point is OpenClaw/Ollama-first. Atomic tasks are
+queued with `workflow_task_begin`. PostgreSQL accepts later tasks as `queued`;
+it does not reject them because another task is running. Only the FIFO head is
+activated. RAG lookup is performed at activation so a later task can consume a
+lesson learned by the preceding task.
 
-- **OpenClaw/Ollama-first:** local implementation, deterministic verification,
-  then explicit Codex/Kimi review.
-- **Codex-first:** start with `make codex` or `make codex-repo`, retrieve through
-  MCP, implement and validate in Codex, then use `generation_capture` so the
-  approved procedure can later be reused locally.
+The task route is visible through `workflow_task_get`:
 
-Codex-first development is still cloud inference and must satisfy the cloud
-disclosure policy. It is not permitted for local-only maintenance.
+| Route | Required execution |
+|---|---|
+| `rag_hit` | Ollama result → local validation. Cloud review is skipped. |
+| `rag_miss_cloud_review` | Ollama result → read-only Codex review → Ollama revision → local validation. |
+| `rag_miss_local_only` | Ollama result → local validation. Cloud credentials and fallback are forbidden. |
+
+Local-model tasks default to `execution_mode=auto`. A required cloud review is
+therefore invoked without asking the user to accept it. Use
+`execution_mode=manual` only when an explicit Product Owner decision is wanted
+before disclosure. The later candidate-promotion approval remains mandatory in
+both modes.
+
+Direct `make codex` sessions remain available for explicitly selected cloud
+work, but they are outside this governed hybrid route and do not satisfy its
+audit contract.
 
 For OpenClaw-delegated patch work:
 
@@ -302,14 +316,19 @@ For OpenClaw-delegated patch work:
 3. Have the local Ollama worker return a unified patch instead of directly
    mutating the authoritative checkout.
 4. Run `make workpacket-verify PACKET=... PATCH=...`.
-5. For development work requiring independent review, construct a minimal,
-   sanitized package and explicitly invoke Codex, Kimi, or both.
+5. If the checkpoint route is `rag_miss_cloud_review`, construct a minimal,
+   sanitized package and invoke Codex with a read-only sandbox and read-only
+   repository mount. A required review fails closed if OpenAI is unavailable.
 6. Store the exact response in `raw_output`, normalized findings in `comments`,
    and the sanitized disclosure manifest in `context_manifest` through
-   `review_record`; reproduce accepted recommendations locally and rerun
-   deterministic checks.
-7. Capture the improved result as a pending candidate. Approve only generalized,
-   validated content; only then does the outbox worker embed it in Milvus.
+   `review_record` using a non-mutating cloud verdict. Record
+   `CLOUD_REVIEW_RECORDED` with both artifact hashes. The transition fails
+   closed unless PostgreSQL has a matching review row for the same candidate,
+   workflow, provider, and model.
+7. Reproduce accepted recommendations with Ollama, rerun deterministic checks,
+   and record the locally revised pending candidate.
+8. After local validation, approve only generalized content. Wait for the
+   outbox and complete `RAG_READBACK_VERIFIED`; only then does the queue advance.
 
 Raw remote-review text is evidence, not immediately reusable truth. Maintenance
 packets are local-only and cannot request remote review, but may retrieve
@@ -330,6 +349,12 @@ Operationally verify a review learning cycle by checking:
 4. An accountable actor approves the candidate separately.
 5. The outbox worker completes `knowledge.upsert` before semantic search is
    expected to return the improvement.
+6. `RAG_READBACK_VERIFIED` returns the approved candidate UUID from backend
+   `milvus`; otherwise the checkpoint and FIFO queue remain blocked.
+
+A queued task may be removed only with an authorized `TASK_REJECTED` transition
+and immutable reason evidence. Normal backpressure is represented by `queued`,
+not by rejection.
 
 ## Rebuild Milvus
 
