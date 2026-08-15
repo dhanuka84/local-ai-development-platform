@@ -22,7 +22,7 @@ RUN npm install --global --ignore-scripts \
     @sourcegraph/scip-typescript@0.4.0 \
     @sourcegraph/scip-python@0.6.6
 
-FROM gradle:9.1.0-jdk25@sha256:d2f954187670397de6dd42c5c3a9d4535409b590059c6d248ff2a59ba67cecc3 AS gradle-tools
+FROM gradle:9.7.0-jdk25@sha256:7d4e63b32991e679b183645680ff81762b6f1ef137850d8c2750b362eb994d08 AS gradle-tools
 
 # Local-only analyzer profile. Repositories are mounted read-only and copied to
 # a disposable directory before an indexer or build tool runs.
