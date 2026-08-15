@@ -26,7 +26,7 @@ FROM gradle:9.1.0-jdk25@sha256:d2f954187670397de6dd42c5c3a9d4535409b590059c6d248
 
 # Local-only analyzer profile. Repositories are mounted read-only and copied to
 # a disposable directory before an indexer or build tool runs.
-FROM maven:3.9.11-eclipse-temurin-25@sha256:407c4423cec0cf2981055bc2c6c0dc211d9605b6669279b95997f2d1c7e91e2c AS gateway-analyzer
+FROM maven:3.9.15-eclipse-temurin-26@sha256:029a8e2838ae68238ffb8be407cddbb3f07d4d839c60c6f26c619a69fd184531 AS gateway-analyzer
 RUN apt-get update && apt-get install --yes --no-install-recommends git python3 python3-pip && \
     rm -rf /var/lib/apt/lists/*
 COPY deploy/analyzer/scip-java-runtime.pom.xml /tmp/scip-java-runtime.pom.xml
