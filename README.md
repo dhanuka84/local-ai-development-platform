@@ -87,17 +87,26 @@ Go was selected over Python for the long-running production data plane and over 
 
 ## Quick start
 
-Prerequisites: Docker Compose v2, Git, and approximately 16 GB free RAM for the infrastructure. NVIDIA GPU use additionally requires the NVIDIA Container Toolkit. The application itself is multi-architecture; the intended host is the ASUS Ascent GX10/GB10.
+Prerequisites: Docker Compose v2, Git, Python 3 with the `cryptography`
+dependency from `requirements/vault.txt`, and approximately 16 GB free RAM for
+the infrastructure. NVIDIA GPU use additionally requires the NVIDIA Container
+Toolkit. The application itself is multi-architecture; the intended host is the
+ASUS Ascent GX10/GB10.
 
-1. Create protected local configuration with independent random secrets:
+1. Create non-secret local settings and an encrypted credential vault:
 
    ```bash
    make env-init
    ```
 
-   The target never prints secrets and refuses to overwrite an existing `.env`.
+   Enter a vault passphrase when prompted. The target never prints credentials,
+   stores them encrypted in `.local/vault.json`, and refuses to overwrite an
+   existing `.env` or vault.
    `CODEGRAPH_HOST_ROOT` selects the one host directory mounted read-only at
    `/workspace` for analysis. Use an absolute path to analyze another repository.
+   Existing workstations with credentials in `.env` run
+   `make vault-import-env` instead; the command encrypts them before scrubbing
+   the legacy entries.
 
 2. Start the stack. Use `up-gpu` on the GBX100/GB10 host:
 
@@ -139,6 +148,47 @@ and timing guidance, follow the
 
 All published ports bind to `127.0.0.1`. Do not expose PostgreSQL, Milvus, Ollama, or the MCP endpoint directly to an untrusted network.
 
+## Encrypted local data backup
+
+The optional Google Drive workflow creates a consistent cold backup of
+PostgreSQL, the full Milvus dependency set (Milvus, etcd, and MinIO), and the
+artifact volume. Archives are encrypted locally with an independent vault key
+before the direct Drive API client uploads them; a Google account password is
+entered only in Google's browser flow and is never stored by this project.
+
+```bash
+make gdrive-install
+make vault-set NAME=GDRIVE_FOLDER_ID
+make vault-set NAME=GDRIVE_CLIENT_ID
+make vault-set NAME=GDRIVE_CLIENT_SECRET
+make gdrive-auth
+make gdrive-check
+make backup-gdrive BACKUP_DATA_CLASSIFICATION=approved-for-encrypted-cloud
+```
+
+Use `make download-gdrive STAMP=<stamp>` to download, authenticate, decrypt,
+and checksum a bundle without changing local volumes. Restore requires the
+additional destructive confirmation:
+
+```bash
+make restore-gdrive STAMP=<stamp> CONFIRM_RESTORE=<stamp>
+```
+
+New vaults created by `make env-init` already contain
+`BACKUP_ENCRYPTION_KEY`. For an upgraded vault, add it once with
+`make vault-set NAME=BACKUP_ENCRYPTION_KEY GENERATE=true`. Do not regenerate
+that key while backups encrypted with it must remain recoverable. Follow the
+[complete backup and restore runbook](docs/manual-backup-restore-postgres-milvus-google-drive.md)
+before the first backup or restore.
+
+At the hidden `Value for GDRIVE_FOLDER_ID:` prompt, paste either the folder URL
+or its ID. If an older checkout already has that value in `.env`, migrate and
+scrub it without printing it:
+
+```bash
+make vault-import-env NAME=GDRIVE_FOLDER_ID
+```
+
 ## Role-based commands
 
 The same canonical Make targets are grouped into four operating workflows:
@@ -168,8 +218,8 @@ Codex itself on the local Ollama model. Neither route requires
 `OPENAI_API_KEY`.
 
 The local MCP bearer token is a separate, non-billable secret used only between
-Codex and the loopback gateway. The Make targets load it from `.env` without
-printing it. OpenClaw is not required for this Codex workflow; use
+Codex and the loopback gateway. The Make targets load it from the encrypted
+local vault without printing it. OpenClaw is not required for this Codex workflow; use
 `make mcp-status` for Codex-only health checks and `make platform-status` only
 when the OpenClaw integration is also expected to be running.
 
@@ -197,7 +247,8 @@ make codex-login
 make preflight
 ```
 
-`make mcp-preflight` validates Docker access, local secrets, and Compose
+`make mcp-preflight` materializes selected credentials into protected tmpfs
+files, then validates Docker access, vault credentials, and Compose
 configuration. For the cloud route, `make preflight` additionally validates the
 stored Codex login and the `hybrid_knowledge` MCP registration. The
 project-scoped [`.codex/config.toml`](.codex/config.toml) registers the local
@@ -308,8 +359,9 @@ make dev-session-local-repo REPO=/absolute/path/to/software-repository
 ```
 
 The second target resolves the repository path, changes the Codex working
-directory, and loads `AUTH_TOKEN` as `HYBRID_AI_MCP_TOKEN` only for the child
-process. Do not copy `.env` or the bearer token into the target repository.
+directory, and loads the vault-backed `AUTH_TOKEN` as `HYBRID_AI_MCP_TOKEN`
+only for the child process. Do not copy `.env`, `.local/vault.json`, runtime
+secret files, or the bearer token into the target repository.
 
 The local launcher prints the selected model route before Codex starts. The
 Codex startup banner must also show values equivalent to:
@@ -626,7 +678,7 @@ This repository pins and tests its controller plugin against OpenClaw
    - The MCP server using `CONTROLLER_AUTH_TOKEN` and a bounded tool list.
 
 4. Start OpenClaw in its own terminal. This loads only the non-human controller
-   credential from `.env`:
+   credential from the local vault runtime files:
 
    ```bash
    make openclaw-start
@@ -635,7 +687,7 @@ This repository pins and tests its controller plugin against OpenClaw
    If another OpenClaw gateway is already reachable, the target stops before
    starting a conflicting listener and tells the operator how to resolve it.
    In particular, a separately installed systemd user service does not inherit
-   the controller credential from this repository's `.env`; stop that service
+   the controller credential from this repository's vault; stop that service
    before using this target.
 
 The default local human credential remains `AUTH_TOKEN`. It represents
@@ -787,6 +839,7 @@ See [enterprise-deployment.md](docs/enterprise-deployment.md) and the [enterpris
 - [OpenClaw agentic automation design and implementation plan](docs/openclaw-agentic-automation-plan.md)
 - [Routing capability and benchmark scorecard](docs/cost-routing-evaluation.md)
 - [Operations runbook](docs/operations.md)
+- [Manual backup, restore, and local credential vault](docs/manual-backup-restore-postgres-milvus-google-drive.md)
 - [Security model](docs/security.md)
 - [Enterprise deployment](docs/enterprise-deployment.md)
 - [Architecture diagrams and Mermaid sources](docs/diagrams/README.md)

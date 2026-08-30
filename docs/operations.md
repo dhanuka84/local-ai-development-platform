@@ -23,7 +23,7 @@ security boundaries. Do not reuse one credential for another service.
 | Boundary | Credential | Required for this deployment | Billing/data boundary |
 |---|---|---:|---|
 | Codex CLI -> OpenAI models | ChatGPT sign-in | Yes for the recommended Codex workflow | Uses the signed-in ChatGPT account/workspace entitlements and limits. It does not require OpenAI Platform API-key billing. |
-| Codex CLI -> local MCP gateway | `HYBRID_AI_MCP_TOKEN` in the Codex process | Yes in HTTP mode | Local bearer secret; it must equal the gateway's `AUTH_TOKEN` in `.env`. It is not an OpenAI token and has no model-usage charge. |
+| Codex CLI -> local MCP gateway | `HYBRID_AI_MCP_TOKEN` in the Codex process | Yes in HTTP mode | Local bearer secret; it must equal the gateway's vault-backed `AUTH_TOKEN`. It is not an OpenAI token and has no model-usage charge. |
 | OpenClaw -> local MCP gateway | `CONTROLLER_AUTH_TOKEN` | Yes for orchestration | Separate non-human controller identity. It cannot perform QA/Product Owner human gates. |
 | OpenClaw -> Kimi cloud | Moonshot/Kimi API key | Only for an explicitly selected cloud-review workflow | Moonshot cloud billing and disclosure boundary. Store it through OpenClaw's provider onboarding, not in this repository's `.env`. |
 | OpenClaw -> Ollama | No real cloud credential | Yes for local inference | Local-machine inference. A provider may require a non-secret placeholder such as `OLLAMA_API_KEY=ollama-local`. |
@@ -56,7 +56,10 @@ committing it or entering it in shell history. Project governance remains `solo`
 
 ## First-time workstation setup
 
-Prerequisites are Docker with Compose v2, Git, Codex CLI, and enough memory for the selected Ollama model. GPU mode additionally requires a supported NVIDIA driver and the NVIDIA Container Toolkit.
+Prerequisites are Docker with Compose v2, Git, Python 3 with the
+`cryptography` dependency from `requirements/vault.txt`, Codex CLI, and enough
+memory for the selected Ollama model. GPU mode additionally requires a supported
+NVIDIA driver and the NVIDIA Container Toolkit.
 
 For the end-to-end workstation procedure—including Docker group repair,
 multi-repository cloning, an explicitly destructive volume-free rebuild,
@@ -69,10 +72,14 @@ indexing requests, SQL verification, and measured timing—use the
    make env-init
    ```
 
-   This generates separate random `AUTH_TOKEN`, `CONTROLLER_AUTH_TOKEN`, and
-   `POSTGRES_PASSWORD` values,
-   writes `.env` with mode `0600`, sets `CODEGRAPH_HOST_ROOT` to this checkout,
-   and never prints the secrets. It refuses to overwrite an existing `.env`.
+   Enter a vault passphrase of at least 16 characters. This generates separate
+   random `AUTH_TOKEN`, `CONTROLLER_AUTH_TOKEN`, `POSTGRES_PASSWORD`,
+   `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`, and `BACKUP_ENCRYPTION_KEY` values
+   in the authenticated encrypted `.local/vault.json`, writes only non-secret
+   settings to `.env` with mode `0600`, sets `CODEGRAPH_HOST_ROOT` to this
+   checkout, and never prints the credentials. It refuses to overwrite existing
+   state. Workstations with legacy credentials in `.env` use
+   `make vault-import-env` once.
    Edit `CODEGRAPH_HOST_ROOT` if the analyzer needs a different narrow host
    repository or parent directory; it is mounted read-only at `/workspace`.
    Never commit `.env`.
@@ -132,7 +139,13 @@ make codex-check
 make codex
 ```
 
-`make codex` reads only `AUTH_TOKEN` from `.env`, passes it to the child Codex process as `HYBRID_AI_MCP_TOKEN`, and does not print it. It does not set or require `OPENAI_API_KEY`; Codex continues to use its stored ChatGPT sign-in. Starting plain `codex` is also valid when `HYBRID_AI_MCP_TOKEN` is already exported in that shell.
+`make codex` reads only `AUTH_TOKEN` from the protected tmpfs vault runtime,
+passes it to the child Codex process as `HYBRID_AI_MCP_TOKEN`, and does not print
+it. It does not set or require `OPENAI_API_KEY`; Codex continues to use its
+stored ChatGPT sign-in. The checked-in project configuration requires
+`hybrid_knowledge`, so a plain `codex` launch must already have
+`HYBRID_AI_MCP_TOKEN` exported. Prefer `make codex` (or `make codex-local`);
+those targets load the token and explicitly enable the required server.
 
 Inside Codex, run:
 
@@ -167,8 +180,17 @@ overrides. The target repository's trusted Codex configuration still applies.
 
 | Command | Purpose |
 |---|---|
-| `make env-init` | Create a protected `.env` with independent random local secrets; refuse overwrite. |
-| `make mcp-preflight` | Validate Docker daemon access, Git, curl, secrets, and Compose configuration. |
+| `make env-init` | Create non-secret `.env` settings and an encrypted vault with independent random credentials; refuse overwrite. |
+| `make vault-import-env [NAME=...]` | Import legacy `.env` credentials, or one named value such as `GDRIVE_FOLDER_ID`, into the encrypted vault and scrub the imported lines. |
+| `make vault-check` / `make vault-list` | Authenticate and validate the vault or list credential names without values. |
+| `make vault-set NAME=... GENERATE=true` | Rotate one credential to a generated random value; stop services first. |
+| `make vault-materialize` / `make vault-clean` | Create or remove the private tmpfs runtime credential files. |
+| `make vault-recover-runtime` | After a lost passphrase, recover an exact matching tmpfs generation into a separate encrypted vault; never overwrite the original. |
+| `make vault-test` | Test encryption, tamper rejection, file permissions, tmpfs materialization, and fail-closed recovery. |
+| `make gdrive-install` | Install the direct Drive client's pinned-range dependencies in ignored `.local/gdrive-venv`. |
+| `make gdrive-auth` / `make gdrive-check` | Authorize the `drive.file` OAuth scope, store the refresh token in the vault, or verify destination write access. |
+| `make gdrive-test` | Test backup envelope round trips, tamper rejection, key validation, and bundle checksums. |
+| `make mcp-preflight` | Materialize vault credentials and validate Docker, Git, curl, and Compose configuration. |
 | `make preflight` | Run MCP preflight plus Codex authentication/registration checks. |
 | `make mcp-start` | Start the CPU platform and HTTP MCP gateway. |
 | `make mcp-start-gpu` | Start the NVIDIA platform and HTTP MCP gateway. |
@@ -206,6 +228,10 @@ overrides. The target repository's trusted Codex configuration still applies.
 | `make worker-scale-postgres-fallback WORKER_REPLICAS=N` | Temporarily scale batched workers without restarting PostgreSQL. |
 | `make migrate-postgres-fallback` | Apply migrations to an existing PostgreSQL-only volume without requiring AGE. |
 | `make mcp-stop` | Stop the platform while retaining named volumes. |
+| `make backup-gdrive BACKUP_DATA_CLASSIFICATION=approved-for-encrypted-cloud` | Stop consistently, archive selected volumes, restart, encrypt locally, upload through the Drive API, and verify Drive SHA-256. |
+| `make download-gdrive STAMP=...` | Download, authenticate, decrypt, and checksum a complete bundle into private `.local/gdrive-downloads` without changing volumes. |
+| `make restore-gdrive STAMP=... CONFIRM_RESTORE=...` | Download and authenticate the encrypted bundle, stage it, then replace local volumes after explicit confirmation. |
+| `make backup-restore-test` | Exercise the complete workflow against disposable volumes and a fake Drive client. |
 
 ## OpenClaw client operation
 
@@ -454,25 +480,28 @@ For native STDIO operation, set `CODEGRAPH_ALLOWED_ROOTS` to an OS path-list of 
 
 ## Backup
 
-Back up independently:
+Use the implemented encrypted cold-volume workflow for local PostgreSQL,
+artifacts, etcd, MinIO, and Milvus. It validates checksums, repository/Compose
+revision evidence, and exact image IDs. See [Manual Backup and
+Restore](manual-backup-restore-postgres-milvus-google-drive.md) for setup,
+classification restrictions, commands, failure recovery, and restore tests.
 
-1. Git repositories and reviewed configuration.
-2. PostgreSQL with `pg_dump` plus regular tested restore procedures.
-3. Artifact storage, preserving paths and hashes.
-4. OpenClaw/Codex configuration and credential stores using an encrypted secret backup.
-
-Milvus backup is optional when PostgreSQL and the embedding model/version are preserved; rebuilding may be slower than restoring at enterprise scale. Ollama model files are also replaceable but expensive to download.
+Back up Git repositories and reviewed configuration independently. Do not put
+the local vault, its passphrase, plaintext credentials, personal data,
+production dumps, or unrestricted repository content into Google Drive.
 
 ## Credential rotation and revocation
 
 For the local MCP credentials:
 
 1. Stop or quiesce MCP clients.
-2. Generate new, different random values for `AUTH_TOKEN` and
-   `CONTROLLER_AUTH_TOKEN` in `.env`.
-3. Recreate the gateway with `make mcp-stop`, followed by `make mcp-start` or `make mcp-start-gpu`.
-4. Restart Codex with `make codex` and OpenClaw with `make openclaw-start`.
-5. Verify `/mcp verbose`, `platform_status`, and
+2. Stop the platform with `make mcp-stop`.
+3. Generate new, different values with
+   `make vault-set NAME=AUTH_TOKEN GENERATE=true` and
+   `make vault-set NAME=CONTROLLER_AUTH_TOKEN GENERATE=true`.
+4. Recreate the gateway with `make mcp-start` or `make mcp-start-gpu`.
+5. Restart Codex with `make codex` and OpenClaw with `make openclaw-start`.
+6. Verify `/mcp verbose`, `platform_status`, and
    `make openclaw-plugin-doctor` as applicable.
 
 The old bearer credentials become invalid after the gateway restarts. Rotate
@@ -499,10 +528,15 @@ of OpenAI.
 | Codex is billed through the OpenAI API | Codex was deliberately signed in using an API key | Run `codex logout`, then `codex login` and choose ChatGPT sign-in if subscription/workspace access is intended. |
 | `codex mcp list` says `enabled`, but tools do not work | The command confirmed registration only | Start the gateway, launch with `make codex`, and inspect `/mcp verbose`. |
 | Codex fails during startup/resume on `hybrid_knowledge` | The required MCP server is down, unreachable, or rejected its token | Start Terminal 1 first; run `make mcp-status`, then verify the token mapping and gateway logs. |
-| `make codex` reports missing `.env` or `AUTH_TOKEN` | Local configuration is absent or still contains `CHANGE_ME` | Copy `.env.example`, set real secrets, and retry. |
-| `AUTH_TOKEN is required` | HTTP mode without a token | Set a long random token in `.env`; export the matching client variable. |
-| `CONTROLLER_AUTH_TOKEN is required` | OpenClaw controller credential is absent | Run `make env-init` or set a second random token that differs from `AUTH_TOKEN`, recreate the gateway, and restart OpenClaw. |
-| MCP returns unauthorized | `HYBRID_AI_MCP_TOKEN` does not exactly match `.env` `AUTH_TOKEN` | Restart Codex with `make codex`; after rotation, recreate the gateway and restart every client. |
+| `make mcp-preflight` reports a missing vault | Local configuration is absent or credentials remain only in legacy `.env` | Run `make env-init` for a new setup or `make vault-import-env` for an existing setup. |
+| Vault authentication fails | Wrong passphrase or modified ciphertext | Verify the passphrase source. If the current private tmpfs generation still exists, do not clean or reboot: `make vault-recover-runtime` can create a separate re-encrypted vault only when its manifest hash exactly matches the current ciphertext. Otherwise restore a known-good encrypted vault; never bypass authentication. |
+| Runtime credentials are rejected as non-tmpfs | `VAULT_RUNTIME_DIR` is outside `/dev/shm`, follows a symlink, or is on a non-tmpfs mount | Use the generated `/dev/shm/hybrid-ai-platform-vault-<uid>` setting. |
+| Backup Compose validation says `VAULT_RUNTIME_DIR` is missing | The backup script was invoked directly without the materialized vault path | Use `make backup-gdrive`; it materializes credentials and passes the selected runtime directory. Direct script use must export the same `VAULT_RUNTIME_DIR`. |
+| Backup reports missing `BACKUP_ENCRYPTION_KEY` | An existing vault predates encrypted backups | Add it once with `make vault-set NAME=BACKUP_ENCRYPTION_KEY GENERATE=true`; do not rotate it while old backups must remain decryptable. |
+| Google OAuth refresh or destination write check fails | The refresh token was revoked/expired, the OAuth client changed, or the configured folder is unavailable | Update the vault-backed folder URL/ID or OAuth values as needed, run `make gdrive-auth`, then `make gdrive-check`. Drive identifiers, OAuth values, and the refresh token stay only in the vault. |
+| `AUTH_TOKEN is required` | HTTP mode cannot read a non-empty token file | Run `make vault-check`, rematerialize, and inspect the service's granted Compose secrets. |
+| `CONTROLLER_AUTH_TOKEN is required` | OpenClaw controller credential is absent | Generate the separate vault credential, recreate the gateway, and restart OpenClaw. |
+| MCP returns unauthorized | Client and gateway received different vault generations | Stop the stack, rematerialize/restart it, and restart every client. |
 | OpenClaw MCP calls return unauthorized | Its controller credential is stale or missing | Restart with `make openclaw-start`; do not substitute the human `AUTH_TOKEN`. |
 | OpenClaw is denied at QA/Product Owner gate | Expected human-only policy enforcement | Complete the gate through an authenticated human Codex/local client; do not grant the controller human roles. |
 | Search reports lexical fallback | Ollama or Milvus unavailable | Run `make doctor`; inspect service logs; local exact search remains usable. |

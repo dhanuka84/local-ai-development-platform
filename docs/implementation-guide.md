@@ -325,14 +325,19 @@ Knowledge search attempts Ollama embedding and Milvus first. If either fails and
 
 ## Configuration
 
-Configuration is environment-only and validated at startup. Important values:
+Configuration is validated at startup. Sensitive values can be supplied by
+environment variable or by the corresponding `_FILE` variable; the Compose
+deployment uses read-only files materialized from the encrypted local vault.
+Important values:
 
 | Variable | Default | Notes |
 |---|---|---|
 | `MCP_TRANSPORT` | `http` | `http` or `stdio`. |
 | `AUTH_MODE` | `token` | `none` is rejected outside local mode. |
-| `AUTH_TOKEN` | none | Local human credential; defaults to Development, QA, Product Owner, and Operations roles. |
-| `CONTROLLER_AUTH_TOKEN` | none | Separate non-human OpenClaw controller credential; must differ from `AUTH_TOKEN`. |
+| `AUTH_TOKEN` / `AUTH_TOKEN_FILE` | none | Local human credential; defaults to Development, QA, Product Owner, and Operations roles. Compose uses the file form. |
+| `CONTROLLER_AUTH_TOKEN` / `CONTROLLER_AUTH_TOKEN_FILE` | none | Separate non-human OpenClaw controller credential; must differ from `AUTH_TOKEN`. Compose uses the file form. |
+| `DATABASE_PASSWORD` / `DATABASE_PASSWORD_FILE` | none | Database password used when `DATABASE_URL` is assembled from components; Compose uses the file form. |
+| `VAULT_RUNTIME_DIR` | `/dev/shm/hybrid-ai-platform-vault-<uid>` | Host-only path to materialized credential files used by Compose; it is not a secret and must remain on private tmpfs. |
 | `AUTHORIZATION_MODE` | `none` locally, `cerbos` otherwise | Compose sets `cerbos`; `none` is rejected outside local mode. |
 | `CERBOS_ADDRESS` | `127.0.0.1:3593` | Internal PDP address; never publish it to an untrusted network. |
 | `DATABASE_URL` | local PostgreSQL | Required for all durable operations. |

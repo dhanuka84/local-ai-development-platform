@@ -93,8 +93,12 @@ cd /absolute/path/to/local-ai-development-platform
 make env-init
 ```
 
-`make env-init` creates `.env` with mode `0600` and refuses to overwrite an
-existing file. Set `CODEGRAPH_HOST_ROOT` in `.env` to the absolute
+`make env-init` creates a non-secret `.env` with mode `0600`, generates six
+independent credentials (human token, controller token, database password,
+MinIO root user/password, and backup encryption key) in
+`.local/vault.json` using authenticated encryption, and refuses to overwrite
+existing state. Enter the vault passphrase when
+prompted. Set `CODEGRAPH_HOST_ROOT` in `.env` to the absolute
 `repository_root` selected above. Compose mounts that one directory read-only
 at `/workspace`; an organization checkout is addressed as
 `/workspace/<organization>/<repository-name>`.
@@ -109,7 +113,16 @@ CODEGRAPH_MAX_RELATIONS=1000000
 ```
 
 Increase a limit only after reviewing the repository and the expected database
-growth. Keep `.env` out of Git.
+growth. Keep `.env`, `.local/vault.json`, and all materialized runtime secret
+files out of Git. Existing workstations with credentials in `.env` should run
+`make vault-import-env` once.
+
+Google Drive backup is optional and is not required for repository indexing.
+When it is enabled, store the destination folder URL/ID, OAuth client values,
+refresh token, and backup encryption key only in the existing vault. Complete
+the [manual backup and restore
+runbook](manual-backup-restore-postgres-milvus-google-drive.md) before the first
+upload; never enter or store a Google account password in this repository.
 
 Authenticate Codex and validate the complete configuration:
 

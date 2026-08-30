@@ -1,0 +1,6 @@
+-r vault.txt
+
+# OAuth desktop flow and resumable Google Drive API transfers.
+google-api-python-client>=2.100.0,<3.0.0
+google-auth>=2.30.0,<3.0.0
+google-auth-oauthlib>=1.2.0,<2.0.0

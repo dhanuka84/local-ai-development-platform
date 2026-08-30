@@ -24,5 +24,14 @@
 make fmt
 make check
 make build
-docker compose --env-file .env.example -f deploy/compose/compose.yaml config --quiet
+make mcp-preflight
+make vault-test
+make gdrive-test
+make backup-restore-test
 ```
+
+Run `make vault-test` and `make gdrive-test` for vault or Drive-client changes.
+Run the Docker-backed `make backup-restore-test` for backup/restore workflow or
+Compose secret changes. These tests use disposable credentials and a fake Drive
+client; never use real OAuth credentials, refresh tokens, vault files, or cloud
+folders in automated tests.

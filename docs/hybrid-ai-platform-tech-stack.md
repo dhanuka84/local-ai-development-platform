@@ -491,6 +491,15 @@ Back up:
 
 Do not back up Ollama model blobs unless bandwidth or availability makes re-pulling impractical. Record model names and immutable digests instead.
 
+For the implemented single-workstation deployment, the encrypted cold-volume
+workflow covers PostgreSQL, artifacts, and the complete Milvus dependency set
+(Milvus, etcd, and MinIO). It encrypts each archive locally before upload
+through the Google Drive API and verifies ciphertext plus plaintext manifests
+during restore. Follow the [manual backup and restore
+runbook](manual-backup-restore-postgres-milvus-google-drive.md). This local
+workflow complements rather than replaces enterprise `pg_dump`/PITR, managed
+secret/KMS, off-site retention, and scheduled recovery testing.
+
 ## 13. Version policy
 
 Pin exact versions in deployment automation and update deliberately:

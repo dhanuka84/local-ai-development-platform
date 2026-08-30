@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -60,7 +62,27 @@ func load(validateAuth bool) (Config, error) {
 	if environment == "local" {
 		authorizationDefault = "none"
 	}
-	authPrincipals, err := principalBootstraps()
+	authToken, err := secretValue("AUTH_TOKEN")
+	if err != nil {
+		return Config{}, err
+	}
+	controllerAuthToken, err := secretValue("CONTROLLER_AUTH_TOKEN")
+	if err != nil {
+		return Config{}, err
+	}
+	authPrincipalsJSON, err := secretValue("AUTH_PRINCIPALS_JSON")
+	if err != nil {
+		return Config{}, err
+	}
+	authPrincipals, err := principalBootstraps(authPrincipalsJSON, authToken, controllerAuthToken)
+	if err != nil {
+		return Config{}, err
+	}
+	databaseURL, err := configuredDatabaseURL()
+	if err != nil {
+		return Config{}, err
+	}
+	milvusAPIKey, err := secretValue("MILVUS_API_KEY")
 	if err != nil {
 		return Config{}, err
 	}
@@ -70,12 +92,12 @@ func load(validateAuth bool) (Config, error) {
 		HTTPAddress:            env("HTTP_ADDRESS", "127.0.0.1:8080"),
 		MCPTransport:           env("MCP_TRANSPORT", "http"),
 		AuthMode:               env("AUTH_MODE", "token"),
-		AuthToken:              os.Getenv("AUTH_TOKEN"),
+		AuthToken:              authToken,
 		AuthPrincipals:         authPrincipals,
 		AuthorizationMode:      env("AUTHORIZATION_MODE", authorizationDefault),
 		CerbosAddress:          env("CERBOS_ADDRESS", "127.0.0.1:3593"),
 		CerbosRequestTimeout:   durationEnv("CERBOS_REQUEST_TIMEOUT", 2*time.Second),
-		DatabaseURL:            env("DATABASE_URL", "postgres://hybrid:hybrid@127.0.0.1:5432/hybrid?sslmode=disable"),
+		DatabaseURL:            databaseURL,
 		GraphBackend:           env("GRAPH_BACKEND", "postgres"),
 		GraphFallbackEnabled:   boolEnv("GRAPH_FALLBACK_ENABLED", true),
 		AgeGraphName:           env("AGE_GRAPH_NAME", "software_knowledge_graph"),
@@ -85,7 +107,7 @@ func load(validateAuth bool) (Config, error) {
 		MilvusAddress:          env("MILVUS_ADDRESS", "127.0.0.1:19530"),
 		MilvusDatabase:         env("MILVUS_DATABASE", "default"),
 		MilvusCollection:       env("MILVUS_COLLECTION", "approved_knowledge_v1"),
-		MilvusAPIKey:           os.Getenv("MILVUS_API_KEY"),
+		MilvusAPIKey:           milvusAPIKey,
 		WorkerPollInterval:     durationEnv("WORKER_POLL_INTERVAL", 2*time.Second),
 		EmbeddingDimension:     intEnv("EMBEDDING_DIMENSION", 768),
 		WorkerBatchSize:        intEnv("WORKER_BATCH_SIZE", 25),
@@ -157,8 +179,8 @@ type principalBootstrapJSON struct {
 	ProjectIDs  []string `json:"project_ids"`
 }
 
-func principalBootstraps() ([]domain.PrincipalBootstrap, error) {
-	if raw := strings.TrimSpace(os.Getenv("AUTH_PRINCIPALS_JSON")); raw != "" {
+func principalBootstraps(rawJSON, token, controllerToken string) ([]domain.PrincipalBootstrap, error) {
+	if raw := strings.TrimSpace(rawJSON); raw != "" {
 		var definitions []principalBootstrapJSON
 		if err := json.Unmarshal([]byte(raw), &definitions); err != nil {
 			return nil, fmt.Errorf("parse AUTH_PRINCIPALS_JSON: %w", err)
@@ -178,7 +200,7 @@ func principalBootstraps() ([]domain.PrincipalBootstrap, error) {
 		return validatePrincipalBootstraps(result)
 	}
 	result := make([]domain.PrincipalBootstrap, 0, 2)
-	token := strings.TrimSpace(os.Getenv("AUTH_TOKEN"))
+	token = strings.TrimSpace(token)
 	if token != "" {
 		result = append(result, domain.PrincipalBootstrap{
 			ID:          env("AUTH_PRINCIPAL_ID", "human:local-developer"),
@@ -189,7 +211,7 @@ func principalBootstraps() ([]domain.PrincipalBootstrap, error) {
 			ProjectIDs:  commaListEnv("AUTH_PRINCIPAL_PROJECTS", "*"),
 		})
 	}
-	controllerToken := strings.TrimSpace(os.Getenv("CONTROLLER_AUTH_TOKEN"))
+	controllerToken = strings.TrimSpace(controllerToken)
 	if controllerToken != "" {
 		if controllerToken == token {
 			return nil, errors.New("CONTROLLER_AUTH_TOKEN must differ from AUTH_TOKEN")
@@ -200,6 +222,64 @@ func principalBootstraps() ([]domain.PrincipalBootstrap, error) {
 		})
 	}
 	return validatePrincipalBootstraps(result)
+}
+
+func secretValue(name string) (string, error) {
+	direct := os.Getenv(name)
+	path := strings.TrimSpace(os.Getenv(name + "_FILE"))
+	if direct != "" && path != "" {
+		return "", fmt.Errorf("%s and %s_FILE cannot both be set", name, name)
+	}
+	if path == "" {
+		return direct, nil
+	}
+	contents, err := os.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("read %s_FILE %q: %w", name, path, err)
+	}
+	if len(contents) > 1024*1024 {
+		return "", fmt.Errorf("%s_FILE %q exceeds 1 MiB", name, path)
+	}
+	value := strings.TrimRight(string(contents), "\r\n")
+	if value == "" {
+		return "", fmt.Errorf("%s_FILE %q is empty", name, path)
+	}
+	if strings.IndexByte(value, 0) >= 0 {
+		return "", fmt.Errorf("%s_FILE %q contains a NUL byte", name, path)
+	}
+	return value, nil
+}
+
+func configuredDatabaseURL() (string, error) {
+	configuredURL, err := secretValue("DATABASE_URL")
+	if err != nil {
+		return "", err
+	}
+	if strings.TrimSpace(configuredURL) != "" {
+		return strings.TrimSpace(configuredURL), nil
+	}
+	password, err := secretValue("DATABASE_PASSWORD")
+	if err != nil {
+		return "", err
+	}
+	if password == "" {
+		return "postgres://hybrid:hybrid@127.0.0.1:5432/hybrid?sslmode=disable", nil
+	}
+	host := env("DATABASE_HOST", "127.0.0.1")
+	port := env("DATABASE_PORT", "5432")
+	user := env("DATABASE_USER", "hybrid")
+	database := env("DATABASE_NAME", "hybrid")
+	sslMode := env("DATABASE_SSLMODE", "disable")
+	parsed := url.URL{
+		Scheme: "postgres",
+		User:   url.UserPassword(user, password),
+		Host:   net.JoinHostPort(host, port),
+		Path:   database,
+	}
+	query := parsed.Query()
+	query.Set("sslmode", sslMode)
+	parsed.RawQuery = query.Encode()
+	return parsed.String(), nil
 }
 
 func validatePrincipalBootstraps(principals []domain.PrincipalBootstrap) ([]domain.PrincipalBootstrap, error) {

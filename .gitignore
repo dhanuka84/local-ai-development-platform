@@ -1,12 +1,21 @@
 # Local configuration and secrets
 .env
 *.local
+# Vault ciphertext, recovery copies, passphrase files, and local backup state.
+# These explicit rules document the sensitive artifacts; .local/ is the final
+# catch-all for any future vault-managed files.
+.local/vault*.json
+.local/*passphrase*
+.local/gdrive*.json
+.local/
 
 # Build/test output
 bin/
 coverage.out
 *.test
 node_modules/
+__pycache__/
+*.pyc
 
 # Runtime data
 data/

@@ -3,7 +3,12 @@ name: hybrid-ai-platform
 x-platform-environment: &platform-environment
   APP_ENV: local
   LOG_LEVEL: ${LOG_LEVEL:-info}
-  DATABASE_URL: postgres://hybrid:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/hybrid?sslmode=disable
+  DATABASE_HOST: postgres
+  DATABASE_PORT: "5432"
+  DATABASE_USER: hybrid
+  DATABASE_NAME: hybrid
+  DATABASE_SSLMODE: disable
+  DATABASE_PASSWORD_FILE: /run/secrets/postgres_password
   GRAPH_BACKEND: apache-age
   GRAPH_FALLBACK_ENABLED: ${GRAPH_FALLBACK_ENABLED:-true}
   AGE_GRAPH_NAME: ${AGE_GRAPH_NAME:-software_knowledge_graph}
@@ -19,11 +24,14 @@ x-platform-environment: &platform-environment
   AUTHORIZATION_MODE: ${AUTHORIZATION_MODE:-cerbos}
   CERBOS_ADDRESS: cerbos:3593
   CERBOS_REQUEST_TIMEOUT: ${CERBOS_REQUEST_TIMEOUT:-2s}
-  AUTH_TOKEN: ${AUTH_TOKEN:?set AUTH_TOKEN in .env}
   CODEGRAPH_ENABLED: "false"
   CODEGRAPH_MAX_FILES: ${CODEGRAPH_MAX_FILES:-5000}
   CODEGRAPH_MAX_ENTITIES: ${CODEGRAPH_MAX_ENTITIES:-200000}
   CODEGRAPH_MAX_RELATIONS: ${CODEGRAPH_MAX_RELATIONS:-1000000}
+
+x-auth-environment: &auth-environment
+  AUTH_TOKEN_FILE: /run/secrets/auth_token
+  CONTROLLER_AUTH_TOKEN_FILE: /run/secrets/controller_auth_token
 
 services:
   cerbos:
@@ -47,11 +55,13 @@ services:
     environment:
       POSTGRES_DB: hybrid
       POSTGRES_USER: hybrid
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
+    secrets:
+      - postgres_password
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U hybrid -d hybrid"]
       interval: 5s
@@ -79,13 +89,16 @@ services:
   minio:
     image: minio/minio:RELEASE.2024-12-18T13-15-44Z
     environment:
-      MINIO_ACCESS_KEY: minioadmin
-      MINIO_SECRET_KEY: minioadmin
+      MINIO_ROOT_USER_FILE: /run/secrets/minio_root_user
+      MINIO_ROOT_PASSWORD_FILE: /run/secrets/minio_root_password
     command: minio server /minio_data --console-address ":9001"
     ports:
       - "127.0.0.1:9001:9001"
     volumes:
       - minio-data:/minio_data
+    secrets:
+      - minio_root_user
+      - minio_root_password
     healthcheck:
       test: ["CMD", "mc", "ready", "local"]
       interval: 10s
@@ -95,7 +108,13 @@ services:
 
   milvus:
     image: milvusdb/milvus:v2.6.21
-    command: ["milvus", "run", "standalone"]
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        export MINIO_ACCESS_KEY_ID="$$(cat /run/secrets/minio_root_user)"
+        export MINIO_SECRET_ACCESS_KEY="$$(cat /run/secrets/minio_root_password)"
+        exec milvus run standalone
     security_opt:
       - seccomp:unconfined
     environment:
@@ -107,6 +126,9 @@ services:
       - "127.0.0.1:9091:9091"
     volumes:
       - milvus-data:/var/lib/milvus
+    secrets:
+      - minio_root_user
+      - minio_root_password
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
       interval: 10s
@@ -158,7 +180,12 @@ services:
       context: ../..
       target: admin
     command: ["migrate"]
-    environment: *platform-environment
+    environment:
+      <<: [*platform-environment, *auth-environment]
+    secrets:
+      - postgres_password
+      - auth_token
+      - controller_auth_token
     depends_on:
       postgres:
         condition: service_healthy
@@ -170,6 +197,8 @@ services:
       target: admin
     command: ["milvus-init"]
     environment: *platform-environment
+    secrets:
+      - postgres_password
     depends_on:
       milvus:
         condition: service_healthy
@@ -180,12 +209,10 @@ services:
       context: ../..
       target: gateway-analyzer
     environment:
-      <<: *platform-environment
+      <<: [*platform-environment, *auth-environment]
       HTTP_ADDRESS: 0.0.0.0:8080
       MCP_TRANSPORT: http
       AUTH_MODE: token
-      AUTH_TOKEN: ${AUTH_TOKEN:?set AUTH_TOKEN in .env}
-      CONTROLLER_AUTH_TOKEN: ${CONTROLLER_AUTH_TOKEN:?set CONTROLLER_AUTH_TOKEN in .env}
       CONTROLLER_AUTH_PROJECTS: ${CONTROLLER_AUTH_PROJECTS:-*}
       CODEGRAPH_ENABLED: "true"
       CODEGRAPH_ALLOWED_ROOTS: /workspace
@@ -196,6 +223,10 @@ services:
       - artifact-data:/var/lib/hybrid-ai/artifacts
       - analyzer-cache:/var/cache/hybrid-analyzer
       - ${CODEGRAPH_HOST_ROOT:-../..}:/workspace:ro
+    secrets:
+      - postgres_password
+      - auth_token
+      - controller_auth_token
     depends_on:
       cerbos:
         condition: service_healthy
@@ -216,6 +247,8 @@ services:
     environment: *platform-environment
     volumes:
       - artifact-data:/var/lib/hybrid-ai/artifacts
+    secrets:
+      - postgres_password
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -234,3 +267,15 @@ volumes:
   ollama-data:
   artifact-data:
   analyzer-cache:
+
+secrets:
+  auth_token:
+    file: ${VAULT_RUNTIME_DIR:?set VAULT_RUNTIME_DIR to the materialized local-vault directory}/AUTH_TOKEN
+  controller_auth_token:
+    file: ${VAULT_RUNTIME_DIR:?set VAULT_RUNTIME_DIR to the materialized local-vault directory}/CONTROLLER_AUTH_TOKEN
+  postgres_password:
+    file: ${VAULT_RUNTIME_DIR:?set VAULT_RUNTIME_DIR to the materialized local-vault directory}/POSTGRES_PASSWORD
+  minio_root_user:
+    file: ${VAULT_RUNTIME_DIR:?set VAULT_RUNTIME_DIR to the materialized local-vault directory}/MINIO_ROOT_USER
+  minio_root_password:
+    file: ${VAULT_RUNTIME_DIR:?set VAULT_RUNTIME_DIR to the materialized local-vault directory}/MINIO_ROOT_PASSWORD

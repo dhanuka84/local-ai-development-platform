@@ -1,7 +1,9 @@
 package config
 
 import (
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -150,5 +152,70 @@ func TestLoadParsesGraphBackend(t *testing.T) {
 	t.Setenv("GRAPH_BACKEND", "neo4j")
 	if _, err := LoadCLI(); err == nil {
 		t.Fatal("LoadCLI accepted an unsupported graph backend")
+	}
+}
+
+func TestLoadReadsCredentialsFromSecretFiles(t *testing.T) {
+	directory := t.TempDir()
+	writeSecret := func(name, value string) string {
+		t.Helper()
+		path := filepath.Join(directory, name)
+		if err := os.WriteFile(path, []byte(value+"\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		return path
+	}
+	t.Setenv("AUTH_TOKEN", "")
+	t.Setenv("CONTROLLER_AUTH_TOKEN", "")
+	t.Setenv("DATABASE_URL", "")
+	t.Setenv("AUTH_TOKEN_FILE", writeSecret("auth", "human-secret"))
+	t.Setenv("CONTROLLER_AUTH_TOKEN_FILE", writeSecret("controller", "controller-secret"))
+	t.Setenv("DATABASE_PASSWORD_FILE", writeSecret("postgres", "p@ss:/word"))
+	t.Setenv("DATABASE_HOST", "postgres")
+	t.Setenv("AUTH_PRINCIPALS_JSON", "")
+
+	cfg, err := LoadCLI()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.AuthToken != "human-secret" || len(cfg.AuthPrincipals) != 2 {
+		t.Fatalf("file-backed auth config = %#v", cfg.AuthPrincipals)
+	}
+	if !strings.Contains(cfg.DatabaseURL, "p%40ss%3A%2Fword@postgres:5432/hybrid") {
+		t.Fatalf("DATABASE_URL did not safely escape the file-backed password: %s", cfg.DatabaseURL)
+	}
+}
+
+func TestLoadReadsPrincipalJSONFromSecretFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "principals.json")
+	contents := `[{"id":"agent:controller","token":"secret","roles":["controller"],"project_ids":["project"]}]`
+	if err := os.WriteFile(path, []byte(contents), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("AUTH_PRINCIPALS_JSON", "")
+	t.Setenv("AUTH_PRINCIPALS_JSON_FILE", path)
+	t.Setenv("AUTH_TOKEN", "")
+	t.Setenv("AUTH_TOKEN_FILE", "")
+	t.Setenv("CONTROLLER_AUTH_TOKEN", "")
+	t.Setenv("CONTROLLER_AUTH_TOKEN_FILE", "")
+	cfg, err := LoadCLI()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.AuthPrincipals) != 1 || cfg.AuthPrincipals[0].ID != "agent:controller" {
+		t.Fatalf("principals = %#v", cfg.AuthPrincipals)
+	}
+}
+
+func TestLoadRejectsAmbiguousOrMissingSecretFiles(t *testing.T) {
+	t.Setenv("AUTH_TOKEN", "direct-secret")
+	t.Setenv("AUTH_TOKEN_FILE", filepath.Join(t.TempDir(), "auth"))
+	if _, err := LoadCLI(); err == nil || !strings.Contains(err.Error(), "cannot both be set") {
+		t.Fatalf("LoadCLI ambiguous source error = %v", err)
+	}
+
+	t.Setenv("AUTH_TOKEN", "")
+	if _, err := LoadCLI(); err == nil || !strings.Contains(err.Error(), "read AUTH_TOKEN_FILE") {
+		t.Fatalf("LoadCLI missing file error = %v", err)
 	}
 }

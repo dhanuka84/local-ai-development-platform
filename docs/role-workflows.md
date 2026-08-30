@@ -41,7 +41,7 @@ and projection health.
 
 ```bash
 make env-init
-# Review .env, especially CODEGRAPH_HOST_ROOT and model settings.
+# Enter the vault passphrase, then review non-secret .env settings.
 make openclaw-setup
 make mcp-preflight
 make ops-start-gpu       # or: make ops-start
@@ -329,7 +329,7 @@ Operations
 
 | Role | Workflow commands | Canonical/supporting commands |
 |---|---|---|
-| Operations | `ops-start`, `ops-start-gpu`, `ops-status`, `ops-logs`, `ops-stop`, `ops-doctor`, `ops-reindex` | `env-init`, `mcp-preflight`, `migrate`, `migrate-postgres-fallback`, `age-rebuild`, `milvus-init`, `repository-org-sync`, `repository-org-catalog`, `repository-org-index`, `repository-org-wait`, `repository-org-verify`, `compact-code-outbox`, `worker-scale-postgres-fallback`, `up`, `up-gpu`, `rebuild-fresh`, `rebuild-fresh-gpu`, `down`, `logs`, `mcp-start`, `mcp-start-gpu`, `mcp-status`, `mcp-logs`, `mcp-stop`, `doctor`, `reindex`, `pull-local-model`, `models-list`, `openclaw-config-check`, `openclaw-config-plan`, `openclaw-config-apply`, `openclaw-plugin-install`, `openclaw-setup`, `openclaw-start`, `openclaw-status`, `platform-status` |
+| Operations | `ops-start`, `ops-start-gpu`, `ops-status`, `ops-logs`, `ops-stop`, `ops-doctor`, `ops-reindex` | `env-init`, `vault-init`, `vault-import-env`, `vault-set`, `vault-check`, `vault-list`, `vault-materialize`, `vault-clean`, `vault-test`, `gdrive-install`, `gdrive-auth`, `gdrive-check`, `gdrive-test`, `backup-gdrive`, `download-gdrive`, `restore-gdrive`, `backup-restore-test`, `mcp-preflight`, `migrate`, `migrate-postgres-fallback`, `age-rebuild`, `milvus-init`, `repository-org-sync`, `repository-org-catalog`, `repository-org-index`, `repository-org-wait`, `repository-org-verify`, `compact-code-outbox`, `worker-scale-postgres-fallback`, `up`, `up-gpu`, `rebuild-fresh`, `rebuild-fresh-gpu`, `down`, `logs`, `mcp-start`, `mcp-start-gpu`, `mcp-status`, `mcp-logs`, `mcp-stop`, `doctor`, `reindex`, `pull-local-model`, `models-list`, `openclaw-config-check`, `openclaw-config-plan`, `openclaw-config-apply`, `openclaw-plugin-install`, `openclaw-setup`, `openclaw-start`, `openclaw-status`, `platform-status` |
 | Development | `dev-session`, `dev-session-repo`, `dev-policy-check`, `dev-patch-verify`, `dev-check`, `dev-authz-policy-test` | `codex-login`, `codex-check`, `codex`, `codex-repo`, `preflight`, `fmt`, `test`, `check`, `build`, `workpacket-build`, `workpacket-evaluate`, `workpacket-verify`, `authz-policy-test`, `diagram-review-loop`, `diagram-agentic-workflow`, `clean`, plus MCP retrieval/capture/review tools |
 | QA | `qa-session`, `qa-session-repo`, `qa-patch-verify`, `qa-check`, `qa-authz-policy-test`, `qa-candidates`, `qa-candidate-get` | `candidate-list`, `candidate-get`, `codex-check`, `test`, `check`, `workpacket-verify`, `authz-policy-test`, plus MCP `review_record` |
 | Product Owner | `po-candidates`, `po-candidate-get`, `po-approve`, `po-reject` | `candidate-list`, `candidate-get`, `candidate-approve`, `candidate-reject` |

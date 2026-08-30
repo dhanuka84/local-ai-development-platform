@@ -44,8 +44,24 @@ agent's auth store or environment.
   Operations roles for all projects, so one developer can operate every gate.
 - OpenClaw uses a separate non-human controller credential that cannot cross
   QA or Product Owner human gates. The two local tokens must differ.
-- Tokens come from environment variables, are stored only as SHA-256 hashes in
-  PostgreSQL, and are not stored as plaintext in example configuration.
+- Local credentials are encrypted at rest in the Python vault with a
+  scrypt-derived AES-256-GCM key. The passphrase and derived key are not stored.
+  Selected plaintext files exist only in a private `/dev/shm` directory and are
+  granted to Compose services individually. The Go configuration accepts
+  fail-closed `_FILE` sources. Bearer tokens are stored only as SHA-256 hashes
+  in PostgreSQL and are never plaintext in example configuration.
+- MinIO's root identity is independently generated in the vault. MinIO reads
+  both values from secret files, while Milvus reads the same two files only at
+  process startup to authenticate its object-store connection.
+- Lost-passphrase recovery is possible only while the exact current tmpfs
+  generation survives. Recovery checks the runtime manifest against the
+  encrypted vault hash and writes a separate new vault without changing the
+  original.
+- The same vault stores the Google Drive destination URL/ID, OAuth client
+  credentials, refresh token, and an independent backup key. The direct Drive
+  client requests `drive.file`, does not emit Drive identifiers in receipts,
+  encrypts every object locally with AES-256-GCM, and verifies Drive's
+  ciphertext SHA-256 before marking a backup complete.
 - Origin protection, body limits, server timeouts, and constant-time token comparison are enabled.
 - Worker/admin and production gateway images are static and non-root. The local analyzer-enabled gateway is non-root but includes Git and Go because `go/packages` needs the toolchain.
 - Artifacts use SHA-256 addressing, atomic publication, and mode `0600`.
@@ -123,7 +139,11 @@ Before internet or enterprise exposure, add:
 | Client timeout causes a duplicate repository scan | Treat timeout as ambiguous, inspect the active head, rerun the idempotent Make workflow, and compact only superseded outbox events. |
 | Analyzer reads unrelated host files | Read-only narrow bind mount plus canonical-path allowlist; never mount a home directory or filesystem root. |
 | Malicious or oversized repository exhausts resources | File/entity/relation caps locally; enterprise analyzers require sandbox CPU, memory, process, network, and deadline controls. |
-| Token disclosure in Git | Environment references, `.env` ignored, examples contain placeholders only. |
+| Token disclosure in Git or `.env` | Encrypted ignored vault, tmpfs runtime files, Compose secret mounts, `.env` migration/scrubbing, and placeholder-free examples. |
+| Vault ciphertext is modified or decrypted with the wrong passphrase | AES-GCM authentication fails closed before any credential is materialized. |
+| Vault passphrase is brute-forced offline | Unique salt plus bounded memory-hard scrypt parameters; operators must use a passphrase of at least 16 characters. |
+| Google Drive destination, OAuth credential, or refresh token leaks from local configuration | Store all of them only inside the authenticated encrypted vault; the client does not put them on command lines or emit Drive identifiers in receipts. |
+| Drive backup ciphertext is corrupted or the backup key is wrong | Compare Drive and local ciphertext SHA-256, authenticate AES-GCM before publishing plaintext, validate the plaintext checksum manifest, and stage every volume before replacement. |
 | DNS rebinding/cross-origin local attack | SDK localhost protection plus Go cross-origin protection. |
 | Worker crash loses indexing | Durable outbox, reclaimable locks, retries, idempotent Milvus upsert. |
 | Multiple workers duplicate vector publication | PostgreSQL row locking with `SKIP LOCKED`, stable UUID primary keys, batched idempotent Milvus upserts, and active-head hydration. |

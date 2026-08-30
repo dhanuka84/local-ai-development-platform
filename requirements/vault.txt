@@ -1,0 +1,2 @@
+# AES-GCM and scrypt primitives used by scripts/local_vault.py.
+cryptography>=41.0.0,<50.0.0

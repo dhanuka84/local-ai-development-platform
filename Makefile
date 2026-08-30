@@ -1,5 +1,21 @@
 SHELL := /bin/sh
-COMPOSE := docker compose --env-file .env -f deploy/compose/compose.yaml
+VAULT_FILE ?= $(shell sed -n 's/^[[:space:]]*VAULT_FILE[[:space:]]*=[[:space:]]*//p' .env 2>/dev/null | tail -n 1)
+ifeq ($(strip $(VAULT_FILE)),)
+VAULT_FILE := .local/vault.json
+endif
+VAULT_RUNTIME_DIR ?= $(shell sed -n 's/^[[:space:]]*VAULT_RUNTIME_DIR[[:space:]]*=[[:space:]]*//p' .env 2>/dev/null | tail -n 1)
+ifeq ($(strip $(VAULT_RUNTIME_DIR)),)
+VAULT_RUNTIME_DIR := /dev/shm/hybrid-ai-platform-vault-$(shell id -u)
+endif
+VAULT_PASSPHRASE_FILE ?=
+VAULT := python3 scripts/local_vault.py --vault "$(VAULT_FILE)"
+GDRIVE_PYTHON ?= .local/gdrive-venv/bin/python
+GDRIVE := $(GDRIVE_PYTHON) scripts/gdrive_client.py --vault "$(VAULT_FILE)"
+ifneq ($(strip $(VAULT_PASSPHRASE_FILE)),)
+VAULT := $(VAULT) --passphrase-file "$(VAULT_PASSPHRASE_FILE)"
+GDRIVE := $(GDRIVE) --passphrase-file "$(VAULT_PASSPHRASE_FILE)"
+endif
+COMPOSE := VAULT_RUNTIME_DIR="$(VAULT_RUNTIME_DIR)" docker compose --env-file .env -f deploy/compose/compose.yaml
 MCP_BASE_URL ?= http://127.0.0.1:8080
 MCP_URL := $(MCP_BASE_URL)/mcp
 PROJECT ?=
@@ -18,6 +34,15 @@ FORCE ?= false
 WAIT_TIMEOUT ?= 3600
 WORKER_REPLICAS ?= 1
 CONFIRM_DESTROY ?=
+STAMP ?=
+BACKUP_ROOT ?=
+DOWNLOAD_ROOT ?= .local/gdrive-downloads
+RESTORE_WORK_ROOT ?=
+BACKUP_DATA_CLASSIFICATION ?=
+INCLUDE_OLLAMA ?= false
+INCLUDE_ANALYZER_CACHE ?= false
+CONFIRM_RESTORE ?=
+ALLOW_VERSION_MISMATCH ?= false
 CODEX_LOCAL_MODEL ?= $(shell sed -n 's/^[[:space:]]*LOCAL_CHAT_MODEL[[:space:]]*=[[:space:]]*//p' .env 2>/dev/null | tail -n 1)
 ifeq ($(strip $(CODEX_LOCAL_MODEL)),)
 CODEX_LOCAL_MODEL := qwen3.6:35b
@@ -37,6 +62,7 @@ OPENCLAW_MCP_SERVER := hybridKnowledge
 CODEX_MCP_ARGS := \
 	-c 'mcp_servers.hybrid_knowledge.url="$(MCP_URL)"' \
 	-c 'mcp_servers.hybrid_knowledge.bearer_token_env_var="HYBRID_AI_MCP_TOKEN"' \
+	-c 'mcp_servers.hybrid_knowledge.enabled=true' \
 	-c 'mcp_servers.hybrid_knowledge.required=true' \
 	-c 'mcp_servers.hybrid_knowledge.startup_timeout_sec=20' \
 	-c 'mcp_servers.hybrid_knowledge.tool_timeout_sec=1200' \
@@ -51,7 +77,7 @@ CODEX_LOCAL_ARGS := \
 	-c 'model_catalog_json="$(CODEX_LOCAL_MODEL_CATALOG)"' \
 	-c 'model_reasoning_effort="$(CODEX_LOCAL_REASONING_EFFORT)"'
 
-.PHONY: help help-operations help-development help-qa help-product-owner env-init mcp-preflight preflight fmt fmt-container check check-container check-all integration-test-fresh test build migrate migrate-postgres-fallback age-rebuild milvus-init doctor reindex compact-code-outbox worker-refresh-postgres-fallback worker-scale-postgres-fallback candidate-list candidate-get candidate-approve candidate-reject mcp-call repository-sync-one repository-index-one repository-verify-one repository-index-one-all repository-org-sync repository-org-catalog repository-org-index repository-org-queue-status repository-org-wait repository-org-verify repository-org-index-all up up-gpu rebuild-fresh rebuild-fresh-gpu down logs mcp-start mcp-start-gpu mcp-status mcp-logs mcp-stop codex-login codex-check codex-route codex-local-check codex-local-smoke hybrid-verify-static hybrid-verify-image hybrid-verify codex codex-repo codex-local codex-local-repo workpacket-build workpacket-evaluate workpacket-verify authz-policy-test contracts-check openclaw-plugin-deps openclaw-plugin-check openclaw-config-check openclaw-config-plan openclaw-config-apply openclaw-plugin-build openclaw-plugin-install openclaw-plugin-doctor openclaw-setup openclaw-start openclaw-status platform-status diagram-local-architecture diagram-enterprise-architecture diagram-local-to-enterprise diagram-review-loop diagram-agentic-workflow pull-local-model models-list clean ops-start ops-start-gpu ops-status ops-logs ops-stop ops-doctor ops-reindex dev-session dev-session-repo dev-session-local dev-session-local-repo dev-policy-check dev-patch-verify dev-check dev-authz-policy-test qa-session qa-session-repo qa-session-local qa-session-local-repo qa-patch-verify qa-check qa-authz-policy-test qa-candidates qa-candidate-get po-candidates po-candidate-get po-approve po-reject
+.PHONY: help help-operations help-development help-qa help-product-owner env-init vault-init vault-import-env vault-set vault-list vault-check vault-materialize vault-recover-runtime vault-clean vault-test gdrive-install gdrive-auth gdrive-check gdrive-test backup-gdrive download-gdrive restore-gdrive backup-restore-test mcp-preflight preflight fmt fmt-container check check-container check-all integration-test-fresh test build migrate migrate-postgres-fallback age-rebuild milvus-init doctor reindex compact-code-outbox worker-refresh-postgres-fallback worker-scale-postgres-fallback candidate-list candidate-get candidate-approve candidate-reject mcp-call repository-sync-one repository-index-one repository-verify-one repository-index-one-all repository-org-sync repository-org-catalog repository-org-index repository-org-queue-status repository-org-wait repository-org-verify repository-org-index-all up up-gpu rebuild-fresh rebuild-fresh-gpu down logs mcp-start mcp-start-gpu mcp-status mcp-logs mcp-stop codex-login codex-check codex-route codex-local-check codex-local-smoke hybrid-verify-static hybrid-verify-image hybrid-verify codex codex-repo codex-local codex-local-repo workpacket-build workpacket-evaluate workpacket-verify authz-policy-test contracts-check openclaw-plugin-deps openclaw-plugin-check openclaw-config-check openclaw-config-plan openclaw-config-apply openclaw-plugin-build openclaw-plugin-install openclaw-plugin-doctor openclaw-setup openclaw-start openclaw-status platform-status diagram-local-architecture diagram-enterprise-architecture diagram-local-to-enterprise diagram-review-loop diagram-agentic-workflow pull-local-model models-list clean ops-start ops-start-gpu ops-status ops-logs ops-stop ops-doctor ops-reindex dev-session dev-session-repo dev-session-local dev-session-local-repo dev-policy-check dev-patch-verify dev-check dev-authz-policy-test qa-session qa-session-repo qa-session-local qa-session-local-repo qa-patch-verify qa-check qa-authz-policy-test qa-candidates qa-candidate-get po-candidates po-candidate-get po-approve po-reject
 
 help: ## Show all commands plus role-specific workflow guides
 	@printf '%s\n' \
@@ -85,6 +111,12 @@ help-operations: ## Show the Operations workflow and commands
 		'' \
 		'Administration:' \
 		'  make migrate | make age-rebuild | make milvus-init | make ops-doctor | make ops-reindex' \
+		'  make vault-check | make vault-list | make vault-set NAME=<name> GENERATE=true' \
+		'  make vault-import-env NAME=GDRIVE_FOLDER_ID  # migrate and scrub an older .env value' \
+		'  make gdrive-install | make gdrive-auth | make gdrive-check' \
+		'  make backup-gdrive BACKUP_DATA_CLASSIFICATION=approved-for-encrypted-cloud' \
+		'  make download-gdrive STAMP=<stamp> [DOWNLOAD_ROOT=.local/gdrive-downloads]' \
+		'  make restore-gdrive STAMP=<stamp> CONFIRM_RESTORE=<stamp>' \
 		'  Destructive fresh images: make rebuild-fresh-gpu CONFIRM_DESTROY=all-platform-data' \
 		'' \
 		'GitHub organization indexing:' \
@@ -145,39 +177,97 @@ help-product-owner: ## Show the Product Owner workflow and commands
 		'     or: make po-reject ID=<candidate-uuid>' \
 		'  5. Operations monitors outbox/index completion'
 
-env-init: ## Create .env with random local secrets; never overwrites an existing file
-	@command -v openssl >/dev/null 2>&1 || { echo "openssl is required" >&2; exit 1; }
+env-init: ## Create non-secret .env settings and an encrypted credential vault
+	@command -v python3 >/dev/null 2>&1 || { echo "python3 is required" >&2; exit 1; }
+	@python3 -c 'import cryptography' >/dev/null 2>&1 || { echo "install requirements/vault.txt" >&2; exit 1; }
 	@test -f .env.example || { echo "missing .env.example" >&2; exit 1; }
 	@test ! -e .env || { echo ".env already exists; refusing to overwrite it" >&2; exit 1; }
+	@test ! -e "$(VAULT_FILE)" || { echo "vault already exists; refusing to create a mismatched .env" >&2; exit 1; }
 	@umask 077; \
 	env_tmp=$$(mktemp .env.tmp.XXXXXX); \
 	trap 'rm -f "$$env_tmp"' 0 1 2 3 15; \
-	auth_token_value=$$(openssl rand -hex 32); \
-	controller_auth_token_value=$$(openssl rand -hex 32); \
-	postgres_password_value=$$(openssl rand -hex 32); \
 	workspace_root=$$(pwd -P); \
+	runtime_dir="/dev/shm/hybrid-ai-platform-vault-$$(id -u)"; \
 	sed \
-		-e "s|^AUTH_TOKEN=CHANGE_ME.*|AUTH_TOKEN=$$auth_token_value|" \
-		-e "s|^CONTROLLER_AUTH_TOKEN=CHANGE_ME.*|CONTROLLER_AUTH_TOKEN=$$controller_auth_token_value|" \
-		-e "s|^POSTGRES_PASSWORD=CHANGE_ME.*|POSTGRES_PASSWORD=$$postgres_password_value|" \
+		-e "s|^VAULT_RUNTIME_DIR=.*|VAULT_RUNTIME_DIR=$$runtime_dir|" \
 		-e "s|^CODEGRAPH_HOST_ROOT=.*|CODEGRAPH_HOST_ROOT=$$workspace_root|" \
 		.env.example > "$$env_tmp"; \
 	chmod 600 "$$env_tmp"; \
 	mv "$$env_tmp" .env; \
-	echo "created .env with mode 0600; secrets were not printed"
+	echo "created non-secret .env with mode 0600"
+	@$(MAKE) --no-print-directory vault-init
 
-mcp-preflight: ## Validate local tools, .env secrets, and Compose configuration
+vault-init: ## Create the encrypted vault and generate independent local credentials
+	@command -v python3 >/dev/null 2>&1 || { echo "python3 is required" >&2; exit 1; }
+	@python3 -c 'import cryptography' >/dev/null 2>&1 || { echo "install requirements/vault.txt" >&2; exit 1; }
+	@$(VAULT) init
+
+vault-import-env: ## Import legacy .env credentials (or NAME) into the vault and scrub them
+	@test -f .env || { echo "missing .env" >&2; exit 1; }
+	@if test -n "$(NAME)"; then \
+		$(VAULT) import-env --env-file .env --name "$(NAME)" --scrub; \
+	else \
+		$(VAULT) import-env --env-file .env --scrub; \
+	fi
+
+vault-set: ## Set or generate NAME in the encrypted vault; use GENERATE=true for a random value
+	@test -n "$(NAME)" || { echo "usage: make vault-set NAME=<credential> [GENERATE=true]" >&2; exit 1; }
+	@case "$(GENERATE)" in true) generate_arg=--generate;; ""|false) generate_arg=;; *) echo "GENERATE must be true or false" >&2; exit 1;; esac; \
+	$(VAULT) set "$(NAME)" $$generate_arg
+
+vault-list: ## Authenticate and list vault credential names without values
+	@$(VAULT) list
+
+vault-check: ## Authenticate and validate the encrypted vault
+	@$(VAULT) check
+
+vault-materialize: ## Materialize required credentials into protected tmpfs files
+	@test -f "$(VAULT_FILE)" || { echo "missing encrypted vault; run 'make vault-init' or 'make vault-import-env'" >&2; exit 1; }
+	@$(VAULT) materialize --runtime-dir "$(VAULT_RUNTIME_DIR)"
+
+vault-recover-runtime: ## Recover matching tmpfs credentials into a separate vault with a new passphrase
+	@test -f "$(VAULT_FILE)" || { echo "missing encrypted vault" >&2; exit 1; }
+	@test ! -e "$(dir $(VAULT_FILE))$(basename $(notdir $(VAULT_FILE))).recovered$(suffix $(VAULT_FILE))" || { echo "recovered vault already exists; refusing to overwrite it" >&2; exit 1; }
+	@$(VAULT) recover-runtime --runtime-dir "$(VAULT_RUNTIME_DIR)"
+
+vault-clean: ## Remove materialized tmpfs credentials (encrypted vault is retained)
+	@$(VAULT) clean --runtime-dir "$(VAULT_RUNTIME_DIR)"
+
+vault-test: ## Run authenticated-encryption and runtime-secret tests
+	@python3 scripts/local_vault_test.py
+
+gdrive-install: ## Install the Google Drive client in an ignored local virtual environment
+	@python3 -m venv .local/gdrive-venv
+	@.local/gdrive-venv/bin/python -m pip install --disable-pip-version-check -r requirements/gdrive.txt
+
+gdrive-auth: ## Authorize Drive in a browser and store the refresh token in the vault
+	@$(GDRIVE_PYTHON) -c 'import googleapiclient,google_auth_oauthlib' >/dev/null 2>&1 || { echo "run 'make gdrive-install'" >&2; exit 1; }
+	@$(GDRIVE) auth
+
+gdrive-check: ## Verify vault-backed OAuth and writable Drive folder access
+	@$(GDRIVE_PYTHON) -c 'import googleapiclient,google_auth_oauthlib' >/dev/null 2>&1 || { echo "run 'make gdrive-install'" >&2; exit 1; }
+	@$(GDRIVE) check
+
+gdrive-test: ## Run client-side encryption and bundle-validation tests
+	@python3 scripts/gdrive_client_test.py
+
+mcp-preflight: vault-materialize ## Validate local tools, vault credentials, and Compose configuration
 	@command -v docker >/dev/null 2>&1 || { echo "docker is required" >&2; exit 1; }
 	@command -v curl >/dev/null 2>&1 || { echo "curl is required" >&2; exit 1; }
 	@command -v git >/dev/null 2>&1 || { echo "git is required" >&2; exit 1; }
 	@test -f .env || { echo "missing .env; run 'make env-init'" >&2; exit 1; }
-	@auth_token_value=$$(sed -n 's/^[[:space:]]*AUTH_TOKEN[[:space:]]*=[[:space:]]*//p' .env | tail -n 1); \
-	controller_auth_token_value=$$(sed -n 's/^[[:space:]]*CONTROLLER_AUTH_TOKEN[[:space:]]*=[[:space:]]*//p' .env | tail -n 1); \
-	postgres_password_value=$$(sed -n 's/^[[:space:]]*POSTGRES_PASSWORD[[:space:]]*=[[:space:]]*//p' .env | tail -n 1); \
-	case "$$auth_token_value" in ""|CHANGE_ME*) echo "set a real AUTH_TOKEN in .env" >&2; exit 1;; esac; \
-	case "$$controller_auth_token_value" in ""|CHANGE_ME*) echo "set a real CONTROLLER_AUTH_TOKEN in .env" >&2; exit 1;; esac; \
+	@auth_token_value=$$(cat "$(VAULT_RUNTIME_DIR)/AUTH_TOKEN"); \
+	controller_auth_token_value=$$(cat "$(VAULT_RUNTIME_DIR)/CONTROLLER_AUTH_TOKEN"); \
+	postgres_password_value=$$(cat "$(VAULT_RUNTIME_DIR)/POSTGRES_PASSWORD"); \
+	minio_root_user_value=$$(cat "$(VAULT_RUNTIME_DIR)/MINIO_ROOT_USER"); \
+	minio_root_password_value=$$(cat "$(VAULT_RUNTIME_DIR)/MINIO_ROOT_PASSWORD"); \
+	case "$$auth_token_value" in "") echo "vault AUTH_TOKEN is empty" >&2; exit 1;; esac; \
+	case "$$controller_auth_token_value" in "") echo "vault CONTROLLER_AUTH_TOKEN is empty" >&2; exit 1;; esac; \
 	test "$$auth_token_value" != "$$controller_auth_token_value" || { echo "AUTH_TOKEN and CONTROLLER_AUTH_TOKEN must differ" >&2; exit 1; }; \
-	case "$$postgres_password_value" in ""|CHANGE_ME*) echo "set a real POSTGRES_PASSWORD in .env" >&2; exit 1;; esac
+	case "$$postgres_password_value" in "") echo "vault POSTGRES_PASSWORD is empty" >&2; exit 1;; esac; \
+	test $${#minio_root_user_value} -ge 3 || { echo "vault MINIO_ROOT_USER must contain at least 3 characters" >&2; exit 1; }; \
+	test $${#minio_root_password_value} -ge 8 || { echo "vault MINIO_ROOT_PASSWORD must contain at least 8 characters" >&2; exit 1; }; \
+	test "$$minio_root_user_value" != "$$minio_root_password_value" || { echo "MINIO_ROOT_USER and MINIO_ROOT_PASSWORD must differ" >&2; exit 1; }
 	@docker compose version >/dev/null
 	@docker info >/dev/null 2>&1 || { \
 		echo "cannot connect to the Docker daemon; start Docker and verify this login session has docker-group access" >&2; \
@@ -199,6 +289,8 @@ check: ## Run formatting, vet, and unit tests
 	test -z "$$(gofmt -l cmd components internal migrations)"
 	go vet ./...
 	go test -race ./...
+	bash -n scripts/*.sh
+	python3 -c 'import ast,pathlib; [ast.parse(pathlib.Path(path).read_text()) for path in ("scripts/local_vault.py","scripts/local_vault_test.py","scripts/gdrive_client.py","scripts/gdrive_client_test.py","scripts/manual_backup_restore_test.py")]'
 
 check-container: ## Run make check with the local build-check image
 	docker run --rm -v "$(CURDIR):/src" -w /src local-ai-platform-buildcheck make check
@@ -241,13 +333,13 @@ openclaw-config-check: ## Validate the example against the pinned OpenClaw confi
 openclaw-config-plan: mcp-preflight ## Dry-run the local OpenClaw configuration merge
 	@command -v openclaw >/dev/null 2>&1 || { echo "openclaw is required" >&2; exit 1; }
 	@test -f "$(OPENCLAW_CONFIG_PATCH)" || { echo "missing $(OPENCLAW_CONFIG_PATCH)" >&2; exit 1; }
-	@controller_auth_token_value=$$(sed -n 's/^[[:space:]]*CONTROLLER_AUTH_TOKEN[[:space:]]*=[[:space:]]*//p' .env | tail -n 1); \
-	case "$$controller_auth_token_value" in ""|CHANGE_ME*) echo "set a real CONTROLLER_AUTH_TOKEN in .env" >&2; exit 1;; esac; \
+	@controller_auth_token_value=$$(cat "$(VAULT_RUNTIME_DIR)/CONTROLLER_AUTH_TOKEN"); \
+	case "$$controller_auth_token_value" in "") echo "vault CONTROLLER_AUTH_TOKEN is empty" >&2; exit 1;; esac; \
 	CONTROLLER_AUTH_TOKEN="$$controller_auth_token_value" \
 		openclaw config patch --file "$(OPENCLAW_CONFIG_PATCH)" --dry-run
 
 openclaw-config-apply: openclaw-config-plan ## Apply the validated OpenClaw configuration merge
-	@controller_auth_token_value=$$(sed -n 's/^[[:space:]]*CONTROLLER_AUTH_TOKEN[[:space:]]*=[[:space:]]*//p' .env | tail -n 1); \
+	@controller_auth_token_value=$$(cat "$(VAULT_RUNTIME_DIR)/CONTROLLER_AUTH_TOKEN"); \
 	CONTROLLER_AUTH_TOKEN="$$controller_auth_token_value" \
 		openclaw config patch --file "$(OPENCLAW_CONFIG_PATCH)"
 
@@ -279,7 +371,7 @@ openclaw-start: mcp-preflight openclaw-plugin-build ## Start OpenClaw with the n
 		echo "stop the existing user service before starting a foreground gateway: systemctl --user stop openclaw-gateway" >&2; \
 		exit 1; \
 	fi
-	@controller_auth_token_value=$$(sed -n 's/^[[:space:]]*CONTROLLER_AUTH_TOKEN[[:space:]]*=[[:space:]]*//p' .env | tail -n 1); \
+	@controller_auth_token_value=$$(cat "$(VAULT_RUNTIME_DIR)/CONTROLLER_AUTH_TOKEN"); \
 	CONTROLLER_AUTH_TOKEN="$$controller_auth_token_value" exec openclaw gateway
 
 openclaw-status: mcp-status ## Verify OpenClaw, its controller plugin, agents, and MCP connection
@@ -298,7 +390,7 @@ openclaw-status: mcp-status ## Verify OpenClaw, its controller plugin, agents, a
 	@openclaw plugins doctor
 	@openclaw agents list
 	@openclaw mcp status
-	@controller_auth_token_value=$$(sed -n 's/^[[:space:]]*CONTROLLER_AUTH_TOKEN[[:space:]]*=[[:space:]]*//p' .env | tail -n 1); \
+	@controller_auth_token_value=$$(cat "$(VAULT_RUNTIME_DIR)/CONTROLLER_AUTH_TOKEN"); \
 	CONTROLLER_AUTH_TOKEN="$$controller_auth_token_value" openclaw mcp probe $(OPENCLAW_MCP_SERVER)
 
 platform-status: openclaw-status ## Verify the complete MCP and OpenClaw integration
@@ -349,7 +441,7 @@ mcp-call: mcp-preflight ## Call one MCP tool non-interactively; requires MCP_TOO
 	@command -v jq >/dev/null 2>&1 || { echo "jq is required" >&2; exit 1; }
 	@test -n "$(MCP_TOOL)" || { echo "usage: make mcp-call MCP_TOOL=<tool> MCP_ARGUMENTS='<json-object>'" >&2; exit 1; }
 	@printf '%s' '$(MCP_ARGUMENTS)' | jq -e 'type == "object"' >/dev/null || { echo "MCP_ARGUMENTS must be a JSON object" >&2; exit 1; }
-	@auth_token_value=$$(sed -n 's/^[[:space:]]*AUTH_TOKEN[[:space:]]*=[[:space:]]*//p' .env | tail -n 1); \
+	@auth_token_value=$$(cat "$(VAULT_RUNTIME_DIR)/AUTH_TOKEN"); \
 	request_body=$$(jq -cn --arg tool "$(MCP_TOOL)" --argjson arguments '$(MCP_ARGUMENTS)' \
 		'{jsonrpc:"2.0",id:1,method:"tools/call",params:{name:$$tool,arguments:$$arguments}}'); \
 	curl --fail-with-body --silent --show-error --max-time 1800 \
@@ -528,10 +620,10 @@ candidate-reject: mcp-preflight ## Reject a candidate as the authenticated local
 	@test -n "$(ID)" || { echo "ID is required" >&2; exit 1; }
 	$(COMPOSE) run --rm migrate reject "$(ID)"
 
-up: ## Start the local CPU stack
+up: vault-materialize ## Start the local CPU stack
 	$(COMPOSE) up --build -d
 
-up-gpu: ## Start the local NVIDIA GPU stack
+up-gpu: vault-materialize ## Start the local NVIDIA GPU stack
 	$(COMPOSE) -f deploy/compose/compose.gpu.yaml up --build -d
 
 rebuild-fresh: mcp-preflight ## Destroy all platform data, rebuild fresh CPU images, and start (requires confirmation)
@@ -546,10 +638,11 @@ rebuild-fresh-gpu: mcp-preflight ## Destroy all platform data, rebuild fresh GPU
 	$(COMPOSE) -f deploy/compose/compose.gpu.yaml build --pull --no-cache
 	$(COMPOSE) -f deploy/compose/compose.gpu.yaml up --force-recreate -d
 
-down: ## Stop containers while retaining named volumes
+down: vault-materialize ## Stop containers while retaining named volumes
 	$(COMPOSE) down
+	@$(MAKE) --no-print-directory vault-clean
 
-logs: ## Follow gateway and worker logs
+logs: vault-materialize ## Follow gateway and worker logs
 	$(COMPOSE) logs -f gateway worker
 
 mcp-start: mcp-preflight ## Start the local platform and MCP gateway in the background
@@ -566,8 +659,50 @@ mcp-status: mcp-preflight ## Show containers and verify gateway liveness/readine
 mcp-logs: mcp-preflight ## Follow the separately running MCP gateway and worker
 	$(COMPOSE) logs -f gateway worker
 
-mcp-stop: mcp-preflight ## Stop the MCP platform while retaining all named volumes
+mcp-stop: vault-materialize ## Stop the MCP platform while retaining all named volumes
 	$(COMPOSE) down
+	@$(MAKE) --no-print-directory vault-clean
+
+backup-gdrive: vault-materialize ## Cold-backup volumes with client-side encryption to Google Drive
+	@VAULT_RUNTIME_DIR="$(VAULT_RUNTIME_DIR)" \
+	VAULT_FILE="$(VAULT_FILE)" \
+	VAULT_PASSPHRASE_FILE="$(VAULT_PASSPHRASE_FILE)" \
+	GDRIVE_PYTHON_BIN="$(GDRIVE_PYTHON)" \
+	STAMP="$(STAMP)" \
+	BACKUP_ROOT="$(BACKUP_ROOT)" \
+	BACKUP_DATA_CLASSIFICATION="$(BACKUP_DATA_CLASSIFICATION)" \
+	INCLUDE_OLLAMA="$(INCLUDE_OLLAMA)" \
+	INCLUDE_ANALYZER_CACHE="$(INCLUDE_ANALYZER_CACHE)" \
+	./scripts/manual-backup-to-gdrive.sh
+
+download-gdrive: ## Download, authenticate, and decrypt a backup without restoring volumes
+	@test -n "$(STAMP)" || { echo "STAMP=<backup-folder> is required" >&2; exit 1; }
+	@case "$(STAMP)" in *[!A-Za-z0-9._-]*|'') echo "STAMP contains unsafe characters" >&2; exit 1;; esac
+	@case "$(DOWNLOAD_ROOT)" in ''|'/'|'.') echo "DOWNLOAD_ROOT must be a dedicated private directory" >&2; exit 1;; esac
+	@umask 077; \
+	mkdir -p "$(DOWNLOAD_ROOT)"; \
+	test -d "$(DOWNLOAD_ROOT)" && test ! -L "$(DOWNLOAD_ROOT)" || { echo "DOWNLOAD_ROOT must be a non-symlink directory" >&2; exit 1; }; \
+	test "$$(stat -c '%u' "$(DOWNLOAD_ROOT)")" = "$$(id -u)" || { echo "DOWNLOAD_ROOT must be owned by the current user" >&2; exit 1; }; \
+	test "$$(stat -c '%a' "$(DOWNLOAD_ROOT)")" = 700 || { echo "DOWNLOAD_ROOT permissions must be 0700" >&2; exit 1; }; \
+	test ! -e "$(DOWNLOAD_ROOT)/$(STAMP)" || { echo "download output already exists: $(DOWNLOAD_ROOT)/$(STAMP)" >&2; exit 1; }; \
+	$(GDRIVE) download-bundle \
+		--stamp "$(STAMP)" --output-dir "$(DOWNLOAD_ROOT)/$(STAMP)"; \
+	echo "decrypted backup: $(DOWNLOAD_ROOT)/$(STAMP)"
+
+restore-gdrive: vault-materialize ## Authenticate, decrypt, and restore volumes from Google Drive
+	@test -n "$(STAMP)" || { echo "STAMP=<backup-folder> is required" >&2; exit 1; }
+	@VAULT_RUNTIME_DIR="$(VAULT_RUNTIME_DIR)" \
+	VAULT_FILE="$(VAULT_FILE)" \
+	VAULT_PASSPHRASE_FILE="$(VAULT_PASSPHRASE_FILE)" \
+	GDRIVE_PYTHON_BIN="$(GDRIVE_PYTHON)" \
+	STAMP="$(STAMP)" \
+	RESTORE_WORK_ROOT="$(RESTORE_WORK_ROOT)" \
+	CONFIRM_RESTORE="$(CONFIRM_RESTORE)" \
+	ALLOW_VERSION_MISMATCH="$(ALLOW_VERSION_MISMATCH)" \
+	./scripts/manual-restore-from-gdrive.sh
+
+backup-restore-test: ## Exercise cold backup/restore against disposable Docker volumes
+	@python3 scripts/manual_backup_restore_test.py
 
 codex-login: ## Authenticate Codex through the interactive ChatGPT browser flow
 	@command -v codex >/dev/null 2>&1 || { echo "codex is required" >&2; exit 1; }
@@ -576,7 +711,7 @@ codex-login: ## Authenticate Codex through the interactive ChatGPT browser flow
 codex-check: mcp-preflight ## Check Codex authentication and MCP registration
 	@command -v codex >/dev/null 2>&1 || { echo "codex is required" >&2; exit 1; }
 	@codex login status
-	@auth_token_value=$$(sed -n 's/^[[:space:]]*AUTH_TOKEN[[:space:]]*=[[:space:]]*//p' .env | tail -n 1); \
+	@auth_token_value=$$(cat "$(VAULT_RUNTIME_DIR)/AUTH_TOKEN"); \
 	HYBRID_AI_MCP_TOKEN="$$auth_token_value" codex mcp get $(CODEX_MCP_ARGS) hybrid_knowledge >/dev/null; \
 	echo "Codex MCP registration passed: hybrid_knowledge"
 
@@ -629,14 +764,15 @@ hybrid-verify: codex-local-check hybrid-verify-static hybrid-verify-image ## Pro
 	HYBRID_VERIFY_IMAGE="$(HYBRID_VERIFY_IMAGE)" \
 	HYBRID_VERIFY_AUDIT_ROOT="$(HYBRID_VERIFY_AUDIT_ROOT)" \
 	HYBRID_VERIFY_TIMEOUT="$(HYBRID_VERIFY_TIMEOUT)" \
+	VAULT_RUNTIME_DIR="$(VAULT_RUNTIME_DIR)" \
 	bash scripts/hybrid-verify.sh
 
 codex: mcp-preflight ## Start Codex in this repository with the MCP bearer token loaded
 	@command -v codex >/dev/null 2>&1 || { echo "codex is required" >&2; exit 1; }
 	@codex login status >/dev/null || { echo "Codex is signed out; run 'make codex-login'" >&2; exit 1; }
 	@curl --fail --silent --show-error --max-time 5 "$(MCP_BASE_URL)/healthz" >/dev/null || { echo "MCP gateway is unavailable; start Terminal 1 with 'make mcp-start' or 'make mcp-start-gpu'" >&2; exit 1; }
-	@auth_token_value=$$(sed -n 's/^[[:space:]]*AUTH_TOKEN[[:space:]]*=[[:space:]]*//p' .env | tail -n 1); \
-	case "$$auth_token_value" in ""|CHANGE_ME*) echo "set a real AUTH_TOKEN in .env" >&2; exit 1;; esac; \
+	@auth_token_value=$$(cat "$(VAULT_RUNTIME_DIR)/AUTH_TOKEN"); \
+	case "$$auth_token_value" in "") echo "vault AUTH_TOKEN is empty" >&2; exit 1;; esac; \
 	HYBRID_AI_MCP_TOKEN="$$auth_token_value" exec codex $(CODEX_MCP_ARGS)
 
 codex-repo: mcp-preflight ## Start Codex for REPO=/absolute/path with this HTTP MCP server
@@ -644,21 +780,21 @@ codex-repo: mcp-preflight ## Start Codex for REPO=/absolute/path with this HTTP 
 	@test -n "$(REPO)" || { echo "usage: make codex-repo REPO=/absolute/path/to/repository" >&2; exit 1; }
 	@codex login status >/dev/null || { echo "Codex is signed out; run 'make codex-login'" >&2; exit 1; }
 	@curl --fail --silent --show-error --max-time 5 "$(MCP_BASE_URL)/healthz" >/dev/null || { echo "MCP gateway is unavailable; start Terminal 1 first" >&2; exit 1; }
-	@auth_token_value=$$(sed -n 's/^[[:space:]]*AUTH_TOKEN[[:space:]]*=[[:space:]]*//p' .env | tail -n 1); \
+	@auth_token_value=$$(cat "$(VAULT_RUNTIME_DIR)/AUTH_TOKEN"); \
 	repository_path=$$(cd "$(REPO)" 2>/dev/null && pwd -P) || { echo "REPO is not an accessible directory: $(REPO)" >&2; exit 1; }; \
 	HYBRID_AI_MCP_TOKEN="$$auth_token_value" exec codex -C "$$repository_path" $(CODEX_MCP_ARGS)
 
 codex-local: codex-local-check ## Start local-Ollama Codex; MCP is registered but deferred
-	@auth_token_value=$$(sed -n 's/^[[:space:]]*AUTH_TOKEN[[:space:]]*=[[:space:]]*//p' .env | tail -n 1); \
-	case "$$auth_token_value" in ""|CHANGE_ME*) echo "set a real AUTH_TOKEN in .env" >&2; exit 1;; esac; \
+	@auth_token_value=$$(cat "$(VAULT_RUNTIME_DIR)/AUTH_TOKEN"); \
+	case "$$auth_token_value" in "") echo "vault AUTH_TOKEN is empty" >&2; exit 1;; esac; \
 	echo "Codex model route: ollama/$(CODEX_LOCAL_MODEL) (reasoning=$(CODEX_LOCAL_REASONING_EFFORT), no cloud fallback)"; \
 	echo "Compatibility: use cloud Codex or OpenClaw when the task requires hybrid_knowledge tool calls"; \
 	HYBRID_AI_MCP_TOKEN="$$auth_token_value" exec codex $(CODEX_LOCAL_ARGS) $(CODEX_MCP_ARGS)
 
 codex-local-repo: codex-local-check ## Start local-Ollama Codex in REPO; MCP is registered
 	@test -n "$(REPO)" || { echo "usage: make codex-local-repo REPO=/absolute/path/to/repository" >&2; exit 1; }
-	@auth_token_value=$$(sed -n 's/^[[:space:]]*AUTH_TOKEN[[:space:]]*=[[:space:]]*//p' .env | tail -n 1); \
-	case "$$auth_token_value" in ""|CHANGE_ME*) echo "set a real AUTH_TOKEN in .env" >&2; exit 1;; esac; \
+	@auth_token_value=$$(cat "$(VAULT_RUNTIME_DIR)/AUTH_TOKEN"); \
+	case "$$auth_token_value" in "") echo "vault AUTH_TOKEN is empty" >&2; exit 1;; esac; \
 	repository_path=$$(cd "$(REPO)" 2>/dev/null && pwd -P) || { echo "REPO is not an accessible directory: $(REPO)" >&2; exit 1; }; \
 	echo "Codex model route: ollama/$(CODEX_LOCAL_MODEL) (reasoning=$(CODEX_LOCAL_REASONING_EFFORT), no cloud fallback)"; \
 	echo "Compatibility: use cloud Codex or OpenClaw when the task requires hybrid_knowledge tool calls"; \
