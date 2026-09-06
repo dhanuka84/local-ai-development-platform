@@ -17,6 +17,8 @@ type Client struct {
 	http    *http.Client
 }
 
+func (c *Client) EmbeddingIdentity() (string, string, int) { return "ollama", c.model, 0 }
+
 func New(baseURL, model string) *Client {
 	return &Client{
 		baseURL: strings.TrimRight(baseURL, "/"),

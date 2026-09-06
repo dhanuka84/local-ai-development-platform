@@ -22,7 +22,7 @@ jobs:
           go-version: 1.25.8
           cache: true
       - name: Format
-        run: test -z "$(gofmt -l cmd components internal migrations)"
+        run: test -z "$(gofmt -l cmd components contracts internal migrations)"
       - name: Vet
         run: go vet ./...
       - name: Unit and race tests
@@ -30,15 +30,43 @@ jobs:
       - name: Build
         run: go build ./cmd/...
 
+  postgres-integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: hybrid
+          POSTGRES_USER: hybrid
+          POSTGRES_PASSWORD: integration-only
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U hybrid -d hybrid"
+          --health-interval 2s --health-timeout 3s --health-retries 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 1.25.8
+          cache: true
+      - name: Promotion, quality, concurrency and recovery invariants
+        env:
+          TEST_DATABASE_URL: postgres://hybrid:integration-only@localhost:5432/hybrid?sslmode=disable
+        run: go test -race -count=1 ./internal/postgres
+
   configuration:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 1.25.8
+          cache: true
       - name: Validate Docker Compose
         run: docker compose --env-file .env.example -f deploy/compose/compose.yaml config --quiet
       - name: Compile and test Cerbos policies
         run: make authz-policy-test
-      - name: Parse workflow schemas
+      - name: Validate versioned contracts and positive/negative fixtures
         run: make contracts-check
       - name: Render Kubernetes base
         uses: imranismail/setup-kustomize@v2

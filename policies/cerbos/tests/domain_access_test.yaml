@@ -3,6 +3,13 @@ name: DomainAccessAuthorization
 description: Existing MCP knowledge and graph actions use trusted project roles and human decisions.
 
 principals:
+  local_validator:
+    id: workload:local-validator
+    roles: [validation_executor]
+    attr:
+      human: false
+      project_ids: [project-a]
+
   controller:
     id: agent:openclaw-controller
     roles: [controller]
@@ -63,6 +70,35 @@ resources:
       project_id: project-a
 
 tests:
+  - name: Local verifier may execute but cannot attest or approve
+    input:
+      principals: [local_validator]
+      resources: [pending_candidate]
+      actions: [validate_local, validate, decide_validated, approve]
+    expected:
+      - principal: local_validator
+        resource: pending_candidate
+        actions: {validate_local: EFFECT_ALLOW, validate: EFFECT_DENY, decide_validated: EFFECT_DENY, approve: EFFECT_DENY}
+
+  - name: Only authenticated human QA can attest validation
+    input:
+      principals: [controller, solo_developer, cloud_reviewer, wrong_project_owner]
+      resources: [pending_candidate]
+      actions: [validate, decide_validated]
+    expected:
+      - principal: controller
+        resource: pending_candidate
+        actions: {validate: EFFECT_DENY, decide_validated: EFFECT_DENY}
+      - principal: solo_developer
+        resource: pending_candidate
+        actions: {validate: EFFECT_ALLOW, decide_validated: EFFECT_ALLOW}
+      - principal: cloud_reviewer
+        resource: pending_candidate
+        actions: {validate: EFFECT_DENY, decide_validated: EFFECT_DENY}
+      - principal: wrong_project_owner
+        resource: pending_candidate
+        actions: {validate: EFFECT_DENY, decide_validated: EFFECT_DENY}
+
   - name: Controller can retrieve and capture but cannot impersonate human approval
     input:
       principals: [controller]

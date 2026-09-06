@@ -359,11 +359,11 @@ func TestRecordReviewRequiresFreshEvidenceForRevision(t *testing.T) {
 
 func TestSearchPreservesMilvusRankingAndApproval(t *testing.T) {
 	repository := &fakeRepository{items: []domain.KnowledgeItem{
-		{ID: "a", Status: domain.CandidateApproved},
-		{ID: "b", Status: domain.CandidateApproved},
+		{ID: "a", ProjectID: "project", Version: 1, Status: domain.CandidateApproved},
+		{ID: "b", ProjectID: "project", Version: 1, Status: domain.CandidateApproved},
 		{ID: "pending", Status: domain.CandidatePending},
 	}}
-	vectors := &fakeVectors{hits: []domain.VectorHit{{ID: "b", Score: .9}, {ID: "pending", Score: .8}, {ID: "a", Score: .7}}}
+	vectors := &fakeVectors{hits: []domain.VectorHit{fixtureVectorHit(repository.items[1], .9), {ID: "pending", Score: .8}, fixtureVectorHit(repository.items[0], .7)}}
 	svc := New(repository, &fakeArtifacts{}, &fakeEmbedder{vectors: [][]float32{{1}}}, vectors, true, false)
 
 	hits, backend, err := svc.Search(context.Background(), "project", "query", 5)
@@ -376,7 +376,7 @@ func TestSearchPreservesMilvusRankingAndApproval(t *testing.T) {
 }
 
 func TestSearchFallsBackToPostgres(t *testing.T) {
-	repository := &fakeRepository{lexical: []domain.SearchHit{{KnowledgeItem: domain.KnowledgeItem{ID: "fallback"}}}}
+	repository := &fakeRepository{lexical: []domain.SearchHit{{KnowledgeItem: domain.KnowledgeItem{ID: "fallback", ProjectID: "project", Status: domain.CandidateApproved}}}}
 	svc := New(repository, &fakeArtifacts{}, &fakeEmbedder{err: errors.New("offline")}, &fakeVectors{}, true, false)
 	hits, backend, err := svc.Search(context.Background(), "project", "query", 5)
 	if err != nil {
@@ -460,7 +460,7 @@ func TestIndexCodeRepositoryEnforcesAllowedRoot(t *testing.T) {
 
 func TestCodeSearchPreservesVectorRankingAndRepositoryFilter(t *testing.T) {
 	repository := &fakeRepository{codeEntities: []domain.CodeEntity{
-		{ID: "a", RepositoryID: "repo-1"}, {ID: "b", RepositoryID: "repo-2"},
+		{ID: "a", ProjectID: "product", RepositoryID: "repo-1"}, {ID: "b", ProjectID: "product", RepositoryID: "repo-2"},
 	}}
 	vectors := &fakeVectors{codeHits: []domain.VectorHit{{ID: "b", Score: .9}, {ID: "a", Score: .8}}}
 	svc := New(repository, &fakeArtifacts{}, &fakeEmbedder{vectors: [][]float32{{1}}}, vectors, true, false)

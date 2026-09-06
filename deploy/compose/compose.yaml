@@ -3,6 +3,8 @@ name: hybrid-ai-platform
 x-platform-environment: &platform-environment
   APP_ENV: local
   LOG_LEVEL: ${LOG_LEVEL:-info}
+  TRACE_EXPORT_ENDPOINT: ${TRACE_EXPORT_ENDPOINT:-}
+  TRACE_RETENTION_DAYS: ${TRACE_RETENTION_DAYS:-30}
   DATABASE_HOST: postgres
   DATABASE_PORT: "5432"
   DATABASE_USER: hybrid
@@ -244,9 +246,12 @@ services:
     build:
       context: ../..
       target: worker
-    environment: *platform-environment
+    environment:
+      <<: *platform-environment
+      CODEGRAPH_ALLOWED_ROOTS: /workspace
     volumes:
       - artifact-data:/var/lib/hybrid-ai/artifacts
+      - ${CODEGRAPH_HOST_ROOT:-../..}:/workspace:ro
     secrets:
       - postgres_password
     depends_on:

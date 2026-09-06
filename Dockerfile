@@ -53,8 +53,10 @@ USER 65532:65532
 WORKDIR /workspace
 ENTRYPOINT ["/gateway"]
 
-FROM gcr.io/distroless/static-debian12:nonroot AS worker
+FROM debian:bookworm-slim AS worker
+RUN apt-get update && apt-get install --yes --no-install-recommends git ca-certificates && apt-get clean
 COPY --from=build /out/worker /worker
+USER 65532:65532
 ENTRYPOINT ["/worker"]
 
 FROM gcr.io/distroless/static-debian12:nonroot AS admin

@@ -1,0 +1,24 @@
+# Optional local derived trace view. Keep the collector on an internal network;
+# do not publish 4318 externally. PostgreSQL remains the evidence authority.
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 128
+  batch: {}
+exporters:
+  debug:
+    verbosity: basic
+service:
+  telemetry:
+    logs:
+      level: warn
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [debug]

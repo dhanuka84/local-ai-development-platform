@@ -1,0 +1,46 @@
+{
+  "id": "00000000-0000-4000-8000-000000000001",
+  "schema_version": "hybrid-ai/knowledge-validation/v1",
+  "knowledge_id": "00000000-0000-4000-8000-000000000002",
+  "project_id": "synthetic-fixture",
+  "candidate_version": 0,
+  "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "source_manifest": {
+    "schema_version": "hybrid-ai/knowledge-source/v1",
+    "sources": [
+      {
+        "kind": "repository",
+        "reference": "/fixture/repository",
+        "branch": "main",
+        "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    ]
+  },
+  "source_manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "method": "manual",
+  "criteria": [
+    {
+      "name": "synthetic",
+      "passed": true,
+      "observation": "schema-only fixture; not actual validation"
+    }
+  ],
+  "commands": [],
+  "verdict": "pass",
+  "validated_by": "human:synthetic",
+  "started_at": "2026-09-06T00:00:00Z",
+  "completed_at": "2026-09-06T00:01:00Z",
+  "valid_until": "2026-09-07T00:01:00Z",
+  "report_artifact": {
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "uri": "file:///fixture/artifact",
+    "media_type": "application/json",
+    "size_bytes": 42
+  },
+  "source_artifact": {
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "uri": "file:///fixture/artifact",
+    "media_type": "application/json",
+    "size_bytes": 42
+  }
+}

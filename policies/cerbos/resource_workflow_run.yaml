@@ -47,7 +47,7 @@ resourcePolicy:
               "VERIFICATION_PASSED", "VERIFICATION_FAILED", "REVISION_REQUESTED",
               "TASK_QUEUED", "TASK_ACTIVATED", "LOCAL_RESULT_RECORDED",
               "CLOUD_REVIEW_RECORDED", "LOCAL_REVISION_RECORDED",
-              "VALIDATION_PASSED", "VALIDATION_FAILED", "RAG_READBACK_VERIFIED"
+              "VALIDATION_PASSED", "VALIDATION_FAILED", "VALIDATED_REUSE_COMPLETED", "RAG_READBACK_VERIFIED"
             ]
 
     - name: cloud_review_transition
@@ -67,7 +67,7 @@ resourcePolicy:
           expr: >-
             V.localProject &&
             request.resource.attr.event in [
-              "HUMAN_QA_REQUESTED", "REVISION_REQUESTED", "VALIDATION_PASSED", "VALIDATION_FAILED"
+              "HUMAN_QA_REQUESTED", "REVISION_REQUESTED", "VALIDATION_PASSED", "VALIDATION_FAILED", "VALIDATED_REUSE_COMPLETED"
             ]
 
     - name: product_coordination_transition

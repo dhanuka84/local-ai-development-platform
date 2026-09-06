@@ -31,6 +31,8 @@ type Config struct {
 	GraphFallbackEnabled   bool
 	AgeGraphName           string
 	ArtifactsPath          string
+	TraceExportEndpoint    string
+	TraceRetentionDays     int
 	OllamaURL              string
 	EmbeddingModel         string
 	EmbeddingDimension     int
@@ -102,6 +104,8 @@ func load(validateAuth bool) (Config, error) {
 		GraphFallbackEnabled:   boolEnv("GRAPH_FALLBACK_ENABLED", true),
 		AgeGraphName:           env("AGE_GRAPH_NAME", "software_knowledge_graph"),
 		ArtifactsPath:          env("ARTIFACTS_PATH", "./data/artifacts"),
+		TraceExportEndpoint:    env("TRACE_EXPORT_ENDPOINT", ""),
+		TraceRetentionDays:     intEnv("TRACE_RETENTION_DAYS", 30),
 		OllamaURL:              strings.TrimRight(env("OLLAMA_URL", "http://127.0.0.1:11434"), "/"),
 		EmbeddingModel:         env("OLLAMA_EMBEDDING_MODEL", "embeddinggemma"),
 		MilvusAddress:          env("MILVUS_ADDRESS", "127.0.0.1:19530"),
@@ -123,6 +127,9 @@ func load(validateAuth bool) (Config, error) {
 		CodeGraphPythonIndexer: env("CODEGRAPH_PYTHON_INDEXER_COMMAND", "/usr/local/bin/hybrid-index-python"),
 	}
 
+	if cfg.AutoApproveLocal {
+		return Config{}, errors.New("AUTO_APPROVE_LOCAL=true is no longer supported; capture pending knowledge, validate it, and use the human knowledge_candidate_decide gate")
+	}
 	switch cfg.MCPTransport {
 	case "http", "stdio":
 	default:
@@ -285,7 +292,7 @@ func configuredDatabaseURL() (string, error) {
 func validatePrincipalBootstraps(principals []domain.PrincipalBootstrap) ([]domain.PrincipalBootstrap, error) {
 	allowedRoles := map[string]struct{}{
 		"controller": {}, "development": {}, "qa": {}, "product_owner": {}, "operations": {},
-		"cloud_reviewer": {}, "maintenance_executor": {}, "repository_analyzer": {},
+		"cloud_reviewer": {}, "maintenance_executor": {}, "repository_analyzer": {}, "validation_executor": {},
 	}
 	ids := make(map[string]struct{}, len(principals))
 	tokens := make(map[string]struct{}, len(principals))

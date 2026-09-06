@@ -147,6 +147,9 @@ func (r *Repository) StoreCodeGraph(
           AND relation.relation_type IN ('calls','references','implements','imports','tests')`, runID); err != nil {
 		return domain.CodeAnalysis{}, fmt.Errorf("queue code relation indexing: %w", err)
 	}
+	if err := auditMutation(ctx, tx, "code.index", domain.OperationScope{ProjectID: projectID}, domain.EvidenceReference{Kind: "analysis", ID: runID}); err != nil {
+		return domain.CodeAnalysis{}, err
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return domain.CodeAnalysis{}, err
 	}

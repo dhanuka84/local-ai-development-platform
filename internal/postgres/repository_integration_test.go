@@ -26,7 +26,7 @@ func TestRepositoryWorkflowIntegration(t *testing.T) {
 	if err := migrations.Apply(ctx, repository.Pool()); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := repository.Pool().Exec(ctx, `TRUNCATE projects CASCADE; TRUNCATE outbox_events RESTART IDENTITY`); err != nil {
+	if _, err := repository.Pool().Exec(ctx, `TRUNCATE projects CASCADE; TRUNCATE outbox_events RESTART IDENTITY CASCADE`); err != nil {
 		t.Fatal(err)
 	}
 	principals := []domain.PrincipalBootstrap{{
@@ -234,7 +234,16 @@ func TestRepositoryWorkflowIntegration(t *testing.T) {
 	if revised.Content != "reviewed solution" || revised.Version != 2 || len(revised.ValidationEvidence) != 1 || revised.ValidationEvidence[0] != "go test ./... passed after revision" {
 		t.Fatalf("revised candidate = %#v", revised)
 	}
-	approved, err := repository.ApproveCandidate(ctx, candidate.ID, "owner")
+	validation := fixtureValidation(t, ctx, repository, revised, principal.ID, time.Now().UTC())
+	// This storage fixture sets the managed gate directly; the service-level
+	// acceptance suite exercises the real transition and human-role boundaries.
+	if _, err := repository.Pool().Exec(ctx, `UPDATE workflow_runs SET state='promotion_pending',qa_validated_by=$2 WHERE id=$1`, workflow.ID, principal.ID); err != nil {
+		t.Fatal(err)
+	}
+	decisionID, _ := domain.NewID()
+	approved, err := repository.DecideKnowledge(ctx, domain.KnowledgeDecision{ID: decisionID, KnowledgeID: candidate.ID, ExpectedVersion: revised.Version,
+		ValidationID: validation.ID, Decision: "approve", Reason: "synthetic storage fixture", IdempotencyKey: "fixture-approval", Actor: principal.ID,
+		RequestSHA256: domain.Digest([]byte("synthetic storage fixture")), Authorization: domain.AuthorizationDecision{Allowed: true}})
 	if err != nil {
 		t.Fatal(err)
 	}

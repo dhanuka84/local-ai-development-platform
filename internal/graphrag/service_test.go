@@ -78,11 +78,11 @@ func (f *graphStoreFake) ExpandKnowledgeGraph(_ context.Context, request domain.
 
 func TestSearchUsesHydratedMilvusSeedsAndRanksExpansion(t *testing.T) {
 	repository := &repositoryFake{
-		knowledge: []domain.KnowledgeItem{{ID: "knowledge", ProjectID: "product", Status: domain.CandidateApproved}},
+		knowledge: []domain.KnowledgeItem{{ID: "knowledge", ProjectID: "product", Version: 1, Status: domain.CandidateApproved}},
 		code:      []domain.CodeEntity{{ID: "code", ProjectID: "product", RepositoryID: "repo", RepositoryName: "api"}},
 	}
 	vectors := &vectorsFake{
-		knowledge: []domain.VectorHit{{ID: "knowledge", Score: .9}},
+		knowledge: []domain.VectorHit{{ID: "knowledge", Score: .9, Version: 1, ContentSHA256: domain.Digest([]byte(repository.knowledge[0].RetrievalText()))}},
 		code:      []domain.VectorHit{{ID: "code", Score: .8}},
 	}
 	graphs := &graphStoreFake{}

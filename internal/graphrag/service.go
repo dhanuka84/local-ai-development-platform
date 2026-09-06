@@ -29,6 +29,9 @@ func (s *Service) Search(ctx context.Context, request Request) (Context, error) 
 		return Context{}, errors.New("project_id and query are required")
 	}
 	seeds, backend, err := s.semanticSeeds(ctx, request)
+	if errors.Is(err, domain.ErrQualityBlocked) {
+		return Context{}, err
+	}
 	if err != nil || len(seeds) == 0 {
 		seeds, err = s.lexicalSeeds(ctx, request)
 		backend = "postgres-lexical-fallback"

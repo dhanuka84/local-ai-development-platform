@@ -159,6 +159,9 @@ func (r *Repository) CreateWorkflowTask(ctx context.Context, task domain.Workflo
 	}
 	event.EvidenceArtifact = &created.RequestArtifact
 	event.Sequence = 1
+	if err := auditMutation(ctx, tx, "workflow.task.create", domain.OperationScope{ProjectID: created.ProjectID, WorkflowID: created.WorkflowID, TaskID: created.ID}, domain.EvidenceReference{Kind: "task", ID: created.ID, Version: created.Version}, domain.EvidenceReference{Kind: "artifact", ID: created.RequestArtifact.SHA256, SHA256: created.RequestArtifact.SHA256}); err != nil {
+		return domain.WorkflowTaskCheckpoint{}, domain.WorkflowTaskEvent{}, err
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return domain.WorkflowTaskCheckpoint{}, domain.WorkflowTaskEvent{}, err
 	}
@@ -244,6 +247,16 @@ func (r *Repository) TransitionWorkflowTask(ctx context.Context, transition doma
 		}
 	}
 	completedAt := any(nil)
+	if transition.Event.EventType == "VALIDATION_PASSED" || transition.Event.EventType == "VALIDATED_REUSE_COMPLETED" {
+		if err := recordTaskLocalValidation(ctx, tx, task, transition.Event); err != nil {
+			return domain.WorkflowTaskCheckpoint{}, domain.WorkflowTaskEvent{}, err
+		}
+	}
+	if transition.ResultingState == domain.TaskStateCompleted {
+		if err := verifyTaskContextCompletion(ctx, tx, task, transition.Event.EventType == "VALIDATED_REUSE_COMPLETED"); err != nil {
+			return domain.WorkflowTaskCheckpoint{}, domain.WorkflowTaskEvent{}, err
+		}
+	}
 	if transition.Completed {
 		completedAt = time.Now().UTC()
 	}
@@ -293,6 +306,13 @@ func (r *Repository) TransitionWorkflowTask(ctx context.Context, transition doma
 	event.EvidenceArtifact = transition.Event.EvidenceArtifact
 	updated, err := getWorkflowTask(ctx, tx, transition.TaskID, false)
 	if err != nil {
+		return domain.WorkflowTaskCheckpoint{}, domain.WorkflowTaskEvent{}, err
+	}
+	refs := []domain.EvidenceReference{{Kind: "task", ID: updated.ID, Version: updated.Version}, {Kind: "task_event", ID: event.ID}}
+	if event.EvidenceArtifact != nil {
+		refs = append(refs, domain.EvidenceReference{Kind: "artifact", ID: event.EvidenceArtifact.SHA256, SHA256: event.EvidenceArtifact.SHA256})
+	}
+	if err := auditMutation(ctx, tx, "workflow.task.transition", domain.OperationScope{ProjectID: updated.ProjectID, WorkflowID: updated.WorkflowID, TaskID: updated.ID}, refs...); err != nil {
 		return domain.WorkflowTaskCheckpoint{}, domain.WorkflowTaskEvent{}, err
 	}
 	if err := tx.Commit(ctx); err != nil {

@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	ErrForbidden                = errors.New("forbidden")
+	ErrForbidden                = domain.ErrForbidden
 	ErrAuthorizationUnavailable = errors.New("authorization unavailable")
 )
 
@@ -269,6 +269,10 @@ func (s *Service) TransitionWorkflow(ctx context.Context, input TransitionWorkfl
 }
 
 func (s *Service) authorize(ctx context.Context, request domain.AuthorizationRequest) (domain.AuthorizationDecision, error) {
+	return s.tracedAuthorization(ctx, request)
+}
+
+func (s *Service) authorizeUntraced(ctx context.Context, request domain.AuthorizationRequest) (domain.AuthorizationDecision, error) {
 	if s.authorizer == nil {
 		return domain.AuthorizationDecision{}, fmt.Errorf("%w: authorizer is not configured", ErrAuthorizationUnavailable)
 	}

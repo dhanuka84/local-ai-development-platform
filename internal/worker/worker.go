@@ -2,21 +2,31 @@ package worker
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
 
 	"github.com/dhanuka84/hybrid-ai-platform/internal/domain"
+	"github.com/dhanuka84/hybrid-ai-platform/internal/telemetry"
 )
 
 type Worker struct {
-	repository domain.Repository
-	embedder   domain.Embedder
-	vectors    domain.VectorStore
-	logger     *slog.Logger
-	interval   time.Duration
-	batchSize  int
-	projector  domain.GraphProjector
+	repository     domain.Repository
+	embedder       domain.Embedder
+	vectors        domain.VectorStore
+	logger         *slog.Logger
+	interval       time.Duration
+	batchSize      int
+	projector      domain.GraphProjector
+	refreshSources func(context.Context, string) error
+	exporter       *telemetry.Exporter
+}
+
+func (w *Worker) ConfigureTraceExporter(exporter *telemetry.Exporter) { w.exporter = exporter }
+
+func (w *Worker) ConfigureSourceVerifier(verify func(context.Context, string) error) {
+	w.refreshSources = verify
 }
 
 type codeEntityBatchUpserter interface {
@@ -24,6 +34,7 @@ type codeEntityBatchUpserter interface {
 }
 
 func New(repository domain.Repository, embedder domain.Embedder, vectors domain.VectorStore, logger *slog.Logger, interval time.Duration, batchSize int) *Worker {
+	embedder = telemetry.WrapEmbedder(repository, embedder)
 	return &Worker{repository: repository, embedder: embedder, vectors: vectors, logger: logger, interval: interval, batchSize: batchSize}
 }
 
@@ -51,14 +62,75 @@ func (w *Worker) Run(ctx context.Context) error {
 }
 
 func (w *Worker) ProcessOnce(ctx context.Context) (int, error) {
+	if err := w.refreshDefinitions(ctx); err != nil {
+		return 0, err
+	}
+	if w.exporter != nil {
+		if err := w.exporter.ProcessOnce(ctx); err != nil {
+			w.logger.Warn("local trace export deferred")
+		}
+	}
+	if repository, ok := w.repository.(domain.KnowledgeQualityRepository); ok && w.refreshSources != nil {
+		ids, err := repository.ListQualityRefreshIDs(ctx, w.batchSize)
+		if err != nil {
+			return 0, err
+		}
+		for _, id := range ids {
+			if err := w.refreshSources(ctx, id); err != nil {
+				w.logger.Warn("source verification failed", "knowledge_id", id)
+				continue
+			}
+			// Independently re-read the projection. This is not a heartbeat and
+			// does not generate another embedding or extend content validation.
+			item, err := w.repository.GetKnowledge(ctx, id, false)
+			if err != nil {
+				continue
+			}
+			if manifests, ok := w.repository.(domain.ProjectionRepository); ok {
+				manifest, err := manifests.KnowledgeProjection(ctx, item.ID)
+				if err != nil {
+					continue
+				}
+				identity, ok := w.embedder.(interface{ EmbeddingIdentity() (string, string, int) })
+				if !ok {
+					continue
+				}
+				provider, model, _ := identity.EmbeddingIdentity()
+				if manifest.Provider != provider || manifest.Model != model {
+					continue
+				}
+				item.Projection = &manifest
+			}
+			reader, ok := w.vectors.(interface {
+				VerifyKnowledgeProjection(context.Context, domain.KnowledgeItem) error
+			})
+			if !ok {
+				continue
+			}
+			if err := reader.VerifyKnowledgeProjection(ctx, item); err != nil {
+				w.logger.Warn("projection verification failed", "knowledge_id", id)
+				continue
+			}
+			if err := repository.RecordProjectionCheck(ctx, item); err != nil {
+				return 0, err
+			}
+		}
+	}
 	events, err := w.repository.ClaimOutbox(ctx, w.batchSize)
 	if err != nil {
 		return 0, fmt.Errorf("claim outbox: %w", err)
 	}
 	for index := 0; index < len(events); {
+		if events[index].Attempts > 10 {
+			if err := w.finishEvent(ctx, events[index], fmt.Errorf("retry limit exceeded; operator recovery required")); err != nil {
+				return len(events), err
+			}
+			index++
+			continue
+		}
 		if events[index].Topic == "code_entity.upsert" {
 			end := index + 1
-			for end < len(events) && events[end].Topic == "code_entity.upsert" {
+			for end < len(events) && events[end].Topic == "code_entity.upsert" && events[end].Attempts <= 10 {
 				end++
 			}
 			if err := w.processCodeEntityBatch(ctx, events[index:end]); err != nil {
@@ -146,7 +218,25 @@ func (w *Worker) processCodeEntityBatch(ctx context.Context, events []domain.Out
 	return nil
 }
 
-func (w *Worker) process(ctx context.Context, event domain.OutboxEvent) error {
+func (w *Worker) process(ctx context.Context, event domain.OutboxEvent) (err error) {
+	if event.Topic == "knowledge.upsert" {
+		item, lookupErr := w.repository.GetKnowledge(ctx, event.AggregateID, true)
+		if lookupErr != nil {
+			return lookupErr
+		}
+		repository, _ := w.repository.(domain.TraceRepository)
+		scope := domain.OperationScope{ProjectID: item.ProjectID, WorkflowID: item.WorkflowID}
+		var finish telemetry.Finish
+		ctx, finish, err = telemetry.Begin(ctx, repository, "index.knowledge", scope, []domain.EvidenceReference{{Kind: "knowledge", ID: item.ID, Version: item.Version}, {Kind: "outbox", ID: fmt.Sprint(event.ID)}})
+		if err != nil {
+			return err
+		}
+		defer func() { err = errors.Join(err, finish(err)) }()
+	}
+	return w.processEffect(ctx, event)
+}
+
+func (w *Worker) processEffect(ctx context.Context, event domain.OutboxEvent) error {
 	switch event.Topic {
 	case "knowledge.upsert":
 		item, err := w.repository.GetKnowledge(ctx, event.AggregateID, false)
@@ -160,8 +250,37 @@ func (w *Worker) process(ctx context.Context, event domain.OutboxEvent) error {
 		if len(embeddings) != 1 {
 			return fmt.Errorf("expected one embedding, got %d", len(embeddings))
 		}
+		if err := domain.ValidateEmbedding(embeddings[0], len(embeddings[0])); err != nil {
+			return err
+		}
+		if manifests, ok := w.repository.(domain.ProjectionRepository); ok {
+			identity, ok := w.embedder.(interface{ EmbeddingIdentity() (string, string, int) })
+			if !ok {
+				return domain.ErrQualityBlocked
+			}
+			provider, model, _ := identity.EmbeddingIdentity()
+			manifest, err := manifests.BuildKnowledgeProjection(ctx, item, provider, model, len(embeddings[0]))
+			if err != nil {
+				return err
+			}
+			item.Projection = &manifest
+		}
 		if err := w.vectors.Upsert(ctx, item, embeddings[0]); err != nil {
 			return err
+		}
+		if repository, ok := w.repository.(domain.KnowledgeQualityRepository); ok {
+			reader, ok := w.vectors.(interface {
+				VerifyKnowledgeProjection(context.Context, domain.KnowledgeItem) error
+			})
+			if !ok {
+				return fmt.Errorf("projection readback unavailable")
+			}
+			if err := reader.VerifyKnowledgeProjection(ctx, item); err != nil {
+				return err
+			}
+			if err := repository.RecordProjectionCheck(ctx, item); err != nil {
+				return err
+			}
 		}
 		if w.projector != nil {
 			if err := w.projector.ProjectKnowledge(ctx, item.ID); err != nil {
@@ -192,6 +311,8 @@ func (w *Worker) process(ctx context.Context, event domain.OutboxEvent) error {
 			return w.projector.ProjectRepositoryRelation(ctx, relation)
 		}
 		return nil
+	case "context.upsert":
+		return w.indexDefinition(ctx, event)
 	case "code_graph.project":
 		if w.projector == nil {
 			return nil

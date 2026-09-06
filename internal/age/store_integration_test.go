@@ -8,8 +8,12 @@ import (
 	"time"
 
 	"github.com/dhanuka84/hybrid-ai-platform/components/codegraph"
+	"github.com/dhanuka84/hybrid-ai-platform/internal/artifacts"
+	"github.com/dhanuka84/hybrid-ai-platform/internal/authorization"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/domain"
+	"github.com/dhanuka84/hybrid-ai-platform/internal/identity"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/postgres"
+	"github.com/dhanuka84/hybrid-ai-platform/internal/service"
 	"github.com/dhanuka84/hybrid-ai-platform/migrations"
 )
 
@@ -34,7 +38,7 @@ func TestAGEProjectionAndTraversalIntegration(t *testing.T) {
 	if err := migrations.Apply(ctx, repository.Pool()); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := repository.Pool().Exec(ctx, `TRUNCATE projects CASCADE; TRUNCATE outbox_events RESTART IDENTITY`); err != nil {
+	if _, err := repository.Pool().Exec(ctx, `TRUNCATE projects CASCADE; TRUNCATE outbox_events RESTART IDENTITY CASCADE`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := store.Rebuild(ctx); err != nil {
@@ -111,17 +115,8 @@ func TestAGEProjectionAndTraversalIntegration(t *testing.T) {
 		t.Fatalf("code traversal mismatch: age=%d/%d postgres=%d/%d err=%v", len(codeResult.Entities), len(codeResult.Relations), len(relationalCode.Entities), len(relationalCode.Relations), err)
 	}
 
-	var knowledgeA, knowledgeB string
-	if err := repository.Pool().QueryRow(ctx, `INSERT INTO knowledge_items(
-      project_id,title,problem,content,status,version,approved_at,approved_by
-    ) VALUES('product','Milvus indexing','impact','validated procedure','approved',1,now(),'owner') RETURNING id::text`).Scan(&knowledgeA); err != nil {
-		t.Fatal(err)
-	}
-	if err := repository.Pool().QueryRow(ctx, `INSERT INTO knowledge_items(
-      project_id,title,problem,content,status,version,approved_at,approved_by
-    ) VALUES('product','API contract','impact','validated contract','approved',1,now(),'owner') RETURNING id::text`).Scan(&knowledgeB); err != nil {
-		t.Fatal(err)
-	}
+	knowledgeA := createGovernedFixture(t, ctx, repository, "Milvus indexing").ID
+	knowledgeB := createGovernedFixture(t, ctx, repository, "API contract").ID
 	if _, err := repository.Pool().Exec(ctx, `INSERT INTO knowledge_relations(from_id,to_id,relation_type,confidence)
       VALUES($1,$2,'related_to',0.9)`, knowledgeA, knowledgeB); err != nil {
 		t.Fatal(err)
@@ -158,6 +153,48 @@ func TestAGEProjectionAndTraversalIntegration(t *testing.T) {
 	if err != nil || len(relationalContext.Nodes) != len(contextGraph.Nodes) || len(relationalContext.Edges) != len(contextGraph.Edges) {
 		t.Fatalf("unified traversal mismatch: age=%d/%d postgres=%d/%d err=%v", len(contextGraph.Nodes), len(contextGraph.Edges), len(relationalContext.Nodes), len(relationalContext.Edges), err)
 	}
+	quality, err := repository.KnowledgeQuality(ctx, knowledgeB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := repository.RecordSourceCheck(ctx, knowledgeB, quality.Version, quality.ValidationID, false, "source_changed"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.ExpandKnowledgeGraph(ctx, domain.KnowledgeGraphRequest{ProjectID: "product", KnowledgeSeedIDs: []string{knowledgeA}, MaxHops: 3, MaxNodes: 1, MaxEdges: 1}); !errors.Is(err, ErrProjectionStale) {
+		t.Fatalf("bounded AGE traversal crossed quarantined knowledge: %v", err)
+	}
+}
+
+func createGovernedFixture(t *testing.T, ctx context.Context, repository *postgres.Repository, title string) domain.KnowledgeItem {
+	t.Helper()
+	actor := "human:age-synthetic-fixture"
+	if err := repository.BootstrapPrincipals(ctx, []domain.PrincipalBootstrap{{ID: actor, Human: true, Roles: []string{"qa", "product_owner"}, ProjectIDs: []string{"product"}}}); err != nil {
+		t.Fatal(err)
+	}
+	store := artifacts.NewLocalStore(t.TempDir())
+	svc := service.New(repository, store, nil, nil, false, false)
+	if err := svc.ConfigureAuthorization(authorization.Disabled{}, false); err != nil {
+		t.Fatal(err)
+	}
+	principal := domain.Principal{ID: actor, Human: true, RoleBindings: map[string][]string{"product": {"qa", "product_owner"}}}
+	ctx = identity.WithPrincipal(ctx, principal)
+	item, err := svc.Capture(ctx, service.CaptureInput{ProjectID: "product", Prompt: title, Response: "synthetic solution: " + title, Summary: title, Procedure: []string{"Execute synthetic fixture"}, Provider: "ollama", Model: "synthetic-no-model-invocation"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	source, err := store.Put(ctx, []byte("synthetic fixture source"), "text/plain")
+	if err != nil {
+		t.Fatal(err)
+	}
+	report, err := svc.RecordManualValidation(ctx, service.ValidationInput{KnowledgeID: item.ID, ExpectedVersion: item.Version, SourceManifest: domain.SourceManifest{SchemaVersion: "hybrid-ai/knowledge-source/v1", Sources: []domain.KnowledgeSource{{Kind: "procedure", Reference: "synthetic-fixture", ArtifactSHA256: source.SHA256}}}, Criteria: []domain.ValidationCriterion{{Name: "fixture", Passed: true, Observation: "Synthetic fixture; not approval of real knowledge"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	item, err = svc.DecideKnowledge(ctx, service.DecisionInput{KnowledgeID: item.ID, ExpectedVersion: item.Version, ValidationID: report.ID, Decision: "approve", Reason: "synthetic test only", IdempotencyKey: item.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return item
 }
 
 func upsertTestRelation(t *testing.T, ctx context.Context, repository *postgres.Repository, from, to, relationType string) domain.RepositoryRelation {

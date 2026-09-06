@@ -1,0 +1,1 @@
+{"verdict":"pass","acceptance_results":[{"criterion":"tests","status":"pass","evidence":"local fixture"}],"command_results":[{"argv":["go","test","./..."],"exit_code":0,"artifact_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}],"residual_risks":[]}

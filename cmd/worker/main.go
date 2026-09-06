@@ -12,6 +12,7 @@ import (
 	"github.com/dhanuka84/hybrid-ai-platform/internal/logging"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/ollama"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/platform"
+	"github.com/dhanuka84/hybrid-ai-platform/internal/telemetry"
 	workerpkg "github.com/dhanuka84/hybrid-ai-platform/internal/worker"
 )
 
@@ -35,6 +36,14 @@ func main() {
 	}
 	embedder := ollama.New(cfg.OllamaURL, cfg.EmbeddingModel)
 	worker := workerpkg.New(app.Repository, embedder, app.Vectors, logger, cfg.WorkerPollInterval, cfg.WorkerBatchSize)
+	worker.ConfigureSourceVerifier(app.Service.RefreshKnowledgeSources)
+	if cfg.TraceExportEndpoint != "" {
+		exporter, err := telemetry.NewExporter(app.Repository, cfg.TraceExportEndpoint)
+		if err != nil {
+			fail(err)
+		}
+		worker.ConfigureTraceExporter(exporter)
+	}
 	if app.Projector != nil {
 		worker.ConfigureGraphProjector(app.Projector)
 	}

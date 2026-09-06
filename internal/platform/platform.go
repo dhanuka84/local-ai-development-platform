@@ -19,6 +19,7 @@ import (
 	"github.com/dhanuka84/hybrid-ai-platform/internal/ollama"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/postgres"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/service"
+	"github.com/dhanuka84/hybrid-ai-platform/internal/telemetry"
 )
 
 type Platform struct {
@@ -42,9 +43,15 @@ func Open(ctx context.Context, cfg config.Config) (*Platform, error) {
 		repository.Close()
 		return nil, err
 	}
-	embedder := ollama.New(cfg.OllamaURL, cfg.EmbeddingModel)
+	embedder := telemetry.WrapEmbedder(repository, ollama.New(cfg.OllamaURL, cfg.EmbeddingModel))
 	artifactStore := artifacts.NewLocalStore(cfg.ArtifactsPath)
 	svc := service.New(repository, artifactStore, embedder, vectors, cfg.SearchFallback, cfg.AutoApproveLocal)
+	if err := svc.ConfigureTraceRetention(cfg.TraceRetentionDays); err != nil {
+		repository.Close()
+		_ = vectors.Close(ctx)
+		return nil, err
+	}
+	svc.ConfigureSourceRoots(cfg.CodeGraphAllowedRoots)
 	relationalGraphs := postgres.NewRecursiveGraphStore(repository)
 	var graphStore domain.GraphStore = relationalGraphs
 	var graphHealth domain.HealthChecker

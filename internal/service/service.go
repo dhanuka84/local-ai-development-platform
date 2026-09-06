@@ -12,6 +12,7 @@ import (
 	"github.com/dhanuka84/hybrid-ai-platform/components/codegraph"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/domain"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/graphrag"
+	"github.com/dhanuka84/hybrid-ai-platform/internal/telemetry"
 )
 
 var ErrInvalidInput = errors.New("invalid input")
@@ -25,12 +26,14 @@ type Service struct {
 	autoApprove                bool
 	codeAnalyzer               codegraph.Analyzer
 	codeRoots                  []string
+	sourceRoots                []string
 	codeLimits                 CodeGraphLimits
 	authorizer                 domain.Authorizer
 	reportAuthorizerDependency bool
 	graphStore                 domain.GraphStore
 	graphHealth                domain.HealthChecker
 	graphRAG                   *graphrag.Service
+	traceRetentionDays         int
 }
 
 func (s *Service) ConfigureAuthorization(authorizer domain.Authorizer, reportDependency bool) error {
@@ -49,6 +52,7 @@ type CodeGraphLimits struct {
 }
 
 func New(repository domain.Repository, artifacts domain.ArtifactStore, embedder domain.Embedder, vectors domain.VectorStore, lexicalFallback, autoApprove bool) *Service {
+	embedder = telemetry.WrapEmbedder(repository, embedder)
 	return &Service{
 		repository: repository, artifacts: artifacts, embedder: embedder, vectors: vectors,
 		lexicalFallback: lexicalFallback, autoApprove: autoApprove,
@@ -207,7 +211,7 @@ func (s *Service) SearchCodeEntities(ctx context.Context, projectID, repositoryI
 				result := make([]domain.CodeEntity, 0, limit)
 				for _, hit := range vectorHits {
 					entity, ok := byID[hit.ID]
-					if !ok || (repositoryID != "" && entity.RepositoryID != repositoryID) {
+					if !ok || entity.ProjectID != projectID || !domain.FiniteScore(hit.Score) || (repositoryID != "" && entity.RepositoryID != repositoryID) {
 						continue
 					}
 					entity.Score = hit.Score
@@ -302,6 +306,9 @@ func (s *Service) Capture(ctx context.Context, input CaptureInput) (domain.Knowl
 }
 
 func (s *Service) Search(ctx context.Context, projectID, query string, limit int) ([]domain.SearchHit, string, error) {
+	scope := domain.ScopeFromContext(ctx)
+	scope.ProjectID = projectID
+	ctx = domain.WithOperationScope(ctx, scope)
 	projectID, query = strings.TrimSpace(projectID), strings.TrimSpace(query)
 	if projectID == "" || query == "" {
 		return nil, "", fmt.Errorf("%w: project_id and query are required", ErrInvalidInput)
@@ -328,10 +335,22 @@ func (s *Service) Search(ctx context.Context, projectID, query string, limit int
 					byID[item.ID] = item
 				}
 				result := make([]domain.SearchHit, 0, len(vectorHits))
+				seen := make(map[string]bool)
 				for _, hit := range vectorHits {
-					if item, ok := byID[hit.ID]; ok && item.Status == domain.CandidateApproved {
+					if item, ok := byID[hit.ID]; ok && hit.Matches(item, projectID) && !seen[item.ID] {
+						current, err := s.vectorProjectionCurrent(ctx, item, hit)
+						if err != nil {
+							return nil, "", err
+						}
+						if !current {
+							continue
+						}
+						seen[item.ID] = true
 						result = append(result, domain.SearchHit{KnowledgeItem: item, Score: hit.Score})
 					}
+				}
+				if len(vectorHits) > 0 && len(result) == 0 {
+					return nil, "milvus", domain.ErrQualityBlocked
 				}
 				return result, "milvus", nil
 			}
@@ -344,7 +363,19 @@ func (s *Service) Search(ctx context.Context, projectID, query string, limit int
 		return nil, "", errors.New("vector search unavailable")
 	}
 	hits, err := s.repository.SearchApprovedLexical(ctx, projectID, query, limit)
-	return hits, "postgres-lexical-fallback", err
+	if err != nil {
+		return nil, "postgres-lexical-fallback", err
+	}
+	result := make([]domain.SearchHit, 0, len(hits))
+	for _, hit := range hits {
+		if hit.ProjectID == projectID && hit.Status == domain.CandidateApproved && domain.FiniteScore(hit.Score) {
+			result = append(result, hit)
+		}
+	}
+	if len(hits) > 0 && len(result) == 0 {
+		return nil, "postgres-lexical-fallback", domain.ErrQualityBlocked
+	}
+	return result, "postgres-lexical-fallback", nil
 }
 
 func (s *Service) Get(ctx context.Context, id string, includePending bool) (domain.KnowledgeItem, error) {

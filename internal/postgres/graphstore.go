@@ -46,15 +46,15 @@ const unifiedGraphEdgesSQL = `
            encode(digest(concat_ws(chr(31),'knowledge_relation',relation.from_id::text,relation.to_id::text,relation.relation_type),'sha256'),'hex'),
            relation.relation_type,relation.from_id::text,'knowledge_item',relation.to_id::text,'knowledge_item','',relation.confidence
     FROM knowledge_relations relation
-    JOIN knowledge_items source ON source.id=relation.from_id AND source.status='approved'
-    JOIN knowledge_items target ON target.id=relation.to_id AND target.status='approved' AND target.project_id=source.project_id
+    JOIN knowledge_items source ON source.id=relation.from_id AND knowledge_eligible(source.id)
+    JOIN knowledge_items target ON target.id=relation.to_id AND knowledge_eligible(target.id) AND target.project_id=source.project_id
     UNION ALL
     SELECT knowledge.project_id,
            encode(digest(concat_ws(chr(31),'knowledge_code',reference.knowledge_id::text,reference.entity_id::text,reference.analysis_run_id::text,reference.role),'sha256'),'hex'),
            reference.role,reference.knowledge_id::text,'knowledge_item',reference.entity_id::text,'code_entity',
            reference.evidence,1::real
     FROM knowledge_code_references reference
-    JOIN knowledge_items knowledge ON knowledge.id=reference.knowledge_id AND knowledge.status='approved'
+    JOIN knowledge_items knowledge ON knowledge.id=reference.knowledge_id AND knowledge_eligible(knowledge.id)
     JOIN code_entities entity ON entity.id=reference.entity_id AND entity.project_id=knowledge.project_id
     JOIN code_repository_heads head ON head.repository_id=entity.repository_id AND head.analysis_run_id=reference.analysis_run_id`
 
@@ -75,7 +75,7 @@ func (s *RecursiveGraphStore) ExpandKnowledgeGraph(ctx context.Context, request 
 	}
 	rows, err := s.repository.pool.Query(ctx, `WITH RECURSIVE graph_edges(
         project_id,edge_id,edge_type,source_id,source_type,target_id,target_type,evidence,confidence
-      ) AS MATERIALIZED (`+unifiedGraphEdgesSQL+`), seeds(node_id,node_type) AS (
+      ) AS MATERIALIZED (`+qualitySQL(ctx, unifiedGraphEdgesSQL)+`), seeds(node_id,node_type) AS (
         SELECT * FROM unnest($2::text[],$3::text[])
       ), walk(node_id,node_type,path,depth) AS (
         SELECT node_id,node_type,ARRAY[node_type || ':' || node_id],0 FROM seeds
@@ -147,13 +147,37 @@ func (r *Repository) HydrateKnowledgeSubgraph(ctx context.Context, projectID str
 	if err != nil {
 		return result, err
 	}
+	// Hydration, not projected IDs, defines the authorized node set. Remove
+	// cross-project, stale and missing nodes before deriving any edges.
 	nodeSet := make(map[string]struct{}, len(nodes))
+	for _, item := range result.Repositories {
+		nodeSet[domain.GraphNodeRepository+":"+item.ID] = struct{}{}
+	}
+	code := result.CodeEntities[:0]
+	for _, item := range result.CodeEntities {
+		if item.ProjectID == projectID {
+			code = append(code, item)
+			nodeSet[domain.GraphNodeCodeEntity+":"+item.ID] = struct{}{}
+		}
+	}
+	result.CodeEntities = code
+	knowledge := result.Knowledge[:0]
+	for _, item := range result.Knowledge {
+		if item.ProjectID == projectID {
+			knowledge = append(knowledge, item)
+			nodeSet[domain.GraphNodeKnowledgeItem+":"+item.ID] = struct{}{}
+		}
+	}
+	result.Knowledge = knowledge
+	result.Nodes = []domain.GraphNode{}
 	for _, node := range nodes {
-		nodeSet[node.Type+":"+node.ID] = struct{}{}
+		if _, ok := nodeSet[node.Type+":"+node.ID]; ok {
+			result.Nodes = append(result.Nodes, node)
+		}
 	}
 	edgeRows, err := r.pool.Query(ctx, `WITH graph_edges(
         project_id,edge_id,edge_type,source_id,source_type,target_id,target_type,evidence,confidence
-      ) AS (`+unifiedGraphEdgesSQL+`)
+      ) AS (`+qualitySQL(ctx, unifiedGraphEdgesSQL)+`)
       SELECT edge_id,edge_type,source_id,source_type,target_id,target_type,evidence,confidence
       FROM graph_edges WHERE project_id=$1
         AND source_type || ':' || source_id=ANY($2)

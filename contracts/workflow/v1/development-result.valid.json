@@ -1,0 +1,1 @@
+{"status":"implemented","patch_artifact_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","changed_files":["fixture.go"],"checks_requested":[["go","test","./..."]],"assumptions":[],"escalations":[]}

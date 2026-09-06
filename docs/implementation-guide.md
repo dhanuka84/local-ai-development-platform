@@ -163,8 +163,11 @@ A `revise` verdict requires `provider=ollama`, `improved_content`, and fresh loc
 `validation_evidence`; it replaces both fields on a pending candidate and
 increments its version. It cannot mutate approved knowledge.
 Raw review artifacts are never sent to Milvus. `knowledge_candidate_decide` is
-the explicit gate. Approval, its audit review row, and the `knowledge.upsert`
-outbox event commit in one transaction.
+the explicit gate. It now requires an expected candidate version, validation
+report ID for approval, rationale and idempotency key. Approval, its immutable
+decision, audit review row, and `knowledge.upsert` outbox event commit in one
+transaction. See [the upgrade and QA runbook](agent-ready-data-operations.md)
+for the new CLI/MCP contract and freshness behavior.
 
 The worker claims outbox rows using `FOR UPDATE SKIP LOCKED`. Multiple replicas
 therefore drain one queue without duplicate claims. Consecutive code-entity

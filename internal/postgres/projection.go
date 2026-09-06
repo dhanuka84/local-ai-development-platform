@@ -90,7 +90,7 @@ func (r *Repository) LoadGraphProjectionSnapshot(ctx context.Context) (domain.Gr
 	}
 
 	knowledgeRows, err := r.pool.Query(ctx, `SELECT `+knowledgeColumns+` FROM knowledge_items
-      WHERE status='approved' ORDER BY project_id,id`)
+      WHERE knowledge_eligible(id) ORDER BY project_id,id`)
 	if err != nil {
 		return snapshot, err
 	}
@@ -111,8 +111,8 @@ func (r *Repository) LoadGraphProjectionSnapshot(ctx context.Context) (domain.Gr
 	knowledgeRelationRows, err := r.pool.Query(ctx, `SELECT source.project_id,relation.from_id::text,relation.to_id::text,
         relation.relation_type,relation.confidence
       FROM knowledge_relations relation
-      JOIN knowledge_items source ON source.id=relation.from_id AND source.status='approved'
-      JOIN knowledge_items target ON target.id=relation.to_id AND target.status='approved'
+      JOIN knowledge_items source ON source.id=relation.from_id AND knowledge_eligible(source.id)
+      JOIN knowledge_items target ON target.id=relation.to_id AND knowledge_eligible(target.id) AND target.project_id=source.project_id
       WHERE target.project_id=source.project_id
       ORDER BY source.project_id,relation.from_id,relation.to_id,relation.relation_type`)
 	if err != nil {
@@ -137,7 +137,7 @@ func (r *Repository) LoadGraphProjectionSnapshot(ctx context.Context) (domain.Gr
 	referenceRows, err := r.pool.Query(ctx, `SELECT knowledge.project_id,reference.knowledge_id::text,reference.entity_id::text,
         reference.analysis_run_id::text,reference.role,reference.evidence
       FROM knowledge_code_references reference
-      JOIN knowledge_items knowledge ON knowledge.id=reference.knowledge_id AND knowledge.status='approved'
+      JOIN knowledge_items knowledge ON knowledge.id=reference.knowledge_id AND knowledge_eligible(knowledge.id)
       JOIN code_entities entity ON entity.id=reference.entity_id AND entity.project_id=knowledge.project_id
       JOIN code_repository_heads head ON head.repository_id=entity.repository_id
                                      AND head.analysis_run_id=reference.analysis_run_id
@@ -216,7 +216,7 @@ func (r *Repository) KnowledgeProjectionsCurrent(ctx context.Context, projectID 
 	}
 	var current bool
 	err := r.pool.QueryRow(ctx, `SELECT count(*)=cardinality($2::text[])
-        AND COALESCE(bool_and(item.status='approved' AND projected.version=item.version
+        AND COALESCE(bool_and(knowledge_eligible(item.id) AND projected.version=item.version
                      AND projected.backend='apache-age' AND projected.status='ready'),false)
       FROM knowledge_items item
       LEFT JOIN graph_knowledge_projection_heads projected ON projected.knowledge_id=item.id

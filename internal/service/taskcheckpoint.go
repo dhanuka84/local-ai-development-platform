@@ -8,6 +8,7 @@ import (
 
 	"github.com/dhanuka84/hybrid-ai-platform/internal/domain"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/identity"
+	"github.com/dhanuka84/hybrid-ai-platform/internal/telemetry"
 )
 
 const defaultTaskMatchThreshold = float32(0.75)
@@ -91,6 +92,7 @@ func (s *Service) BeginWorkflowTask(ctx context.Context, input BeginWorkflowTask
 		"title": input.Title, "task_type": input.TaskType, "execution_mode": input.ExecutionMode, "query": input.RAGQuery,
 		"match_threshold": input.MatchThreshold,
 	}
+	ctx = telemetry.WithRole(ctx, actorRole)
 	requestJSON, err := json.Marshal(requestRecord)
 	if err != nil {
 		return domain.WorkflowTaskCheckpoint{}, domain.WorkflowTaskEvent{}, err
@@ -191,6 +193,8 @@ func (s *Service) TransitionWorkflowTask(ctx context.Context, input TransitionWo
 	if err != nil {
 		return domain.WorkflowTaskCheckpoint{}, domain.WorkflowTaskEvent{}, err
 	}
+	ctx = domain.WithPurpose(ctx, domain.TaskPurpose(task.TaskType))
+	ctx = domain.WithOperationScope(ctx, domain.OperationScope{ProjectID: task.ProjectID, WorkflowID: task.WorkflowID, TaskID: task.ID})
 	run, err := s.repository.GetWorkflow(ctx, task.WorkflowID)
 	if err != nil {
 		return domain.WorkflowTaskCheckpoint{}, domain.WorkflowTaskEvent{}, err
@@ -203,6 +207,7 @@ func (s *Service) TransitionWorkflowTask(ctx context.Context, input TransitionWo
 	if !ok {
 		return domain.WorkflowTaskCheckpoint{}, domain.WorkflowTaskEvent{}, fmt.Errorf("%w: principal lacks the required role for %s", ErrForbidden, input.EventType)
 	}
+	ctx = telemetry.WithRole(ctx, actorRole)
 	if spec.provider != "" {
 		if input.Provider != spec.provider || input.Model == "" {
 			return domain.WorkflowTaskCheckpoint{}, domain.WorkflowTaskEvent{}, fmt.Errorf("%w: %s requires provider %s and an explicit model", ErrInvalidInput, input.EventType, spec.provider)
@@ -215,7 +220,7 @@ func (s *Service) TransitionWorkflowTask(ctx context.Context, input TransitionWo
 		return domain.WorkflowTaskCheckpoint{}, domain.WorkflowTaskEvent{}, fmt.Errorf("%w: review_influence_weight must be between 0 and 1", ErrInvalidInput)
 	}
 	var activationRoute, activationBackend string
-	var activationHitIDs []string
+	activationHitIDs := []string{}
 	var activationMaxScore float32
 	var lookupArtifact *domain.Artifact
 	if input.EventType == "TASK_ACTIVATED" {
@@ -412,6 +417,8 @@ func workflowTaskTransition(task domain.WorkflowTaskCheckpoint, event string) (t
 		}
 	case domain.TaskStateValidationRequired:
 		switch event {
+		case "VALIDATED_REUSE_COMPLETED":
+			return taskTransitionSpec{to: domain.TaskStateCompleted, roles: []string{"development", "qa", "controller"}, provider: "ollama", evidenceRequired: true, completed: true}, true
 		case "VALIDATION_PASSED":
 			return taskTransitionSpec{to: domain.TaskStatePromotionRequired, roles: []string{"development", "qa", "controller"}, provider: "ollama", evidenceRequired: true}, true
 		case "VALIDATION_FAILED":

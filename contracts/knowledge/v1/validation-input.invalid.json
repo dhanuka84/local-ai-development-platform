@@ -1,0 +1,1 @@
+{"knowledge_id":"00000000-0000-4000-8000-000000000001","expected_version":1,"source_manifest":{"schema_version":"hybrid-ai/knowledge-source/v1","sources":[{"kind":"repository","reference":"fixture"}]},"criteria":[{"name":"tests","passed":true,"observation":"model assertion"}],"validated_by":"human:forged"}

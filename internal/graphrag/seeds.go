@@ -17,6 +17,9 @@ func (s *Service) semanticSeeds(ctx context.Context, request Request) ([]seed, s
 		return nil, "", err
 	}
 	vector := embeddings[0]
+	if err := domain.ValidateEmbedding(vector, len(vector)); err != nil {
+		return nil, "", err
+	}
 	knowledgeHits, knowledgeErr := s.vectors.Search(ctx, request.ProjectID, vector, request.SeedLimit)
 	codeHits, codeErr := s.vectors.SearchCodeEntities(ctx, request.ProjectID, "", vector, request.SeedLimit)
 	relationHits, relationErr := s.vectors.SearchRelations(ctx, request.ProjectID, vector, request.SeedLimit)
@@ -31,7 +34,39 @@ func (s *Service) semanticSeeds(ctx context.Context, request Request) ([]seed, s
 		return nil, "", err
 	}
 	knowledgeScores := hitScores(knowledgeHits)
+	knowledgeMetadata := map[string]domain.VectorHit{}
+	for _, hit := range knowledgeHits {
+		knowledgeMetadata[hit.ID] = hit
+	}
 	for _, item := range knowledge {
+		if !knowledgeMetadata[item.ID].Matches(item, request.ProjectID) {
+			continue
+		}
+		if repository, ok := s.repository.(domain.KnowledgeQualityRepository); ok {
+			quality, err := repository.KnowledgeQuality(ctx, item.ID)
+			if err != nil {
+				return nil, "", err
+			}
+			if !quality.Eligible || quality.ProjectionVerifiedAt == nil || quality.Version != item.Version {
+				continue
+			}
+			manifests, ok := s.repository.(domain.ProjectionRepository)
+			if !ok {
+				return nil, "", domain.ErrEvidenceUnavailable
+			}
+			manifest, err := manifests.KnowledgeProjection(ctx, item.ID)
+			if err != nil {
+				return nil, "", err
+			}
+			identity, ok := s.embedder.(interface{ EmbeddingIdentity() (string, string, int) })
+			if !ok {
+				return nil, "", domain.ErrQualityBlocked
+			}
+			provider, model, _ := identity.EmbeddingIdentity()
+			if manifest.Provider != provider || manifest.Model != model || knowledgeMetadata[item.ID].ProjectionSHA256 != manifest.Digest() {
+				continue
+			}
+		}
 		candidates = append(candidates, seed{ID: item.ID, Type: domain.GraphNodeKnowledgeItem, Score: knowledgeScores[item.ID]})
 	}
 	code, err := s.repository.GetCodeEntitiesMany(ctx, hitIDs(codeHits))
@@ -40,6 +75,9 @@ func (s *Service) semanticSeeds(ctx context.Context, request Request) ([]seed, s
 	}
 	codeScores := hitScores(codeHits)
 	for _, entity := range code {
+		if entity.ProjectID != request.ProjectID || !domain.FiniteScore(codeScores[entity.ID]) {
+			continue
+		}
 		if request.Repository != "" && request.Repository != entity.RepositoryID && request.Repository != entity.RepositoryName {
 			continue
 		}
@@ -51,6 +89,9 @@ func (s *Service) semanticSeeds(ctx context.Context, request Request) ([]seed, s
 	}
 	relationScores := hitScores(relationHits)
 	for _, relation := range relations {
+		if relation.ProjectID != request.ProjectID || !domain.FiniteScore(relationScores[relation.ID]) {
+			continue
+		}
 		score := relationScores[relation.ID]
 		candidates = append(candidates,
 			seed{ID: relation.From.ID, Type: domain.GraphNodeRepository, Score: score},
@@ -62,10 +103,16 @@ func (s *Service) semanticSeeds(ctx context.Context, request Request) ([]seed, s
 	}
 	edgeScores := hitScores(edgeHits)
 	for _, edge := range edges {
+		if edge.ProjectID != request.ProjectID || !domain.FiniteScore(edgeScores[edge.ID]) {
+			continue
+		}
 		score := edgeScores[edge.ID]
 		candidates = append(candidates,
 			seed{ID: edge.SourceID, Type: edge.SourceType, Score: score},
 			seed{ID: edge.TargetID, Type: edge.TargetType, Score: score})
+	}
+	if len(knowledgeHits) > 0 && len(candidates) == 0 {
+		return nil, "milvus", domain.ErrQualityBlocked
 	}
 	return topSeeds(candidates, request.SeedLimit), "milvus", nil
 }
@@ -73,14 +120,23 @@ func (s *Service) semanticSeeds(ctx context.Context, request Request) ([]seed, s
 func (s *Service) lexicalSeeds(ctx context.Context, request Request) ([]seed, error) {
 	candidates := make([]seed, 0, request.SeedLimit*2)
 	knowledge, knowledgeErr := s.repository.SearchApprovedLexical(ctx, request.ProjectID, request.Query, request.SeedLimit)
+	if errors.Is(knowledgeErr, domain.ErrQualityBlocked) {
+		return nil, knowledgeErr
+	}
 	if knowledgeErr == nil {
 		for _, hit := range knowledge {
+			if hit.ProjectID != request.ProjectID || hit.Status != domain.CandidateApproved || !domain.FiniteScore(hit.Score) {
+				continue
+			}
 			candidates = append(candidates, seed{ID: hit.ID, Type: domain.GraphNodeKnowledgeItem, Score: hit.Score})
 		}
 	}
 	code, codeErr := s.repository.SearchCodeEntitiesLexical(ctx, request.ProjectID, request.Repository, request.Query, request.SeedLimit)
 	if codeErr == nil {
 		for _, entity := range code {
+			if entity.ProjectID != request.ProjectID || !domain.FiniteScore(entity.Score) {
+				continue
+			}
 			candidates = append(candidates, seed{ID: entity.ID, Type: domain.GraphNodeCodeEntity, Score: entity.Score})
 		}
 	}

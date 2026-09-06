@@ -765,7 +765,9 @@ Available tools:
 | `generation_capture` | Store a run, immutable artifacts, provenance, procedure, validation, and pending candidate. |
 | `review_record` | Save review provenance and immutable raw-output/context-manifest artifacts; only `provider=ollama` may use `revise` with fresh local validation to update a pending candidate. |
 | `knowledge_candidates_list` | List the review queue. |
-| `knowledge_candidate_decide` | Approve or reject; approval queues vector indexing. |
+| `knowledge_candidate_decide` | Versioned, idempotent human decision; approval requires a matching validation report and queues verified indexing. |
+| `knowledge_validation_record` | Record authenticated human QA evidence for an exact candidate version; does not approve it. |
+| `knowledge_quality_reviews` | List project-scoped approved knowledge currently withheld by quality gates. |
 | `workflow_task_begin` | Queue an atomic task; automatically activate the FIFO head and perform RAG routing. |
 | `workflow_task_get` | Read queue position, route, checkpoint, provider/model, candidate, and evidence references. |
 | `workflow_task_transition` | Record provider-gated local, review, validation, promotion, read-back, or manual rejection events. |
@@ -844,6 +846,14 @@ See [enterprise-deployment.md](docs/enterprise-deployment.md) and the [enterpris
 - [Enterprise deployment](docs/enterprise-deployment.md)
 - [Architecture diagrams and Mermaid sources](docs/diagrams/README.md)
 - [Architecture decisions](docs/adr/)
+
+## Agent-ready data follow-up
+
+The [implementation checkpoint](docs/agent-ready-data-plan.md) and
+[operations runbook](docs/agent-ready-data-operations.md) cover governed metrics,
+Milvus semantic definitions, trace evidence, explicit validated reuse, and the
+human-gated local pilot. Run `make agent-ready-acceptance` only against disposable
+services; real knowledge and semantic definitions are never auto-approved.
 
 ## License
 

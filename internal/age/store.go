@@ -225,6 +225,20 @@ func (s *Store) ExpandCodeGraph(ctx context.Context, request domain.CodeGraphReq
 }
 
 func (s *Store) ExpandKnowledgeGraph(ctx context.Context, request domain.KnowledgeGraphRequest) (domain.KnowledgeSubgraph, error) {
+	if domain.Purpose(ctx) != domain.PurposeGuidance {
+		return domain.KnowledgeSubgraph{}, fmt.Errorf("%w: consumer-purpose SQL eligibility required", ErrProjectionStale)
+	}
+	// AGE traversal can cross an intermediate node omitted by a bounded result.
+	// Until its projection can enforce per-hop SQL eligibility, conservatively
+	// fall back whenever this project's projection contains ineligible knowledge.
+	var blocked bool
+	if err := s.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM graph_knowledge_projection_heads h JOIN knowledge_items k ON k.id=h.knowledge_id
+		WHERE k.project_id=$1 AND NOT knowledge_eligible(k.id))`, request.ProjectID).Scan(&blocked); err != nil {
+		return domain.KnowledgeSubgraph{}, err
+	}
+	if blocked {
+		return domain.KnowledgeSubgraph{}, fmt.Errorf("%w: knowledge quality gate", ErrProjectionStale)
+	}
 	seedNodes := make([]domain.GraphNode, 0, len(request.KnowledgeSeedIDs)+len(request.CodeSeedIDs)+len(request.RepositorySeedIDs))
 	appendSeeds := func(ids []string, nodeType string) {
 		for _, id := range ids {

@@ -20,9 +20,14 @@ spec:
           resources:
             requests: {cpu: 250m, memory: 256Mi}
             limits: {cpu: "2", memory: 2Gi}
+          volumeMounts:
+            - {name: artifacts, mountPath: /var/lib/hybrid-ai/artifacts, readOnly: true}
           securityContext:
             allowPrivilegeEscalation: false
             capabilities: {drop: [ALL]}
             readOnlyRootFilesystem: true
             runAsNonRoot: true
             seccompProfile: {type: RuntimeDefault}
+      volumes:
+        - name: artifacts
+          persistentVolumeClaim: {claimName: hybrid-ai-artifacts}

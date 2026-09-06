@@ -2,6 +2,8 @@ package mcpserver
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -13,6 +15,21 @@ import (
 )
 
 const Version = "0.3.0"
+
+func addTool[In, Out any](a *API, server *mcp.Server, tool *mcp.Tool, handler func(context.Context, *mcp.CallToolRequest, In) (*mcp.CallToolResult, Out, error)) {
+	mcp.AddTool(server, tool, func(ctx context.Context, request *mcp.CallToolRequest, input In) (result *mcp.CallToolResult, output Out, err error) {
+		payload, err := json.Marshal(input)
+		if err != nil {
+			return nil, output, err
+		}
+		ctx, finish, err := a.service.BeginToolOperation(a.context(ctx), tool.Name, payload)
+		if err != nil {
+			return nil, output, err
+		}
+		defer func() { err = errors.Join(err, finish(err)) }()
+		return handler(ctx, request, input)
+	})
+}
 
 type API struct {
 	service          *service.Service
@@ -35,28 +52,32 @@ func New(svc *service.Service, defaultPrincipals ...domain.Principal) *mcp.Serve
 }
 
 func (a *API) register(server *mcp.Server) {
-	mcp.AddTool(server, readTool("platform_status", "Platform status", "Check PostgreSQL, Apache AGE, Ollama, and Milvus connectivity."), a.status)
-	mcp.AddTool(server, readTool("knowledge_search", "Search approved knowledge", "Search only approved, project-scoped software-development knowledge."), a.search)
-	mcp.AddTool(server, readTool("knowledge_get", "Get knowledge", "Fetch one approved knowledge item by ID."), a.get)
-	mcp.AddTool(server, readTool("knowledge_candidates_list", "List review candidates", "List pending knowledge candidates for review."), a.listCandidates)
-	mcp.AddTool(server, readTool("repository_graph_get", "Get repository graph", "Traverse typed, evidence-backed relationships around a Git repository."), a.repositoryGraph)
-	mcp.AddTool(server, readTool("repository_relation_search", "Search repository relationships", "Semantically search approved Git repository relationships in Milvus."), a.repositoryRelationSearch)
-	mcp.AddTool(server, readTool("code_symbol_search", "Search code symbols", "Semantically search active, revision-specific source symbols with PostgreSQL lexical fallback."), a.codeSymbolSearch)
-	mcp.AddTool(server, readTool("code_graph_get", "Get code graph", "Traverse calls, references, implementations, imports, tests, and containment around a source symbol."), a.codeGraph)
-	mcp.AddTool(server, readTool("graph_context_search", "Search graph context", "Discover semantic seeds, expand governed repository/code/knowledge topology, and return PostgreSQL-hydrated bounded context."), a.graphContextSearch)
-	mcp.AddTool(server, writeTool("generation_capture", "Capture a generation", "Persist a prompt, generated response, provenance, and a review candidate. This is additive and does not approve the candidate."), a.capture)
-	mcp.AddTool(server, writeTool("repository_relation_upsert", "Record repository relationship", "Upsert two Git repositories and an approved, evidence-backed relationship; vector indexing is queued transactionally."), a.repositoryRelationUpsert)
+	addTool(a, server, readTool("platform_status", "Platform status", "Check PostgreSQL, Apache AGE, Ollama, and Milvus connectivity."), a.status)
+	addTool(a, server, readTool("knowledge_search", "Search approved knowledge", "Search only approved, project-scoped software-development knowledge."), a.search)
+	addTool(a, server, readTool("knowledge_get", "Get knowledge", "Fetch one approved knowledge item by ID."), a.get)
+	addTool(a, server, readTool("knowledge_candidates_list", "List review candidates", "List pending knowledge candidates for review."), a.listCandidates)
+	addTool(a, server, readTool("knowledge_quality_reviews", "List quality-blocked knowledge", "List project-scoped approved knowledge withheld by current validation or source quality gates; approval history is preserved."), a.qualityReviews)
+	addTool(a, server, readTool("repository_graph_get", "Get repository graph", "Traverse typed, evidence-backed relationships around a Git repository."), a.repositoryGraph)
+	addTool(a, server, readTool("repository_relation_search", "Search repository relationships", "Semantically search approved Git repository relationships in Milvus."), a.repositoryRelationSearch)
+	addTool(a, server, readTool("code_symbol_search", "Search code symbols", "Semantically search active, revision-specific source symbols with PostgreSQL lexical fallback."), a.codeSymbolSearch)
+	addTool(a, server, readTool("code_graph_get", "Get code graph", "Traverse calls, references, implementations, imports, tests, and containment around a source symbol."), a.codeGraph)
+	addTool(a, server, readTool("graph_context_search", "Search graph context", "Discover semantic seeds, expand governed repository/code/knowledge topology, and return PostgreSQL-hydrated bounded context."), a.graphContextSearch)
+	addTool(a, server, writeTool("generation_capture", "Capture a generation", "Persist a prompt, generated response, provenance, and a review candidate. This is additive and does not approve the candidate."), a.capture)
+	addTool(a, server, writeTool("repository_relation_upsert", "Record repository relationship", "Upsert two Git repositories and an approved, evidence-backed relationship; vector indexing is queued transactionally."), a.repositoryRelationUpsert)
 	if a.service.CodeGraphAnalysisEnabled() {
-		mcp.AddTool(server, writeTool("code_repository_index", "Index a code repository", "Analyze an allowlisted local Go, Java, Kotlin, TypeScript, JavaScript, or Python repository, persist a repository-, branch-, and revision-mapped graph in PostgreSQL, and queue symbol embeddings."), a.codeRepositoryIndex)
+		addTool(a, server, writeTool("code_repository_index", "Index a code repository", "Analyze an allowlisted local Go, Java, Kotlin, TypeScript, JavaScript, or Python repository, persist a repository-, branch-, and revision-mapped graph in PostgreSQL, and queue symbol embeddings."), a.codeRepositoryIndex)
 	}
-	mcp.AddTool(server, writeTool("review_record", "Record review feedback", "Attach Codex, ChatGPT, Kimi, or human review feedback to a candidate without approving it."), a.review)
-	mcp.AddTool(server, writeTool("knowledge_candidate_decide", "Approve or reject candidate", "Approve or reject a pending candidate. Approval schedules indexing into Milvus."), a.decide)
-	mcp.AddTool(server, writeTool("workflow_run_create", "Create workflow run", "Create an idempotent, project-scoped agentic workflow under the authenticated principal."), a.workflowCreate)
-	mcp.AddTool(server, readTool("workflow_run_get", "Get workflow run", "Read authoritative workflow state and governance policy."), a.workflowGet)
-	mcp.AddTool(server, writeTool("workflow_run_transition", "Transition workflow run", "Request an optimistic, idempotent state transition with authorization and evidence."), a.workflowTransition)
-	mcp.AddTool(server, writeTool("workflow_task_begin", "Queue workflow task", "Queue an atomic task. The FIFO head is activated automatically and performs its governed RAG lookup at activation time."), a.workflowTaskBegin)
-	mcp.AddTool(server, readTool("workflow_task_get", "Get workflow task", "Read an atomic task checkpoint, its RAG route, provider provenance, and current gate."), a.workflowTaskGet)
-	mcp.AddTool(server, writeTool("workflow_task_transition", "Transition workflow task", "Record an evidence-backed local, cloud-review, validation, promotion, read-back, or manual rejection event."), a.workflowTaskTransition)
+	addTool(a, server, writeTool("review_record", "Record review feedback", "Attach Codex, ChatGPT, Kimi, or human review feedback to a candidate without approving it."), a.review)
+	addTool(a, server, writeTool("knowledge_candidate_decide", "Approve or reject candidate", "Approve or reject a pending candidate. Approval schedules indexing into Milvus."), a.decide)
+	addTool(a, server, writeTool("knowledge_validation_record", "Record human QA validation", "Record an authenticated human QA attestation for an exact candidate version and source manifest. This cannot claim local command execution or approve knowledge."), a.validateKnowledge)
+	addTool(a, server, writeTool("workflow_run_create", "Create workflow run", "Create an idempotent, project-scoped agentic workflow under the authenticated principal."), a.workflowCreate)
+	addTool(a, server, readTool("workflow_run_get", "Get workflow run", "Read authoritative workflow state and governance policy."), a.workflowGet)
+	addTool(a, server, readTool("workflow_trace_get", "Get workflow evidence trace", "Read project-authorized, sanitized operation evidence and explicit missing outcomes or artifacts."), a.workflowTrace)
+	addTool(a, server, writeTool("workflow_run_transition", "Transition workflow run", "Request an optimistic, idempotent state transition with authorization and evidence."), a.workflowTransition)
+	addTool(a, server, writeTool("workflow_task_begin", "Queue workflow task", "Queue an atomic task. The FIFO head is activated automatically and performs its governed RAG lookup at activation time."), a.workflowTaskBegin)
+	addTool(a, server, readTool("workflow_task_get", "Get workflow task", "Read an atomic task checkpoint, its RAG route, provider provenance, and current gate."), a.workflowTaskGet)
+	a.registerSemantic(server)
+	addTool(a, server, writeTool("workflow_task_transition", "Transition workflow task", "Record an evidence-backed local, cloud-review, validation, promotion, read-back, or manual rejection event."), a.workflowTaskTransition)
 }
 
 func (a *API) context(ctx context.Context) context.Context {
@@ -104,6 +125,20 @@ type searchInput struct {
 	Query     string `json:"query" jsonschema:"software-development question or task; required"`
 	Limit     int    `json:"limit,omitempty" jsonschema:"maximum results from 1 to 25"`
 }
+
+type qualityReviewsInput struct {
+	ProjectID string `json:"project_id"`
+	Limit     int    `json:"limit,omitempty"`
+}
+type qualityReviewsOutput struct {
+	Results []domain.KnowledgeQuality `json:"results"`
+}
+
+func (a *API) qualityReviews(ctx context.Context, _ *mcp.CallToolRequest, input qualityReviewsInput) (*mcp.CallToolResult, qualityReviewsOutput, error) {
+	results, err := a.service.QualityReviews(a.context(ctx), input.ProjectID, input.Limit)
+	return nil, qualityReviewsOutput{Results: results}, err
+}
+
 type searchOutput struct {
 	Backend string             `json:"backend"`
 	Count   int                `json:"count"`
@@ -127,10 +162,15 @@ type getOutput struct {
 }
 
 func (a *API) get(ctx context.Context, _ *mcp.CallToolRequest, input getInput) (*mcp.CallToolResult, getOutput, error) {
-	item, err := a.service.Get(ctx, input.ID, false)
+	// Determine scope privately before returning eligibility diagnostics.
+	item, err := a.service.Get(ctx, input.ID, true)
 	if err == nil {
 		_, err = a.service.AuthorizeProjectAction(a.context(ctx), item.ProjectID, "knowledge_candidate", item.ID, "read", map[string]any{"status": item.Status})
 	}
+	if err != nil {
+		return nil, getOutput{}, err
+	}
+	item, err = a.service.Get(ctx, input.ID, false)
 	return nil, getOutput{Item: item}, err
 }
 
@@ -249,55 +289,20 @@ func (a *API) review(ctx context.Context, _ *mcp.CallToolRequest, input reviewIn
 	return nil, output, err
 }
 
-type decideInput struct {
-	KnowledgeID string `json:"knowledge_id" jsonschema:"pending candidate UUID; required"`
-	Decision    string `json:"decision" jsonschema:"approve or reject; required"`
-}
+type decideInput = service.DecisionInput
 type decideOutput struct {
 	KnowledgeID string `json:"knowledge_id"`
 	Status      string `json:"status"`
 }
 
 func (a *API) decide(ctx context.Context, _ *mcp.CallToolRequest, input decideInput) (*mcp.CallToolResult, decideOutput, error) {
-	decision := strings.ToLower(strings.TrimSpace(input.Decision))
-	if decision != "approve" && decision != "reject" {
-		return nil, decideOutput{}, fmt.Errorf("decision must be approve or reject")
-	}
-	ctx = a.context(ctx)
-	candidate, err := a.service.Get(ctx, input.KnowledgeID, true)
-	if err != nil {
-		return nil, decideOutput{}, err
-	}
-	workflowLinked, qaValidated := candidate.WorkflowID != "", false
-	if workflowLinked {
-		checkpoint, checkpointErr := a.service.GetWorkflowTaskByCandidate(ctx, candidate.ID)
-		if checkpointErr == nil && checkpoint.State == domain.TaskStatePromotionRequired {
-			qaValidated = true
-		} else {
-			workflow, workflowErr := a.service.GetWorkflow(ctx, candidate.WorkflowID)
-			if workflowErr != nil {
-				return nil, decideOutput{}, workflowErr
-			}
-			qaValidated = workflow.QAValidatedBy != "" && workflow.State == "promotion_pending"
-		}
-	}
-	principal, err := a.service.AuthorizeProjectAction(ctx, candidate.ProjectID, "knowledge_candidate", candidate.ID, decision, map[string]any{
-		"status": candidate.Status, "workflow_id": candidate.WorkflowID,
-		"workflow_linked": workflowLinked, "qa_validated": qaValidated,
-	})
-	if err != nil {
-		return nil, decideOutput{}, err
-	}
-	var item domain.KnowledgeItem
-	switch decision {
-	case "approve":
-		item, err = a.service.Approve(ctx, input.KnowledgeID, principal.ID)
-	case "reject":
-		item, err = a.service.Reject(ctx, input.KnowledgeID, principal.ID)
-	default:
-		err = fmt.Errorf("decision must be approve or reject")
-	}
+	item, err := a.service.DecideKnowledge(a.context(ctx), input)
 	return nil, decideOutput{KnowledgeID: item.ID, Status: item.Status}, err
+}
+
+func (a *API) validateKnowledge(ctx context.Context, _ *mcp.CallToolRequest, input service.ValidationInput) (*mcp.CallToolResult, domain.KnowledgeValidation, error) {
+	report, err := a.service.RecordManualValidation(a.context(ctx), input)
+	return nil, report, err
 }
 
 type repositoryInput struct {
@@ -498,6 +503,11 @@ func (a *API) workflowCreate(ctx context.Context, _ *mcp.CallToolRequest, input 
 
 type workflowGetInput struct {
 	WorkflowID string `json:"workflow_id" jsonschema:"workflow UUID; required"`
+}
+
+func (a *API) workflowTrace(ctx context.Context, _ *mcp.CallToolRequest, input workflowGetInput) (*mcp.CallToolResult, domain.WorkflowTrace, error) {
+	result, err := a.service.WorkflowTrace(a.context(ctx), input.WorkflowID)
+	return nil, result, err
 }
 
 func (a *API) workflowGet(ctx context.Context, _ *mcp.CallToolRequest, input workflowGetInput) (*mcp.CallToolResult, workflowRunOutput, error) {

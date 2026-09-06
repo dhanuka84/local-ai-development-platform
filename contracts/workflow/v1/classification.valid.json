@@ -1,0 +1,1 @@
+{"task_class":"development","risk":"low","data_classification":"internal","acceptance_criteria":["Local tests pass"],"affected_repositories":["fixture"],"needs_clarification":false}

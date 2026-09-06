@@ -1,0 +1,11 @@
+{
+  "schema_version": "hybrid-ai/knowledge-source/v1",
+  "sources": [
+    {
+      "kind": "repository",
+      "reference": "/fixture/repository",
+      "branch": "main",
+      "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ]
+}

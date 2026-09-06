@@ -42,24 +42,25 @@ type Artifact struct {
 }
 
 type KnowledgeItem struct {
-	ID                 string    `json:"id"`
-	ProjectID          string    `json:"project_id"`
-	WorkflowID         string    `json:"workflow_id,omitempty"`
-	WorkflowStepID     string    `json:"workflow_step_id,omitempty"`
-	Title              string    `json:"title"`
-	Problem            string    `json:"problem"`
-	Summary            string    `json:"summary"`
-	Content            string    `json:"content"`
-	Procedure          []string  `json:"procedure,omitempty"`
-	ValidationEvidence []string  `json:"validation_evidence,omitempty"`
-	TaskType           string    `json:"task_type"`
-	Language           string    `json:"language,omitempty"`
-	Tags               []string  `json:"tags,omitempty"`
-	Status             string    `json:"status"`
-	SourceGenerationID string    `json:"source_generation_id,omitempty"`
-	Version            int       `json:"version"`
-	CreatedAt          time.Time `json:"created_at"`
-	ApprovedAt         time.Time `json:"approved_at,omitempty"`
+	Projection         *ProjectionManifest `json:"-"`
+	ID                 string              `json:"id"`
+	ProjectID          string              `json:"project_id"`
+	WorkflowID         string              `json:"workflow_id,omitempty"`
+	WorkflowStepID     string              `json:"workflow_step_id,omitempty"`
+	Title              string              `json:"title"`
+	Problem            string              `json:"problem"`
+	Summary            string              `json:"summary"`
+	Content            string              `json:"content"`
+	Procedure          []string            `json:"procedure,omitempty"`
+	ValidationEvidence []string            `json:"validation_evidence,omitempty"`
+	TaskType           string              `json:"task_type"`
+	Language           string              `json:"language,omitempty"`
+	Tags               []string            `json:"tags,omitempty"`
+	Status             string              `json:"status"`
+	SourceGenerationID string              `json:"source_generation_id,omitempty"`
+	Version            int                 `json:"version"`
+	CreatedAt          time.Time           `json:"created_at"`
+	ApprovedAt         time.Time           `json:"approved_at,omitempty"`
 }
 
 func (k KnowledgeItem) RetrievalText() string {
@@ -85,8 +86,11 @@ type SearchHit struct {
 }
 
 type VectorHit struct {
-	ID    string
-	Score float32
+	ID               string
+	Score            float32
+	Version          int
+	ContentSHA256    string
+	ProjectionSHA256 string
 }
 
 type ReviewRecord struct {

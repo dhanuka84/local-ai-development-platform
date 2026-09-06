@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/json"
@@ -10,13 +11,17 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/dhanuka84/hybrid-ai-platform/components/workpacket"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/age"
+	"github.com/dhanuka84/hybrid-ai-platform/internal/artifacts"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/authorization"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/config"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/domain"
+	"github.com/dhanuka84/hybrid-ai-platform/internal/identity"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/milvus"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/ollama"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/postgres"
+	"github.com/dhanuka84/hybrid-ai-platform/internal/service"
 	"github.com/dhanuka84/hybrid-ai-platform/migrations"
 )
 
@@ -29,7 +34,7 @@ func main() {
 
 func run(ctx context.Context, args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: admin <migrate|age-rebuild|milvus-init|doctor|reindex|compact-code-outbox|repository-upsert|candidates|get|approve|reject> [arguments]")
+		return errors.New("usage: admin <migrate|age-rebuild|milvus-init|doctor|reindex|compact-code-outbox|repository-upsert|candidates|get|validate|approve|reject> [arguments]")
 	}
 	cfg, err := config.LoadCLI()
 	if err != nil {
@@ -109,7 +114,11 @@ func run(ctx context.Context, args []string) error {
 		if err != nil {
 			return err
 		}
-		fmt.Printf("queued %d approved knowledge items, %d repository relations, %d code entities, and %d semantic graph edges for indexing\n", knowledgeCount, relationCount, codeEntityCount, edgeCount)
+		definitionCount, err := repository.RequeueContextDefinitions(ctx)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("queued %d approved knowledge items, %d repository relations, %d code entities, %d semantic graph edges, and %d approved context definitions for indexing\n", knowledgeCount, relationCount, codeEntityCount, edgeCount, definitionCount)
 		return nil
 	case "repository-upsert":
 		if len(args) != 6 {
@@ -183,71 +192,107 @@ func run(ctx context.Context, args []string) error {
 		}
 		return json.NewEncoder(os.Stdout).Encode(item)
 	case "approve", "reject":
-		if len(args) != 2 {
-			return fmt.Errorf("usage: admin %s <knowledge-id>", args[0])
+		if len(args) != 6 {
+			return fmt.Errorf("validation_required: usage: admin %s <knowledge-id> <expected-version> <validation-id-or-dash> <idempotency-key> <reason>", args[0])
 		}
-		return decideCandidate(ctx, cfg, args[1], args[0])
+		version, err := strconv.Atoi(args[2])
+		if err != nil {
+			return err
+		}
+		validationID := args[3]
+		if validationID == "-" {
+			validationID = ""
+		}
+		return decideCandidate(ctx, cfg, service.DecisionInput{KnowledgeID: args[1], ExpectedVersion: version, ValidationID: validationID, Decision: args[0], IdempotencyKey: args[4], Reason: args[5]})
+	case "validate":
+		if len(args) != 4 {
+			return errors.New("usage: admin validate <validation-input.json> <work-packet.json> <patch-file>")
+		}
+		return validateCandidate(ctx, cfg, args[1], args[2], args[3])
 	default:
 		return fmt.Errorf("unknown command %q", args[0])
 	}
 }
 
-func decideCandidate(ctx context.Context, cfg config.Config, id, action string) error {
+func governanceService(ctx context.Context, cfg config.Config) (*service.Service, context.Context, func(), error) {
 	if cfg.AuthToken == "" {
-		return errors.New("AUTH_TOKEN is required for an accountable local candidate decision")
+		return nil, ctx, nil, errors.New("AUTH_TOKEN is required for an accountable local candidate decision")
 	}
 	repository, err := openRepository(ctx, cfg)
 	if err != nil {
-		return err
+		return nil, ctx, nil, err
 	}
-	defer repository.Close()
 	tokenHash := sha256.Sum256([]byte(cfg.AuthToken))
 	principal, err := repository.AuthenticatePrincipal(ctx, tokenHash[:])
 	if err != nil {
-		return fmt.Errorf("authenticate Product Owner: %w", err)
-	}
-	candidate, err := repository.GetKnowledge(ctx, id, true)
-	if err != nil {
-		return err
-	}
-	workflowLinked, qaValidated := candidate.WorkflowID != "", false
-	if workflowLinked {
-		workflow, workflowErr := repository.GetWorkflow(ctx, candidate.WorkflowID)
-		if workflowErr != nil {
-			return workflowErr
-		}
-		qaValidated = workflow.QAValidatedBy != "" && workflow.State == "promotion_pending"
+		repository.Close()
+		return nil, ctx, nil, fmt.Errorf("authenticate operator: %w", err)
 	}
 	var authorizer domain.Authorizer = authorization.Disabled{}
 	if cfg.AuthorizationMode == "cerbos" {
 		authorizer, err = authorization.NewCerbos(cfg.CerbosAddress, cfg.CerbosRequestTimeout)
 		if err != nil {
-			return err
+			repository.Close()
+			return nil, ctx, nil, err
 		}
 	}
-	decision, err := authorizer.Authorize(ctx, domain.AuthorizationRequest{
-		Principal: principal, ResourceKind: "knowledge_candidate", ResourceID: candidate.ID, Action: action,
-		Attributes: map[string]any{
-			"project_id": candidate.ProjectID, "status": candidate.Status,
-			"workflow_linked": workflowLinked, "qa_validated": qaValidated,
-		},
-	})
+	svc := service.New(repository, artifacts.NewLocalStore(cfg.ArtifactsPath), nil, nil, false, false)
+	svc.ConfigureSourceRoots(cfg.CodeGraphAllowedRoots)
+	if err := svc.ConfigureAuthorization(authorizer, cfg.AuthorizationMode == "cerbos"); err != nil {
+		repository.Close()
+		return nil, ctx, nil, err
+	}
+	return svc, identity.WithPrincipal(ctx, principal), repository.Close, nil
+}
+
+func decideCandidate(ctx context.Context, cfg config.Config, input service.DecisionInput) error {
+	svc, ctx, close, err := governanceService(ctx, cfg)
 	if err != nil {
-		return fmt.Errorf("authorization unavailable: %w", err)
+		return err
 	}
-	if !decision.Allowed {
-		return fmt.Errorf("Product Owner %q is not authorized to %s candidate %q", principal.ID, action, candidate.ID)
-	}
-	var item domain.KnowledgeItem
-	if action == "approve" {
-		item, err = repository.ApproveCandidate(ctx, candidate.ID, principal.ID)
-	} else {
-		item, err = repository.RejectCandidate(ctx, candidate.ID, principal.ID)
-	}
+	defer close()
+	item, err := svc.DecideKnowledge(ctx, input)
 	if err != nil {
 		return err
 	}
 	return json.NewEncoder(os.Stdout).Encode(item)
+}
+
+func validateCandidate(ctx context.Context, cfg config.Config, inputPath, packetPath, patchPath string) error {
+	var input service.ValidationInput
+	var packet workpacket.Packet
+	inputJSON, err := os.ReadFile(inputPath)
+	if err != nil {
+		return err
+	}
+	inputDecoder := json.NewDecoder(bytes.NewReader(inputJSON))
+	inputDecoder.DisallowUnknownFields()
+	if err := inputDecoder.Decode(&input); err != nil {
+		return err
+	}
+	packetJSON, err := os.ReadFile(packetPath)
+	if err != nil {
+		return err
+	}
+	packetDecoder := json.NewDecoder(bytes.NewReader(packetJSON))
+	packetDecoder.DisallowUnknownFields()
+	if err := packetDecoder.Decode(&packet); err != nil {
+		return err
+	}
+	patch, err := os.ReadFile(patchPath)
+	if err != nil {
+		return err
+	}
+	svc, ctx, close, err := governanceService(ctx, cfg)
+	if err != nil {
+		return err
+	}
+	defer close()
+	report, err := svc.VerifyKnowledgePatch(ctx, input, packet, patch)
+	if err != nil {
+		return err
+	}
+	return json.NewEncoder(os.Stdout).Encode(report)
 }
 
 func openRepository(ctx context.Context, cfg config.Config) (*postgres.Repository, error) {

@@ -34,6 +34,9 @@ func (r *Repository) Close()                         { r.pool.Close() }
 func (r *Repository) Ping(ctx context.Context) error { return r.pool.Ping(ctx) }
 
 func (r *Repository) RecordGeneration(ctx context.Context, capture domain.GenerationCapture) (domain.KnowledgeItem, error) {
+	if capture.AutoApprove {
+		return domain.KnowledgeItem{}, fmt.Errorf("%w: automatic approval is disabled", domain.ErrValidationRequired)
+	}
 	capture.Tags = nonNilStrings(capture.Tags)
 	capture.Procedure = nonNilStrings(capture.Procedure)
 	capture.ValidationEvidence = nonNilStrings(capture.ValidationEvidence)
@@ -64,9 +67,6 @@ func (r *Repository) RecordGeneration(ctx context.Context, capture domain.Genera
 
 	status := domain.CandidatePending
 	actor := ""
-	if capture.AutoApprove {
-		status, actor = domain.CandidateApproved, "local-auto-approval"
-	}
 	title := valueOr(capture.Summary, truncate(capture.Prompt, 160))
 	var item domain.KnowledgeItem
 	var approvedAt *time.Time
@@ -89,6 +89,9 @@ func (r *Repository) RecordGeneration(ctx context.Context, capture domain.Genera
 		if _, err := tx.Exec(ctx, `INSERT INTO outbox_events(aggregate_id,topic) VALUES($1,'knowledge.upsert')`, item.ID); err != nil {
 			return domain.KnowledgeItem{}, fmt.Errorf("enqueue knowledge index: %w", err)
 		}
+	}
+	if err := auditMutation(ctx, tx, "knowledge.capture", domain.OperationScope{ProjectID: item.ProjectID, WorkflowID: item.WorkflowID}, domain.EvidenceReference{Kind: "knowledge", ID: item.ID, Version: item.Version}, domain.EvidenceReference{Kind: "artifact", ID: capture.OutputArtifact.SHA256, SHA256: capture.OutputArtifact.SHA256}); err != nil {
+		return domain.KnowledgeItem{}, err
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return domain.KnowledgeItem{}, err
@@ -114,10 +117,19 @@ func scanKnowledge(row pgx.Row) (domain.KnowledgeItem, error) {
 func (r *Repository) GetKnowledge(ctx context.Context, id string, includePending bool) (domain.KnowledgeItem, error) {
 	query := `SELECT ` + knowledgeColumns + ` FROM knowledge_items WHERE id::text=$1`
 	if !includePending {
-		query += ` AND status='approved'`
+		query += ` AND knowledge_eligible(id)`
 	}
-	item, err := scanKnowledge(r.pool.QueryRow(ctx, query, id))
+	item, err := scanKnowledge(r.pool.QueryRow(ctx, qualitySQL(ctx, query), id))
 	if errors.Is(err, pgx.ErrNoRows) {
+		if !includePending {
+			quality, qualityErr := r.KnowledgeQuality(ctx, id)
+			if qualityErr == nil && quality.Reason != "not_approved" {
+				return domain.KnowledgeItem{}, fmt.Errorf("%w: %s", domain.ErrQualityBlocked, quality.Reason)
+			}
+			if qualityErr != nil && !errors.Is(qualityErr, pgx.ErrNoRows) {
+				return domain.KnowledgeItem{}, qualityErr
+			}
+		}
 		return item, fmt.Errorf("knowledge item %q not found", id)
 	}
 	return item, err
@@ -127,8 +139,8 @@ func (r *Repository) GetKnowledgeMany(ctx context.Context, ids []string) ([]doma
 	if len(ids) == 0 {
 		return []domain.KnowledgeItem{}, nil
 	}
-	rows, err := r.pool.Query(ctx, `SELECT `+knowledgeColumns+` FROM knowledge_items
-        WHERE id::text=ANY($1) AND status='approved'`, ids)
+	rows, err := r.pool.Query(ctx, qualitySQL(ctx, `SELECT `+knowledgeColumns+` FROM knowledge_items
+        WHERE id::text=ANY($1) AND knowledge_eligible(id)`), ids)
 	if err != nil {
 		return nil, err
 	}
@@ -145,13 +157,13 @@ func (r *Repository) GetKnowledgeMany(ctx context.Context, ids []string) ([]doma
 }
 
 func (r *Repository) SearchApprovedLexical(ctx context.Context, projectID, query string, limit int) ([]domain.SearchHit, error) {
-	rows, err := r.pool.Query(ctx, `SELECT `+knowledgeColumns+`,
+	rows, err := r.pool.Query(ctx, qualitySQL(ctx, `SELECT `+knowledgeColumns+`,
         ts_rank_cd(search_document, websearch_to_tsquery('simple',$2)) AS score
       FROM knowledge_items
-      WHERE project_id=$1 AND status='approved'
+      WHERE project_id=$1 AND knowledge_eligible(id)
         AND (search_document @@ websearch_to_tsquery('simple',$2)
              OR title ILIKE '%' || $2 || '%' OR summary ILIKE '%' || $2 || '%')
-      ORDER BY score DESC, approved_at DESC NULLS LAST LIMIT $3`, projectID, query, limit)
+      ORDER BY score DESC, approved_at DESC NULLS LAST LIMIT $3`), projectID, query, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -170,7 +182,22 @@ func (r *Repository) SearchApprovedLexical(ctx context.Context, projectID, query
 		}
 		result = append(result, hit)
 	}
-	return result, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	rows.Close()
+	if len(result) == 0 {
+		var blocked bool
+		if err := r.pool.QueryRow(ctx, qualitySQL(ctx, `SELECT EXISTS(SELECT 1 FROM knowledge_items WHERE project_id=$1 AND status='approved'
+			AND NOT knowledge_eligible(id) AND (search_document @@ websearch_to_tsquery('simple',$2)
+			OR title ILIKE '%' || $2 || '%' OR summary ILIKE '%' || $2 || '%'))`), projectID, query).Scan(&blocked); err != nil {
+			return nil, err
+		}
+		if blocked {
+			return nil, domain.ErrQualityBlocked
+		}
+	}
+	return result, nil
 }
 
 func (r *Repository) ListCandidates(ctx context.Context, projectID string, limit int) ([]domain.KnowledgeItem, error) {
@@ -198,47 +225,11 @@ func (r *Repository) ListCandidates(ctx context.Context, projectID string, limit
 }
 
 func (r *Repository) ApproveCandidate(ctx context.Context, id, actor string) (domain.KnowledgeItem, error) {
-	return r.decide(ctx, id, actor, domain.CandidateApproved)
+	return domain.KnowledgeItem{}, fmt.Errorf("%w: use DecideKnowledge with expected_version and validation_id", domain.ErrValidationRequired)
 }
 
 func (r *Repository) RejectCandidate(ctx context.Context, id, actor string) (domain.KnowledgeItem, error) {
-	return r.decide(ctx, id, actor, domain.CandidateRejected)
-}
-
-func (r *Repository) decide(ctx context.Context, id, actor, status string) (domain.KnowledgeItem, error) {
-	tx, err := r.pool.Begin(ctx)
-	if err != nil {
-		return domain.KnowledgeItem{}, err
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
-	item, err := scanKnowledge(tx.QueryRow(ctx, `UPDATE knowledge_items SET status=$2,
-        approved_at=CASE WHEN $2='approved' THEN now() ELSE NULL END,
-        approved_by=CASE WHEN $2='approved' THEN $3 ELSE NULL END
-      WHERE id::text=$1 AND status='pending' RETURNING `+knowledgeColumns, id, status, actor))
-	if errors.Is(err, pgx.ErrNoRows) {
-		return item, fmt.Errorf("pending knowledge candidate %q not found", id)
-	}
-	if err != nil {
-		return item, err
-	}
-	if status == domain.CandidateApproved {
-		if _, err := tx.Exec(ctx, `INSERT INTO outbox_events(aggregate_id,topic) VALUES($1,'knowledge.upsert')`, id); err != nil {
-			return item, err
-		}
-	}
-	reviewID, err := domain.NewID()
-	if err != nil {
-		return item, err
-	}
-	verdict := "approve"
-	if status == domain.CandidateRejected {
-		verdict = "reject"
-	}
-	if _, err := tx.Exec(ctx, `INSERT INTO review_records(id,knowledge_id,reviewer,verdict,comments)
-        VALUES($1,$2,$3,$4,'candidate decision')`, reviewID, id, actor, verdict); err != nil {
-		return item, err
-	}
-	return item, tx.Commit(ctx)
+	return domain.KnowledgeItem{}, fmt.Errorf("%w: use DecideKnowledge with expected_version, reason and idempotency_key", domain.ErrValidationRequired)
 }
 
 func (r *Repository) RecordReview(ctx context.Context, review domain.ReviewRecord) error {
@@ -299,7 +290,7 @@ func (r *Repository) ReviewEvidenceExists(ctx context.Context, knowledgeID, work
 func (r *Repository) ClaimOutbox(ctx context.Context, limit int) ([]domain.OutboxEvent, error) {
 	rows, err := r.pool.Query(ctx, `WITH picked AS (
         SELECT id FROM outbox_events
-        WHERE completed_at IS NULL AND next_attempt_at <= now()
+        WHERE completed_at IS NULL AND failed_at IS NULL AND next_attempt_at <= now()
           AND (locked_at IS NULL OR locked_at < now() - interval '5 minutes')
         ORDER BY id FOR UPDATE SKIP LOCKED LIMIT $1
       )
@@ -328,13 +319,14 @@ func (r *Repository) CompleteOutbox(ctx context.Context, id int64) error {
 
 func (r *Repository) FailOutbox(ctx context.Context, id int64, message string) error {
 	_, err := r.pool.Exec(ctx, `UPDATE outbox_events SET locked_at=NULL,last_error=$2,
+        failed_at=CASE WHEN attempts>=10 THEN now() ELSE NULL END,
         next_attempt_at=now() + least(attempts,10) * interval '5 seconds' WHERE id=$1`, id, truncate(message, 2000))
 	return err
 }
 
 func (r *Repository) RequeueApprovedKnowledge(ctx context.Context) (int64, error) {
 	result, err := r.pool.Exec(ctx, `INSERT INTO outbox_events(aggregate_id,topic)
-        SELECT id,'knowledge.upsert' FROM knowledge_items WHERE status='approved'`)
+        SELECT id,'knowledge.upsert' FROM knowledge_items WHERE knowledge_eligible(id)`)
 	return result.RowsAffected(), err
 }
 

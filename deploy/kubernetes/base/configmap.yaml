@@ -5,6 +5,8 @@ metadata:
 data:
   APP_ENV: enterprise
   LOG_LEVEL: info
+  TRACE_EXPORT_ENDPOINT: ""
+  TRACE_RETENTION_DAYS: "30"
   HTTP_ADDRESS: 0.0.0.0:8080
   MCP_TRANSPORT: http
   AUTH_MODE: token

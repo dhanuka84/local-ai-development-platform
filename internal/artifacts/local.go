@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -17,6 +18,28 @@ type LocalStore struct {
 
 func NewLocalStore(root string) *LocalStore {
 	return &LocalStore{root: root}
+}
+
+// Read resolves only content-addressed paths under this store and verifies the
+// bytes before they can be used as validation evidence.
+func (s *LocalStore) Read(ctx context.Context, digest string) ([]byte, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	decoded, err := hex.DecodeString(digest)
+	if err != nil || len(decoded) != sha256.Size || hex.EncodeToString(decoded) != digest {
+		return nil, fmt.Errorf("%w: invalid artifact digest", domain.ErrEvidenceUnavailable)
+	}
+	file, err := os.Open(filepath.Join(s.root, digest[:2], digest[2:4], digest))
+	if err != nil {
+		return nil, fmt.Errorf("%w: artifact cannot be opened", domain.ErrEvidenceUnavailable)
+	}
+	defer file.Close()
+	data, err := io.ReadAll(io.LimitReader(file, (8<<20)+1))
+	if err != nil || len(data) > 8<<20 || domain.Digest(data) != digest {
+		return nil, fmt.Errorf("%w: artifact integrity or size check failed", domain.ErrEvidenceUnavailable)
+	}
+	return data, nil
 }
 
 func (s *LocalStore) Put(ctx context.Context, data []byte, mediaType string) (domain.Artifact, error) {
@@ -32,6 +55,9 @@ func (s *LocalStore) Put(ctx context.Context, data []byte, mediaType string) (do
 		return domain.Artifact{}, fmt.Errorf("create artifact directory: %w", err)
 	}
 	if _, err := os.Stat(path); err == nil {
+		if _, err := s.Read(ctx, hexDigest); err != nil {
+			return domain.Artifact{}, err
+		}
 		return artifact(hexDigest, path, mediaType, int64(len(data))), nil
 	} else if !os.IsNotExist(err) {
 		return domain.Artifact{}, fmt.Errorf("inspect artifact: %w", err)

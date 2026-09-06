@@ -1,9 +1,10 @@
-# Project-scoped MCP connection. The gateway never receives the token from Git;
-# export HYBRID_AI_MCP_TOKEN before starting Codex.
+# Project-scoped MCP connection. Bare `codex` sessions may start without the
+# project token; use `make codex` or `make codex-local` for required MCP access.
 [mcp_servers.hybrid_knowledge]
 url = "http://127.0.0.1:8080/mcp"
 bearer_token_env_var = "HYBRID_AI_MCP_TOKEN"
-required = true
+enabled = false
+required = false
 startup_timeout_sec = 20
 tool_timeout_sec = 1200
 default_tools_approval_mode = "writes"

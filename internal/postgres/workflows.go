@@ -216,6 +216,9 @@ func (r *Repository) CreateWorkflow(ctx context.Context, run domain.WorkflowRun,
 	if err != nil {
 		return domain.WorkflowRun{}, err
 	}
+	if err := auditMutation(ctx, tx, "workflow.create", domain.OperationScope{ProjectID: created.ProjectID, WorkflowID: created.ID}, domain.EvidenceReference{Kind: "workflow", ID: created.ID, Version: created.Version}, domain.EvidenceReference{Kind: "artifact", ID: created.RequestArtifact.SHA256, SHA256: created.RequestArtifact.SHA256}); err != nil {
+		return domain.WorkflowRun{}, err
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return domain.WorkflowRun{}, err
 	}
@@ -334,6 +337,9 @@ func (r *Repository) TransitionWorkflow(ctx context.Context, transition domain.W
 	event.EvidenceArtifact = transition.Event.EvidenceArtifact
 	updated, err := getWorkflowByID(ctx, tx, transition.WorkflowID, false)
 	if err != nil {
+		return domain.WorkflowRun{}, domain.WorkflowEvent{}, err
+	}
+	if err := auditMutation(ctx, tx, "workflow.transition", domain.OperationScope{ProjectID: updated.ProjectID, WorkflowID: updated.ID}, domain.EvidenceReference{Kind: "workflow", ID: updated.ID, Version: updated.Version}, domain.EvidenceReference{Kind: "workflow_event", ID: event.ID}); err != nil {
 		return domain.WorkflowRun{}, domain.WorkflowEvent{}, err
 	}
 	if err := tx.Commit(ctx); err != nil {

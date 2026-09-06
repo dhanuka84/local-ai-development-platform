@@ -1,4 +1,15 @@
 SHELL := /bin/sh
+.DEFAULT_GOAL := help
+
+.PHONY: agent-ready-acceptance agent-ready-pilot
+agent-ready-acceptance: ## Run the deterministic two-task scenario against explicitly disposable services
+	@test -n "$$TEST_DATABASE_URL" && test -n "$$TEST_MILVUS_ADDRESS" && test -n "$$TEST_CERBOS_ADDRESS" || { echo 'Set disposable TEST_DATABASE_URL, TEST_MILVUS_ADDRESS and TEST_CERBOS_ADDRESS'; exit 1; }
+	go test -race -count=1 -run TestAgentReadyAcceptanceIntegration -v ./internal/service
+
+agent-ready-pilot: ## Run the local Ollama pilot using PILOT_SPEC; stops at real human approval
+	@test -n "$(PILOT_SPEC)" || { echo 'Set PILOT_SPEC to the reviewed isolated pilot input'; exit 1; }
+	go run ./cmd/agent-ready-pilot "$(PILOT_SPEC)"
+
 VAULT_FILE ?= $(shell sed -n 's/^[[:space:]]*VAULT_FILE[[:space:]]*=[[:space:]]*//p' .env 2>/dev/null | tail -n 1)
 ifeq ($(strip $(VAULT_FILE)),)
 VAULT_FILE := .local/vault.json
@@ -286,7 +297,7 @@ fmt-container: ## Format Go sources with the local build-check image
 	docker run --rm -v "$(CURDIR):/src" -w /src local-ai-platform-buildcheck make fmt
 
 check: ## Run formatting, vet, and unit tests
-	test -z "$$(gofmt -l cmd components internal migrations)"
+	test -z "$$(gofmt -l cmd components contracts internal migrations)"
 	go vet ./...
 	go test -race ./...
 	bash -n scripts/*.sh
@@ -309,9 +320,8 @@ integration-test-fresh: ## Run PostgreSQL migrations and adapter tests in newly 
 authz-policy-test: ## Compile and test the Cerbos policy-as-code contract
 	docker run --rm -v "$(CURDIR)/policies/cerbos:/policies:ro" $(CERBOS_IMAGE) compile /policies
 
-contracts-check: ## Parse every versioned workflow JSON Schema
-	@command -v jq >/dev/null 2>&1 || { echo "jq is required" >&2; exit 1; }
-	@for schema in contracts/workflow/v1/*.schema.json; do jq empty "$$schema" >/dev/null; done
+contracts-check: ## Compile schemas and validate positive/negative contract fixtures
+	go run ./cmd/contracts
 
 openclaw-plugin-deps: ## Install the pinned OpenClaw controller plugin dependencies
 	cd $(OPENCLAW_PLUGIN_DIR) && npm ci --ignore-scripts
@@ -614,11 +624,13 @@ candidate-get: mcp-preflight ## Fetch one candidate including pending content; r
 
 candidate-approve: mcp-preflight ## Approve a QA-validated candidate as the authenticated local Product Owner
 	@test -n "$(ID)" || { echo "ID is required" >&2; exit 1; }
-	$(COMPOSE) run --rm migrate approve "$(ID)"
+	@test -n "$(VERSION)" -a -n "$(VALIDATION_ID)" -a -n "$(DECISION_KEY)" -a -n "$(REASON)" || { echo "VERSION, VALIDATION_ID, DECISION_KEY, and REASON are required" >&2; exit 1; }
+	$(COMPOSE) run --rm migrate approve "$(ID)" "$(VERSION)" "$(VALIDATION_ID)" "$(DECISION_KEY)" "$(REASON)"
 
 candidate-reject: mcp-preflight ## Reject a candidate as the authenticated local Product Owner
 	@test -n "$(ID)" || { echo "ID is required" >&2; exit 1; }
-	$(COMPOSE) run --rm migrate reject "$(ID)"
+	@test -n "$(VERSION)" -a -n "$(DECISION_KEY)" -a -n "$(REASON)" || { echo "VERSION, DECISION_KEY, and REASON are required" >&2; exit 1; }
+	$(COMPOSE) run --rm migrate reject "$(ID)" "$(VERSION)" - "$(DECISION_KEY)" "$(REASON)"
 
 up: vault-materialize ## Start the local CPU stack
 	$(COMPOSE) up --build -d

@@ -8,6 +8,30 @@ resourcePolicy:
         request.principal.attr.project_ids.exists(project_id,
           project_id == "*" || project_id == request.resource.attr.project_id)
   rules:
+    - name: trusted_local_executor
+      actions: ["validate_local"]
+      effect: EFFECT_ALLOW
+      roles: ["validation_executor"]
+      condition:
+        match:
+          expr: V.localProject && request.principal.attr.human == false
+
+    - name: human_validation
+      actions: ["validate"]
+      effect: EFFECT_ALLOW
+      roles: ["qa"]
+      condition:
+        match:
+          expr: V.localProject && request.principal.attr.human == true
+
+    - name: validated_human_decision
+      actions: ["decide_validated"]
+      effect: EFFECT_ALLOW
+      roles: ["product_owner"]
+      condition:
+        match:
+          expr: V.localProject && request.principal.attr.human == true
+
     - name: project_read
       actions: ["read"]
       effect: EFFECT_ALLOW

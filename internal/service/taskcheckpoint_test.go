@@ -81,9 +81,9 @@ func TestManualModePausesBeforeCloudReview(t *testing.T) {
 func TestWorkflowTaskStrongRAGHitSkipsCloudReview(t *testing.T) {
 	repository := &fakeRepository{
 		workflow: checkpointWorkflow("internal"),
-		items:    []domain.KnowledgeItem{{ID: "lesson", ProjectID: "product", Status: domain.CandidateApproved}},
+		items:    []domain.KnowledgeItem{{ID: "lesson", ProjectID: "product", Version: 1, Status: domain.CandidateApproved}},
 	}
-	svc, ctx := checkpointService(repository, &fakeVectors{hits: []domain.VectorHit{{ID: "lesson", Score: 0.91}}})
+	svc, ctx := checkpointService(repository, &fakeVectors{hits: []domain.VectorHit{fixtureVectorHit(repository.items[0], .91)}})
 	task, _, err := svc.BeginWorkflowTask(ctx, BeginWorkflowTaskInput{
 		WorkflowID: "workflow", TaskKey: "design", Title: "Design", RAGQuery: "known design",
 		IdempotencyKey: "task:design", MatchThreshold: 0.8,
@@ -178,7 +178,7 @@ func TestCloudReviewCheckpointRequiresPersistedImmutableReviewEvidence(t *testin
 }
 
 func TestCompletedTaskAutomaticallyActivatesQueuedHead(t *testing.T) {
-	approved := domain.KnowledgeItem{ID: "candidate", ProjectID: "product", WorkflowID: "workflow", Status: domain.CandidateApproved}
+	approved := domain.KnowledgeItem{ID: "candidate", ProjectID: "product", WorkflowID: "workflow", Version: 1, Status: domain.CandidateApproved}
 	repository := &fakeRepository{
 		workflow: checkpointWorkflow("internal"), items: []domain.KnowledgeItem{approved},
 		tasks: []domain.WorkflowTaskCheckpoint{
@@ -186,7 +186,7 @@ func TestCompletedTaskAutomaticallyActivatesQueuedHead(t *testing.T) {
 			{ID: "second", WorkflowID: "workflow", ProjectID: "product", TaskKey: "second", TaskType: "testing", State: domain.TaskStateQueued, Route: domain.TaskRoutePending, Version: 1, RAGQuery: "validated second lesson", MatchThreshold: 0.75},
 		},
 	}
-	svc, ctx := checkpointService(repository, &fakeVectors{hits: []domain.VectorHit{{ID: "candidate", Score: 0.92}}})
+	svc, ctx := checkpointService(repository, &fakeVectors{hits: []domain.VectorHit{fixtureVectorHit(approved, .92)}})
 	completed, _, err := svc.TransitionWorkflowTask(ctx, TransitionWorkflowTaskInput{
 		TaskID: "first", ExpectedVersion: 7, EventType: "RAG_READBACK_VERIFIED",
 		IdempotencyKey: "first:readback",
