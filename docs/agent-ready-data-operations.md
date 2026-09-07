@@ -2,8 +2,11 @@
 
 This runbook covers validation, quality controls, trace evidence, governed
 semantic metrics, and the two-task acceptance/pilot implementation. The real
-Ollama pilot and live rollout have not been executed; synthetic test approvals
-are not human approval of real knowledge. See [the design](agent-ready-data-plan.md).
+Ollama pilot is paused at failed Task A verification/correction; live rollout
+has not been executed. Synthetic test
+approvals are not human approval of real knowledge. See
+[the design](agent-ready-data-plan.md) and the
+[real-pilot receipt](agent-ready-pilot-20260906.md).
 
 ## Upgrade behavior
 
@@ -208,6 +211,22 @@ without publishing the task's newly generated candidate.
 
 ## Local pilot: start, approve, resume
 
+For the local disposable dependency profile, prepare a fresh private runtime:
+
+```sh
+python3 scripts/agent_ready_pilot_prepare.py .local/agent-ready-pilot-20260906
+```
+
+This refuses to overwrite an existing runtime. It creates six-behavior Python
+fixtures for each task, a standalone synthetic Git source, full bounded work
+packets, and a project-scoped non-human workload credential in mode-0600 files.
+The fixture source intentionally has tests but no implementation. The generated
+environment uses the dated disposable PostgreSQL/Milvus/Cerbos container names
+and `pilot-ollama` alias; it is not a general deployment configuration. Review
+those endpoints for another environment. The helper does not create databases,
+start containers, invoke models, provision human identities, or approve anything.
+Keep the generated environment, token and principal files out of logs and Git.
+
 Initialize a disposable PostgreSQL/Milvus/Cerbos deployment, an allowlisted
 synthetic Git repository and a private artifact directory. Never use production
 data or an unrestricted repository prompt. Provision a real workload principal
@@ -224,6 +243,12 @@ with bounded checks and allowlisted files. Use a stable base revision for this
 two-task demonstration. The runner never modifies the source checkout: it
 validates each generated patch in a disposable clone. Configure a `pilot_`
 Milvus collection, Cerbos authorization, and a loopback/private Ollama URL.
+The Ollama request uses an explicit patch/summary/lesson JSON schema and disables
+separate thinking output. Both settings and generation limits are retained in
+the disclosed-context manifest. An empty final response remains a failed
+attempt with its exact raw response preserved; it is never substituted with
+thinking text. These request fields follow the
+[local generate API](https://docs.ollama.com/api/generate).
 
 ```sh
 AGENT_READY_PILOT_ISOLATED=true make agent-ready-pilot PILOT_SPEC=pilot.json
@@ -244,9 +269,20 @@ retain evidence and require explicit checkpoint recovery; blindly regenerating
 over an existing non-local-execution task is refused. Registry approvals and
 metric queries remain separate human-governed steps.
 
-The real-model pilot has **not** been run in this development session. Its
-runner is tested with a local HTTP fixture; this does not prove model quality
-or substitute for the actual human approval checkpoint.
+For the narrow case of a corrupt Task A diff hunk count, an operator can supply
+`workflow_id`, `task_a_id`, and `repair_task_a` in the reviewed spec. Its fields
+are `expected_task_version`, `knowledge_id`, `expected_version`,
+`model_output_sha256`, and `verifier_result_sha256`. The runner checks the exact
+pending checkpoint/candidate and requires both artifacts in that task's durable
+trace. The local model may change only hunk counts: the source lines, file
+headers, hunk positions, summary and lesson must remain unchanged. All packet
+checks still execute in a disposable clone. Original failures and correction
+output remain separate immutable evidence. This does not revise the lesson or
+approve it; other failure classes require their normal explicit recovery.
+
+Local HTTP fixture tests separately verify exact output/disclosure capture and
+failed-response preservation. Those tests do not prove model quality or
+substitute for the actual human approval checkpoint.
 
 ## Verification
 

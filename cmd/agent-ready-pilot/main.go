@@ -27,14 +27,15 @@ import (
 )
 
 type spec struct {
-	ProjectID  string            `json:"project_id"`
-	RunKey     string            `json:"run_key"`
-	Model      string            `json:"model"`
-	Branch     string            `json:"branch"`
-	WorkflowID string            `json:"workflow_id,omitempty"`
-	TaskAID    string            `json:"task_a_id,omitempty"`
-	TaskA      workpacket.Packet `json:"task_a"`
-	TaskB      workpacket.Packet `json:"task_b"`
+	ProjectID   string            `json:"project_id"`
+	RunKey      string            `json:"run_key"`
+	Model       string            `json:"model"`
+	Branch      string            `json:"branch"`
+	WorkflowID  string            `json:"workflow_id,omitempty"`
+	TaskAID     string            `json:"task_a_id,omitempty"`
+	TaskA       workpacket.Packet `json:"task_a"`
+	TaskB       workpacket.Packet `json:"task_b"`
+	RepairTaskA *patchRepair      `json:"repair_task_a,omitempty"`
 }
 type report struct {
 	Status             string                `json:"status"`
@@ -80,6 +81,9 @@ func run(ctx context.Context, args []string) error {
 	}
 	if !strings.HasPrefix(input.ProjectID, "pilot-") || input.RunKey == "" || input.Model == "" || input.Branch == "" {
 		return errors.New("pilot project prefix, run_key, branch and explicit local model required")
+	}
+	if input.RepairTaskA != nil && (input.WorkflowID == "" || input.TaskAID == "") {
+		return errors.New("explicit patch repair requires existing workflow_id and task_a_id")
 	}
 	for _, packet := range []workpacket.Packet{input.TaskA, input.TaskB} {
 		if !packet.LocalOnly || packet.CloudReview || packet.Mode != workpacket.ModePatch || len(packet.Checks) == 0 || len(packet.AllowedFiles) == 0 {
@@ -175,6 +179,16 @@ func (r *runner) execute(ctx context.Context) (out report, err error) {
 		return out, domain.ErrVersionConflict
 	}
 	out.KnowledgeID = a.CandidateID
+	if a.State == domain.TaskStateValidationRequired && r.spec.RepairTaskA != nil {
+		validation, err := r.repairTaskAPatch(ctx, a)
+		if err != nil {
+			return out, err
+		}
+		if a, err = r.transition(ctx, a, "VALIDATION_PASSED", validation.ID); err != nil {
+			return out, err
+		}
+		out.Version, out.ValidationID = validation.CandidateVersion, validation.ID
+	}
 	if a.State == domain.TaskStatePromotionRequired {
 		out.Status = "awaiting_human_approval"
 		out.Next = "Human approval and LEARNING_PROMOTED are required; the runner cannot perform them."
@@ -280,7 +294,16 @@ func (r *runner) generate(ctx context.Context, prompt string) (output []byte, er
 		return nil, err
 	}
 	defer func() { err = errors.Join(err, finish(err)) }()
-	manifest, _ := json.Marshal(map[string]any{"schema": "hybrid-ai/disclosed-context/v1", "provider": "ollama", "model": r.spec.Model, "scope": "synthetic goal, file allowlist, and approved generalized guidance only; no unrestricted repository content", "prompt_sha256": domain.Digest([]byte(prompt))})
+	format := map[string]any{
+		"type": "object", "additionalProperties": false,
+		"required": []string{"patch", "summary", "lesson"},
+		"properties": map[string]any{
+			"patch": map[string]string{"type": "string"}, "summary": map[string]string{"type": "string"},
+			"lesson": map[string]string{"type": "string"},
+		},
+	}
+	options := map[string]any{"temperature": 0.2, "num_predict": 2048}
+	manifest, _ := json.Marshal(map[string]any{"schema": "hybrid-ai/disclosed-context/v1", "provider": "ollama", "model": r.spec.Model, "scope": "synthetic goal and file allowlist, or explicitly bound synthetic patch-repair evidence; only Task B receives approved generalized guidance; no unrestricted repository content", "prompt_sha256": domain.Digest([]byte(prompt)), "think": false, "format": format, "options": options})
 	for _, data := range [][]byte{[]byte(prompt), manifest} {
 		artifact, err := r.store.Put(ctx, data, "text/plain")
 		if err != nil {
@@ -290,7 +313,10 @@ func (r *runner) generate(ctx context.Context, prompt string) (output []byte, er
 			return nil, err
 		}
 	}
-	payload, _ := json.Marshal(map[string]any{"model": r.spec.Model, "prompt": prompt, "stream": false, "format": "json"})
+	// Request the final structured answer explicitly. Thinking-capable models
+	// can otherwise finish with an empty response and separate thinking text.
+	// That text is evidence, never a substitute for the required patch answer.
+	payload, _ := json.Marshal(map[string]any{"model": r.spec.Model, "prompt": prompt, "stream": false, "format": format, "think": false, "options": options})
 	request, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(r.cfg.OllamaURL, "/")+"/api/generate", bytes.NewReader(payload))
 	if err != nil {
 		return nil, err

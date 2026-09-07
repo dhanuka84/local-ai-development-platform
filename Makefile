@@ -1,5 +1,6 @@
 SHELL := /bin/sh
 .DEFAULT_GOAL := help
+BUILD_CHECK_IMAGE ?= local-ai-platform-buildcheck:go1.26.8
 
 .PHONY: agent-ready-acceptance agent-ready-pilot
 agent-ready-acceptance: ## Run the deterministic two-task scenario against explicitly disposable services
@@ -291,20 +292,28 @@ mcp-preflight: vault-materialize ## Validate local tools, vault credentials, and
 preflight: mcp-preflight codex-check ## Validate both MCP platform and Codex client prerequisites
 
 fmt: ## Format Go sources
-	gofmt -w cmd components internal migrations
+	@set -eu; fmt_go_root=$$(go env GOROOT); "$$fmt_go_root/bin/gofmt" -w cmd components contracts internal migrations
 
-fmt-container: ## Format Go sources with the local build-check image
-	docker run --rm -v "$(CURDIR):/src" -w /src local-ai-platform-buildcheck make fmt
+.PHONY: buildcheck-image
+buildcheck-image: ## Build the pinned Go/Python check environment without application rollout
+	docker build --target buildcheck -t "$(BUILD_CHECK_IMAGE)" .
+
+fmt-container: buildcheck-image ## Format Go sources with the pinned build-check image
+	docker run --rm -v "$(CURDIR):/src" -w /src "$(BUILD_CHECK_IMAGE)" make fmt
 
 check: ## Run formatting, vet, and unit tests
-	test -z "$$(gofmt -l cmd components contracts internal migrations)"
+	@command -v go >/dev/null 2>&1 || { echo 'Go is not on PATH; load your Go environment or use make check-container' >&2; exit 1; }
+	@set -eu; check_go_root=$$(go env GOROOT); \
+		check_unformatted=$$("$$check_go_root/bin/gofmt" -l cmd components contracts internal migrations); \
+		test -z "$$check_unformatted" || { printf '%s\n' "$$check_unformatted"; exit 1; }
 	go vet ./...
 	go test -race ./...
 	bash -n scripts/*.sh
 	python3 -c 'import ast,pathlib; [ast.parse(pathlib.Path(path).read_text()) for path in ("scripts/local_vault.py","scripts/local_vault_test.py","scripts/gdrive_client.py","scripts/gdrive_client_test.py","scripts/manual_backup_restore_test.py")]'
+	python3 scripts/agent_ready_pilot_prepare_test.py
 
-check-container: ## Run make check with the local build-check image
-	docker run --rm -v "$(CURDIR):/src" -w /src local-ai-platform-buildcheck make check
+check-container: buildcheck-image ## Run make check with the pinned build-check image
+	docker run --rm -v "$(CURDIR):/src" -w /src "$(BUILD_CHECK_IMAGE)" make check
 
 check-all: check authz-policy-test contracts-check openclaw-plugin-check openclaw-config-check hybrid-verify-static ## Run Go, Cerbos, contracts, OpenClaw, and hybrid-verifier checks
 

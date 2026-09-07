@@ -14,7 +14,7 @@ services:
       - /var/lib/postgresql/data
 
   integration-test:
-    image: golang:1.25.8-bookworm
+    image: golang:1.26.8-bookworm
     working_dir: /src
     command: ["go", "test", "-count=1", "./internal/postgres"]
     environment:

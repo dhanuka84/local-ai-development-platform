@@ -2,6 +2,8 @@ module github.com/dhanuka84/hybrid-ai-platform
 
 go 1.25.8
 
+toolchain go1.26.8
+
 require (
 	github.com/cerbos/cerbos-sdk-go v0.4.0
 	github.com/jackc/pgx/v5 v5.7.6

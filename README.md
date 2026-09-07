@@ -72,7 +72,7 @@ before following calls, references, implementations, imports, or tests.
 
 | Concern | Choice | Reason |
 |---|---|---|
-| MCP and data plane | Go 1.25 | Small services, good concurrency, and an official MCP SDK. |
+| MCP and data plane | Go 1.26.8 toolchain | Small services, good concurrency, and an official MCP SDK. |
 | Workflow and graph authority | PostgreSQL | Safe multi-step writes, strong rules, graph queries, and audit history. |
 | Property-graph traversal | Apache AGE 1.6 / PostgreSQL 17 | Cypher traversal without a separate graph authority or service. |
 | Semantic/hybrid index | Milvus | Vector search that can grow from one machine to a distributed cluster. |
@@ -798,6 +798,25 @@ docs/                architecture, implementation, security, operations, ADRs
 ```
 
 ## Development
+
+Development, CI, and container builds use Go **1.26.8**. The module retains
+`go 1.25.8` as its minimum and selects `toolchain go1.26.8` for development.
+With Go's default `GOTOOLCHAIN=auto`, a Go 1.25.8 installation downloads and
+selects the newer toolchain when run in this repository; replacing a
+system-wide installation is unnecessary. `make fmt` and `make check` use the
+formatter from the selected toolchain, even if a standalone `gofmt` on PATH
+belongs to an older installation. See [Go toolchain selection](https://go.dev/doc/toolchain).
+
+```bash
+go version                 # go1.26.8, or a newer explicitly selected toolchain
+make check                 # native formatting, vet, race and setup tests
+make check-container       # builds the pinned Dockerfile buildcheck target; --rm after checks
+```
+
+Native checks also need Git, a C compiler for race tests, Bash, Python 3 and
+Make. A missing Go executable fails immediately with a setup hint. The
+container alternative does not start or upgrade the live application services.
+Private `.local` runtimes and environment files are excluded from image builds.
 
 ```bash
 make check-all

@@ -1,8 +1,10 @@
 # Agent-ready data: design and implementation plan
 
 Status: the five-gap local implementation and deterministic two-task acceptance
-scenario are implemented in the worktree. Deployment and the real-Ollama pilot
-with an accountable human publication decision remain outstanding. See the
+scenario are committed at `e44cbb4`. The isolated real-Ollama pilot is paused
+after failed Task A patch verification and a correction timeout. Passing local
+validation, accountable human publication, Task B reuse and live rollout remain
+outstanding. See the [real-pilot evidence](agent-ready-pilot-20260906.md),
 checkpoint and [operator runbook](agent-ready-data-operations.md).
 
 Prepared: 2026-09-06. Baseline revision: `4af9954a35ada0818d69ee7888216574e59d57aa`.
@@ -65,9 +67,12 @@ Completed in the follow-up development slice:
   test-only approval actors. `cmd/agent-ready-pilot` provides a real local Ollama
   generation/embedding workflow that stops for human approval and resumes later.
 
-Still operationally required: an initialized isolated pilot deployment, actual
-local-model execution and an accountable human review/publication decision,
-followed by a deliberate live rollout. Kubernetes needs deployment-specific
+The isolated pilot deployment is now initialized and real local-model execution
+has started; its current result is recorded in the
+[pilot receipt](agent-ready-pilot-20260906.md). Still operationally required:
+passing Task A validation, an accountable human review/publication decision,
+verified Task B reuse, and a
+deliberate live rollout. Kubernetes needs deployment-specific
 repository snapshot mounts. Local Git verification does not certify a remote
 branch. The optional collector configuration has not been deployed. Production
 archival/deletion policy and infrastructure remain deployment work.

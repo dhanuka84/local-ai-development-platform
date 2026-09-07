@@ -1,6 +1,9 @@
 .git
 .github
 .env
+.env.*
+!.env.example
+.local
 bin
 data
 deploy/compose/volumes

@@ -1,5 +1,14 @@
 # syntax=docker/dockerfile:1.7
-FROM golang:1.25.8-bookworm AS build
+FROM golang:1.26.8-bookworm AS go-toolchain
+
+# Reproducible local checks, including the Python setup tests. No source or
+# runtime credentials are baked into this target; make mounts the workspace.
+FROM go-toolchain AS buildcheck
+RUN apt-get update && apt-get install --yes --no-install-recommends python3 && \
+    rm -rf /var/lib/apt/lists/*
+WORKDIR /src
+
+FROM go-toolchain AS build
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
