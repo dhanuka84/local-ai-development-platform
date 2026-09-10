@@ -2,8 +2,9 @@
 
 This runbook covers validation, quality controls, trace evidence, governed
 semantic metrics, and the two-task acceptance/pilot implementation. The retained
-real-Ollama Task A passed local verification on September 10 and is awaiting
-human publication; Task B and live rollout have not run. Synthetic test
+real-Ollama pilot completed on September 10, including explicit Task A approval
+and locally verified Task B reuse. Metric definitions remain pending a separate
+decision; live rollout awaits vault unlock. Synthetic test
 approvals are not human approval of real knowledge. See
 [the design](agent-ready-data-plan.md) and the
 [real-pilot receipt](agent-ready-pilot-20260906.md).
@@ -12,12 +13,33 @@ The [September 10 recovery receipt](agent-ready-pilot-20260910.md) and
 
 ## Upgrade behavior
 
-Apply migrations `000008` through `000017` with the usual migration command,
+Apply migrations `000008` through `000018` with the usual migration command,
 then rebuild gateway and worker together. Test the upgrade in a disposable
 database first. These changes have not been applied to the live platform during
 development. The live Cerbos profile bind-mounts and watches `policies/cerbos`,
 so editing policies can reload them even without rebuilding application images.
 The live database was confirmed to remain on migration `000007` at handoff.
+The [release preparation](agent-ready-release-20260910.md) records a successful
+restore and upgrade of its actual PostgreSQL/AGE backup, plus compatible image
+builds and the remaining credential prerequisite. The new
+[task delegation](task-delegation.md) boundary is included in migration 18.
+
+## Candidate text inspection
+
+Before reviewing a candidate, call `knowledge_candidate_quality` with its
+`knowledge_id` and `expected_version`. It returns content/version digests,
+suspicious-character and possible-truncation flags, and possible duplicates
+from up to 100 eligible authoritative PostgreSQL records. Comparison is limited
+to 64 KiB per text and uses token-bigram Jaccard similarity with threshold 0.85.
+The response identifies its bounded coverage. It does not search all historic
+or quarantined content, and a high score can include opposite meanings.
+
+Hydrate a reported duplicate with `knowledge_get` and inspect its exact version,
+source and intended applicability. Findings do not merge records, execute
+validation or grant publication. Missing flags are not proof of quality. Existing
+exact-duplicate, source, validation and projection gates still control eligibility.
+The endpoint is intentionally denied to task delegates until explicitly added
+to their reviewed capability allowlist.
 
 `AUTO_APPROVE_LOCAL=true` is now a configuration error. Capture always creates
 pending knowledge; local model output is not approval. Existing approved items
@@ -308,6 +330,16 @@ derived patch. It still requires the same checkpoint, candidate/version, bound
 corrupt-patch evidence and every original verifier check. The default method
 (`local_model`) retains model-assisted correction. Both routes record a durable
 repair outcome; neither publishes knowledge.
+
+For a failed Task B that needs a new patch, `revise_task_b` takes the same exact
+checkpoint/candidate/version/output/verifier binding fields, with method
+`local_model`. It accepts a failed bound verifier receipt, generates locally
+from the current task and approved general lesson, executes a work-packet
+precheck, records `VALIDATION_FAILED`, revises the pending candidate with an
+optimistic version check, and records `LOCAL_REVISION_RECORDED`. It then runs
+the normal verifier against the new version before `VALIDATED_REUSE_COMPLETED`.
+The old output and failed checks stay immutable. A failed precheck leaves the
+candidate unchanged. The new lesson remains pending even when the task completes.
 
 Local HTTP fixture tests separately verify exact output/disclosure capture and
 failed-response preservation. Those tests do not prove model quality or

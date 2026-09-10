@@ -13,6 +13,13 @@ Before applying it:
 
 The base keeps `CODEGRAPH_ENABLED=false`: enterprise gateways are query-only and do not mount repositories or contain a Go toolchain. Deploy the durable analysis-job API and sandboxed analyzer worker pool described in the enterprise guide before enabling repository indexing at enterprise scale.
 
+For knowledge that requires local repository source verification, use the
+[source-verification overlay](overlays/source-verification/README.md). It mounts
+matching read-only snapshots into gateway and workers and selects a gateway
+runtime with Git, while keeping synchronous analysis disabled. This capability
+is separate from compiler-backed indexing. Workers need write access to the
+artifact volume to preserve mandatory source/projection evidence.
+
 Render without applying:
 
 ```bash

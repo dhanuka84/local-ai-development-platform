@@ -8,6 +8,8 @@
   `make env-init`.
 - Treat all model output as untrusted until checks and human review pass.
 - Keep maintenance on Ollama with no cloud fallback.
+- Use [scoped task credentials](task-delegation.md) for delegated local work;
+  give the bearer to the local supervisor through a private file, not model context.
 - Before any internet-facing deployment, add the controls in
   [Production requirements](#production-requirements).
 

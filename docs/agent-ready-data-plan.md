@@ -4,9 +4,10 @@ Track follow-up work and validation evidence in the
 [gap checklist](agent-ready-gap-checklist.md).
 
 Status as of 2026-09-10: the five-gap local implementation and deterministic
-acceptance are available. The retained real-Ollama Task A has now passed local
-validation after a recorded syntax-only repair. Accountable human publication,
-Task B reuse and live rollout remain outstanding. See the
+acceptance are available. The retained real-Ollama pilot completed both tasks,
+including the user's exact Task A approval, Milvus read-back and validated
+Task B reuse. Metric definitions are validated and pending their separate
+approval. Live rollout is prepared and awaits vault unlock. See the
 [recovery evidence](agent-ready-pilot-20260910.md),
 [original attempt history](agent-ready-pilot-20260906.md) and
 [operator runbook](agent-ready-data-operations.md).
@@ -21,13 +22,16 @@ knowledge-reuse workflow. The detailed design below is specific to this
 software-engineering platform.
 
 The intended first release is a governed local development workflow. It does
-not establish enterprise readiness: delegated per-user credentials, enterprise
-tenant isolation, highly available infrastructure, and production retention
-requirements need separate deployment work.
+not establish enterprise readiness: identity federation, enterprise tenant
+isolation, highly available infrastructure, and production retention
+requirements need separate deployment work. The September 10 follow-up adds
+[scoped local task credentials](task-delegation.md); enterprise identity
+integration remains separate.
 
 ### Implementation checkpoint — 2026-09-06
 
-Implemented in the current worktree (application images and database not upgraded):
+Implemented at the September 6 checkpoint (live application images and database
+were not upgraded):
 
 - Immutable validation reports and source manifests, authenticated human QA
   attestations, and a CLI boundary that executes the local work-packet verifier.
@@ -71,17 +75,18 @@ Completed in the follow-up development slice:
   test-only approval actors. `cmd/agent-ready-pilot` provides a real local Ollama
   generation/embedding workflow that stops for human approval and resumes later.
 
-The isolated pilot deployment is now initialized and real local-model execution
-has started; its current result is recorded in the
-[pilot receipt](agent-ready-pilot-20260906.md). Still operationally required:
-passing Task A validation, an accountable human review/publication decision,
-verified Task B reuse, and a
-deliberate live rollout. Kubernetes needs deployment-specific
-repository snapshot mounts. Local Git verification does not certify a remote
-branch. The optional collector configuration has not been deployed. Production
-archival/deletion policy and infrastructure remain deployment work.
+The September 6 pilot attempt is preserved in the
+[original receipt](agent-ready-pilot-20260906.md). On September 10, Task A passed
+local validation and received the user's exact-version approval; Milvus
+publication and Task B's validated reuse then completed. The
+[completed pilot receipt](agent-ready-pilot-20260910.md) records the evidence and
+the six metric definitions awaiting separate publication. A Kubernetes source
+snapshot overlay and a tested local collector configuration are prepared. Local
+Git verification does not certify a remote branch. Live activation awaits vault
+unlock; cluster certification, production archival/deletion policy and
+infrastructure remain deployment work.
 
-No existing candidate was approved or modified to demonstrate these changes.
+No existing live candidate was approved or modified to demonstrate these changes.
 The live database was verified to remain at migration `000007`. Its running
 Cerbos container bind-mounts and watches this repository's policy directory,
 so policy-file edits may reload without a container restart; application and

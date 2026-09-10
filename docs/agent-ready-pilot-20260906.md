@@ -1,7 +1,7 @@
 # Real local pilot — 2026-09-06
 
 This is the preserved September 6 attempt history. For the current state and
-passing Task A evidence, see the [September 10 recovery](agent-ready-pilot-20260910.md).
+completed two-task workflow, see the [September 10 recovery](agent-ready-pilot-20260910.md).
 
 Status: paused at Task A `validation_required`, task version 3. The generated
 diff failed verification, and its local-model hunk-count correction timed out.

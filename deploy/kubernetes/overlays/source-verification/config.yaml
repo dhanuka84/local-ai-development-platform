@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hybrid-ai-config
+data:
+  CODEGRAPH_ENABLED: "false"
+  CODEGRAPH_ALLOWED_ROOTS: /repository-snapshots
+  AUTHORIZATION_MODE: cerbos
+  CERBOS_ADDRESS: cerbos.authorization.svc.cluster.local:3593

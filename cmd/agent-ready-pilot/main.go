@@ -36,6 +36,7 @@ type spec struct {
 	TaskA       workpacket.Packet `json:"task_a"`
 	TaskB       workpacket.Packet `json:"task_b"`
 	RepairTaskA *patchRepair      `json:"repair_task_a,omitempty"`
+	ReviseTaskB *patchRepair      `json:"revise_task_b,omitempty"`
 }
 type report struct {
 	Status             string                `json:"status"`
@@ -82,7 +83,7 @@ func run(ctx context.Context, args []string) error {
 	if !strings.HasPrefix(input.ProjectID, "pilot-") || input.RunKey == "" || input.Model == "" || input.Branch == "" {
 		return errors.New("pilot project prefix, run_key, branch and explicit local model required")
 	}
-	if input.RepairTaskA != nil && (input.WorkflowID == "" || input.TaskAID == "") {
+	if (input.RepairTaskA != nil || input.ReviseTaskB != nil) && (input.WorkflowID == "" || input.TaskAID == "") {
 		return errors.New("explicit patch repair requires existing workflow_id and task_a_id")
 	}
 	for _, packet := range []workpacket.Packet{input.TaskA, input.TaskB} {
@@ -207,6 +208,7 @@ func (r *runner) execute(ctx context.Context) (out report, err error) {
 	if err != nil {
 		return out, err
 	}
+	out.Version = lesson.Version
 	b, _, err := r.app.Service.BeginWorkflowTask(ctx, service.BeginWorkflowTaskInput{WorkflowID: out.WorkflowID, TaskKey: r.spec.RunKey + ":b", Title: "Pilot B reuse", TaskType: "maintenance", RAGQuery: r.spec.TaskB.Goal, IdempotencyKey: r.spec.RunKey + ":b"})
 	if err != nil {
 		return out, err
@@ -225,11 +227,17 @@ func (r *runner) execute(ctx context.Context) (out report, err error) {
 		if err = r.app.Service.RecordTaskContext(ctx, service.RecordTaskContextInput{TaskID: b.ID, ExpectedVersion: b.Version, Contexts: []domain.UsedContext{{KnowledgeID: lesson.ID, Version: lesson.Version, TargetRepository: r.spec.TaskB.Workspace, TargetBranch: r.spec.Branch, TargetRevision: r.spec.TaskB.BaseRevision}}, IdempotencyKey: r.spec.RunKey + ":use"}); err != nil {
 			return out, err
 		}
-		task, _, validation, err := r.develop(ctx, b, r.spec.TaskB, lesson.RetrievalText())
+		task, _, validation, err := r.develop(ctx, b, r.spec.TaskB, lesson.Content)
 		if err != nil {
 			return out, err
 		}
 		b, err = r.transition(ctx, task, "VALIDATED_REUSE_COMPLETED", validation.ID)
+		if err != nil {
+			return out, err
+		}
+	}
+	if (b.State == domain.TaskStateValidationRequired || b.State == domain.TaskStateLocalRevisionRequired) && r.spec.ReviseTaskB != nil {
+		b, err = r.reviseTaskB(ctx, b, lesson.Content)
 		if err != nil {
 			return out, err
 		}
@@ -259,7 +267,7 @@ func (r *runner) develop(ctx context.Context, task domain.WorkflowTaskCheckpoint
 	var item domain.KnowledgeItem
 	var validation domain.KnowledgeValidation
 	ctx = domain.WithOperationScope(ctx, domain.OperationScope{ProjectID: task.ProjectID, WorkflowID: task.WorkflowID, TaskID: task.ID})
-	prompt := fmt.Sprintf("Create a minimal patch for an isolated synthetic repository. Goal: %s\nAllowed files: %v\nApproved guidance: %s\nReturn JSON only with string fields patch (a git unified diff), summary, and lesson (generalized reusable guidance without raw patch content). Do not include secrets, unrelated files, or claims that tests ran. The lesson is only a pending proposal until locally verified and explicitly approved by a human.", packet.Goal, packet.AllowedFiles, knowledge)
+	prompt := developmentPrompt(packet, knowledge)
 	raw, err := r.generate(ctx, prompt)
 	if err != nil {
 		return task, item, validation, err

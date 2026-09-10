@@ -16,6 +16,17 @@ func (s *Service) BeginOperation(ctx context.Context, name string, scope domain.
 }
 
 func (s *Service) BeginToolOperation(ctx context.Context, name string, input []byte) (context.Context, telemetry.Finish, error) {
+	if p, ok := identity.PrincipalFromContext(ctx); ok && p.Delegation != nil {
+		r, ok := s.repository.(domain.DelegationRepository)
+		if !ok {
+			return ctx, nil, ErrForbidden
+		}
+		current, err := r.RecheckTaskDelegation(ctx, p)
+		if err != nil {
+			return ctx, nil, s.recordDelegationDenial(ctx, name, p)
+		}
+		ctx = identity.WithPrincipal(ctx, current)
+	}
 	var fields struct {
 		ProjectID       string `json:"project_id"`
 		WorkflowID      string `json:"workflow_id"`
@@ -59,6 +70,15 @@ func (s *Service) BeginToolOperation(ctx context.Context, name string, input []b
 	}
 	if scope.ProjectID == "" {
 		scope.ProjectID = "system"
+	}
+	if err := s.checkDelegatedTool(ctx, name, input, scope); err != nil {
+		p, _ := identity.PrincipalFromContext(ctx)
+		return ctx, nil, s.recordDelegationDenial(ctx, name, p)
+	}
+	if p, ok := identity.PrincipalFromContext(ctx); ok && p.Delegation != nil {
+		// Attribute ancillary captures to the exact task that granted access.
+		scope.TaskID = p.Delegation.TaskID
+		scope.WorkflowID = p.Delegation.WorkflowID
 	}
 	return s.BeginOperation(ctx, "mcp."+name, scope, refs...)
 }

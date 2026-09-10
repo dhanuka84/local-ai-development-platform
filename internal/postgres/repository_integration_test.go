@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"crypto/sha256"
+	"errors"
 	"os"
 	"testing"
 	"time"
@@ -208,6 +209,7 @@ func TestRepositoryWorkflowIntegration(t *testing.T) {
 	if err := repository.RecordReview(ctx, domain.ReviewRecord{
 		ID: reviewID, KnowledgeID: candidate.ID, WorkflowID: workflow.ID, Reviewer: "codex", Provider: "openai", Model: "review-model",
 		Verdict: "revise", Comments: "make validation explicit", ImprovedContent: "reviewed solution",
+		ExpectedVersion: candidate.Version, ImprovedSummary: "Revised local solution",
 		ValidationEvidence: []string{"go test ./... passed after revision"},
 		ReviewArtifact:     reviewArtifact, ContextManifestArtifact: manifestArtifact,
 	}); err != nil {
@@ -233,6 +235,17 @@ func TestRepositoryWorkflowIntegration(t *testing.T) {
 	}
 	if revised.Content != "reviewed solution" || revised.Version != 2 || len(revised.ValidationEvidence) != 1 || revised.ValidationEvidence[0] != "go test ./... passed after revision" {
 		t.Fatalf("revised candidate = %#v", revised)
+	}
+	if revised.Summary != "Revised local solution" || revised.Title != revised.Summary {
+		t.Fatal("revision retained the old task summary")
+	}
+	staleReviewID, _ := domain.NewID()
+	if err := repository.RecordReview(ctx, domain.ReviewRecord{ID: staleReviewID, KnowledgeID: candidate.ID, Reviewer: "local", Provider: "ollama", Model: "fixture", Verdict: "revise", ExpectedVersion: 1, ImprovedContent: "stale replacement", ImprovedSummary: "stale summary"}); !errors.Is(err, domain.ErrVersionConflict) {
+		t.Fatalf("stale revision accepted: %v", err)
+	}
+	var staleReviews int
+	if err := repository.Pool().QueryRow(ctx, `SELECT count(*) FROM review_records WHERE id=$1`, staleReviewID).Scan(&staleReviews); err != nil || staleReviews != 0 {
+		t.Fatalf("stale revision receipt committed: %d %v", staleReviews, err)
 	}
 	validation := fixtureValidation(t, ctx, repository, revised, principal.ID, time.Now().UTC())
 	// This storage fixture sets the managed gate directly; the service-level

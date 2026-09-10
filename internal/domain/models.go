@@ -104,6 +104,8 @@ type ReviewRecord struct {
 	Verdict                 string
 	Comments                string
 	ImprovedContent         string
+	ImprovedSummary         string
+	ExpectedVersion         int
 	ValidationEvidence      []string
 	RawOutput               string
 	ContextManifest         string

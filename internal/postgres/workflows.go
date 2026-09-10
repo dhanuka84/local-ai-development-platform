@@ -59,7 +59,7 @@ func (r *Repository) BootstrapPrincipals(ctx context.Context, principals []domai
 }
 
 func (r *Repository) AuthenticatePrincipal(ctx context.Context, tokenHash []byte) (domain.Principal, error) {
-	rows, err := r.pool.Query(ctx, `SELECT p.id,p.display_name,p.kind,b.project_id,b.role
+	rows, err := r.pool.Query(ctx, `SELECT p.id,p.display_name,p.kind,b.project_id,b.role,c.id::text
       FROM principal_credentials c
       JOIN principals p ON p.id=c.principal_id
       JOIN principal_role_bindings b ON b.principal_id=p.id
@@ -75,7 +75,7 @@ func (r *Repository) AuthenticatePrincipal(ctx context.Context, tokenHash []byte
 	principal := domain.Principal{RoleBindings: make(map[string][]string)}
 	for rows.Next() {
 		var id, displayName, kind, projectID, role string
-		if err := rows.Scan(&id, &displayName, &kind, &projectID, &role); err != nil {
+		if err := rows.Scan(&id, &displayName, &kind, &projectID, &role, &principal.CredentialID); err != nil {
 			return domain.Principal{}, err
 		}
 		if principal.ID == "" {
@@ -89,7 +89,8 @@ func (r *Repository) AuthenticatePrincipal(ctx context.Context, tokenHash []byte
 	if principal.ID == "" {
 		return domain.Principal{}, errors.New("invalid or expired bearer token")
 	}
-	return principal, nil
+	rows.Close()
+	return r.constrainDelegatedPrincipal(ctx, principal)
 }
 
 const workflowColumns = `w.id::text,w.project_id,w.kind,w.state,w.version,w.risk,w.data_classification,

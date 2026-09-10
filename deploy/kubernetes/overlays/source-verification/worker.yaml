@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hybrid-ai-worker
+spec:
+  template:
+    spec:
+      securityContext:
+        fsGroup: 65532
+      containers:
+        - name: worker
+          volumeMounts:
+            # Workers persist source-check and projection evidence into CAS.
+            - {name: artifacts, mountPath: /var/lib/hybrid-ai/artifacts, readOnly: false}
+            - {name: repository-snapshots, mountPath: /repository-snapshots, readOnly: true}
+            - {name: scratch, mountPath: /tmp}
+      volumes:
+        - name: repository-snapshots
+          persistentVolumeClaim:
+            claimName: hybrid-ai-repository-snapshots
+            readOnly: true
+        - name: scratch
+          emptyDir: {sizeLimit: 256Mi}

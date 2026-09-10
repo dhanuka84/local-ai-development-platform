@@ -33,6 +33,8 @@ type Principal struct {
 	DisplayName  string              `json:"display_name,omitempty"`
 	Human        bool                `json:"human"`
 	RoleBindings map[string][]string `json:"role_bindings"`
+	CredentialID string              `json:"-"`
+	Delegation   *TaskDelegation     `json:"delegation,omitempty"`
 }
 
 func (p Principal) ProjectIDs() []string {

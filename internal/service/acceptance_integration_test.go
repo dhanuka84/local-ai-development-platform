@@ -54,7 +54,7 @@ func TestAgentReadyAcceptanceIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 	project, _ := domain.NewID()
-	human := domain.PrincipalBootstrap{ID: "human:synthetic-acceptance-" + project, Human: true, Roles: []string{"development", "controller", "qa", "product_owner", "operations"}, ProjectIDs: []string{project}}
+	human := domain.PrincipalBootstrap{ID: "human:synthetic-acceptance-" + project, Token: "synthetic-acceptance-token-" + project, Human: true, Roles: []string{"development", "controller", "qa", "product_owner", "operations"}, ProjectIDs: []string{project}}
 	executor := domain.PrincipalBootstrap{ID: "workload:synthetic-verifier-" + project, Roles: []string{"validation_executor"}, ProjectIDs: []string{project}}
 	if err = r.BootstrapPrincipals(ctx, []domain.PrincipalBootstrap{human, executor}); err != nil {
 		t.Fatal(err)
@@ -133,6 +133,7 @@ func TestAgentReadyAcceptanceIntegration(t *testing.T) {
 		return v
 	}
 	a := begin("task-a")
+	t.Run("scoped task delegation", func(t *testing.T) { exerciseTaskDelegations(t, svc, r, human, a) })
 	lesson := capture(a)
 	a = transition(a, "LOCAL_RESULT_RECORDED", lesson.ID, "")
 	report := verify(lesson)
@@ -159,6 +160,7 @@ func TestAgentReadyAcceptanceIntegration(t *testing.T) {
 		}
 	}
 	a = transition(a, "RAG_READBACK_VERIFIED", "", "")
+	t.Run("candidate text quality", func(t *testing.T) { exerciseTextQuality(t, svc, r, humanCtx, lesson, report.ID) })
 	b := begin("task-b")
 	if b.Route != domain.TaskRouteRAGHit {
 		t.Fatalf("reuse route=%s", b.Route)

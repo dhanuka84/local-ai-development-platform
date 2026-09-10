@@ -6,6 +6,7 @@ import os
 import stat
 import tempfile
 import unittest
+from unittest import mock
 from argparse import Namespace
 from pathlib import Path
 
@@ -16,6 +17,11 @@ import local_vault
 
 class LocalVaultTest(unittest.TestCase):
     passphrase = "correct horse battery staple"
+
+    def test_unavailable_passphrase_fails_with_actionable_error(self) -> None:
+        with mock.patch.object(local_vault.getpass, "getpass", side_effect=EOFError):
+            with self.assertRaisesRegex(local_vault.VaultError, "unlock interactively"):
+                local_vault.read_passphrase(None)
 
     def test_backup_key_is_generated_but_not_materialized_for_compose(self) -> None:
         self.assertIn("BACKUP_ENCRYPTION_KEY", local_vault.DEFAULT_SECRET_NAMES)

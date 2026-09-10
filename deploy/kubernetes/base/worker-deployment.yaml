@@ -11,6 +11,8 @@ spec:
       labels: {app: hybrid-ai-worker}
     spec:
       serviceAccountName: hybrid-ai
+      securityContext:
+        fsGroup: 65532
       containers:
         - name: worker
           image: ghcr.io/example/hybrid-ai-worker:0.1.0
@@ -21,7 +23,7 @@ spec:
             requests: {cpu: 250m, memory: 256Mi}
             limits: {cpu: "2", memory: 2Gi}
           volumeMounts:
-            - {name: artifacts, mountPath: /var/lib/hybrid-ai/artifacts, readOnly: true}
+            - {name: artifacts, mountPath: /var/lib/hybrid-ai/artifacts}
           securityContext:
             allowPrivilegeEscalation: false
             capabilities: {drop: [ALL]}

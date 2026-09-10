@@ -57,6 +57,7 @@ func (a *API) register(server *mcp.Server) {
 	addTool(a, server, readTool("knowledge_get", "Get knowledge", "Fetch one approved knowledge item by ID."), a.get)
 	addTool(a, server, readTool("knowledge_candidates_list", "List review candidates", "List pending knowledge candidates for review."), a.listCandidates)
 	addTool(a, server, readTool("knowledge_quality_reviews", "List quality-blocked knowledge", "List project-scoped approved knowledge withheld by current validation or source quality gates; approval history is preserved."), a.qualityReviews)
+	addTool(a, server, readTool("knowledge_candidate_quality", "Inspect candidate text quality", "Inspect an exact candidate version for suspicious text and possible duplicates from eligible PostgreSQL records. Advisory findings never merge, validate or approve knowledge."), a.candidateQuality)
 	addTool(a, server, readTool("repository_graph_get", "Get repository graph", "Traverse typed, evidence-backed relationships around a Git repository."), a.repositoryGraph)
 	addTool(a, server, readTool("repository_relation_search", "Search repository relationships", "Semantically search approved Git repository relationships in Milvus."), a.repositoryRelationSearch)
 	addTool(a, server, readTool("code_symbol_search", "Search code symbols", "Semantically search active, revision-specific source symbols with PostgreSQL lexical fallback."), a.codeSymbolSearch)
@@ -132,6 +133,16 @@ type qualityReviewsInput struct {
 }
 type qualityReviewsOutput struct {
 	Results []domain.KnowledgeQuality `json:"results"`
+}
+
+type candidateQualityInput struct {
+	KnowledgeID     string `json:"knowledge_id"`
+	ExpectedVersion int    `json:"expected_version"`
+}
+
+func (a *API) candidateQuality(ctx context.Context, _ *mcp.CallToolRequest, input candidateQualityInput) (*mcp.CallToolResult, domain.CandidateQualityAssessment, error) {
+	result, err := a.service.InspectCandidateQuality(a.context(ctx), input.KnowledgeID, input.ExpectedVersion)
+	return nil, result, err
 }
 
 func (a *API) qualityReviews(ctx context.Context, _ *mcp.CallToolRequest, input qualityReviewsInput) (*mcp.CallToolResult, qualityReviewsOutput, error) {
@@ -246,6 +257,8 @@ type reviewInput struct {
 	Verdict            string   `json:"verdict" jsonschema:"one of approve, reject, revise, comment; required"`
 	Comments           string   `json:"comments,omitempty" jsonschema:"review rationale and findings"`
 	ImprovedContent    string   `json:"improved_content,omitempty" jsonschema:"suggested improved response or code"`
+	ImprovedSummary    string   `json:"improved_summary,omitempty" jsonschema:"revised title and summary; requires expected_version"`
+	ExpectedVersion    int      `json:"expected_version,omitempty" jsonschema:"optimistic candidate version for local revision"`
 	ValidationEvidence []string `json:"validation_evidence,omitempty" jsonschema:"fresh local checks for improved_content; required for revise"`
 	RawOutput          string   `json:"raw_output,omitempty" jsonschema:"exact unmodified reviewer response; comments are used when omitted"`
 	ContextManifest    string   `json:"context_manifest,omitempty" jsonschema:"sanitized JSON manifest of context disclosed to the reviewer"`
@@ -277,6 +290,7 @@ func (a *API) review(ctx context.Context, _ *mcp.CallToolRequest, input reviewIn
 		KnowledgeID: input.KnowledgeID, WorkflowID: input.WorkflowID, WorkflowStepID: input.WorkflowStepID,
 		Reviewer: principal.ID, Provider: input.Provider,
 		Model: input.Model, Verdict: verdict, Comments: input.Comments, ImprovedContent: input.ImprovedContent,
+		ImprovedSummary: input.ImprovedSummary, ExpectedVersion: input.ExpectedVersion,
 		ValidationEvidence: input.ValidationEvidence, RawOutput: input.RawOutput, ContextManifest: input.ContextManifest,
 	})
 	output := reviewOutput{Recorded: err == nil, Message: "Review and immutable evidence recorded; use knowledge_candidate_decide for the approval gate."}

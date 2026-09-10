@@ -71,10 +71,17 @@ USER 65532:65532
 WORKDIR /workspace
 ENTRYPOINT ["/gateway"]
 
-FROM debian:bookworm-slim AS worker
+FROM debian:bookworm-slim AS git-runtime
 RUN apt-get update && apt-get install --yes --no-install-recommends git ca-certificates && apt-get clean
-COPY --from=build /out/worker /worker
 USER 65532:65532
+
+# Read-only source verification without the synchronous analyzer toolchains.
+FROM git-runtime AS gateway-source-verifier
+COPY --from=build /out/gateway /gateway
+ENTRYPOINT ["/gateway"]
+
+FROM git-runtime AS worker
+COPY --from=build /out/worker /worker
 ENTRYPOINT ["/worker"]
 
 FROM gcr.io/distroless/static-debian12:nonroot AS admin

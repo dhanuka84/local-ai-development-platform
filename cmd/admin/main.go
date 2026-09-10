@@ -34,13 +34,15 @@ func main() {
 
 func run(ctx context.Context, args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: admin <migrate|age-rebuild|milvus-init|doctor|reindex|compact-code-outbox|repository-upsert|candidates|get|validate|approve|reject> [arguments]")
+		return errors.New("usage: admin <migrate|age-rebuild|milvus-init|doctor|reindex|compact-code-outbox|repository-upsert|candidates|get|validate|approve|reject|delegate-task|revoke-task-delegation> [arguments]")
 	}
 	cfg, err := config.LoadCLI()
 	if err != nil {
 		return err
 	}
 	switch args[0] {
+	case "delegate-task", "revoke-task-delegation":
+		return taskCredential(ctx, cfg, args)
 	case "migrate":
 		repository, err := postgres.Open(ctx, cfg.DatabaseURL)
 		if err != nil {

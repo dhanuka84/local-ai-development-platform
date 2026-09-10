@@ -90,7 +90,7 @@ func (r *Repository) RecordGeneration(ctx context.Context, capture domain.Genera
 			return domain.KnowledgeItem{}, fmt.Errorf("enqueue knowledge index: %w", err)
 		}
 	}
-	if err := auditMutation(ctx, tx, "knowledge.capture", domain.OperationScope{ProjectID: item.ProjectID, WorkflowID: item.WorkflowID}, domain.EvidenceReference{Kind: "knowledge", ID: item.ID, Version: item.Version}, domain.EvidenceReference{Kind: "artifact", ID: capture.OutputArtifact.SHA256, SHA256: capture.OutputArtifact.SHA256}); err != nil {
+	if err := auditMutation(ctx, tx, "knowledge.capture", domain.OperationScope{ProjectID: item.ProjectID, WorkflowID: item.WorkflowID, TaskID: domain.ScopeFromContext(ctx).TaskID}, domain.EvidenceReference{Kind: "knowledge", ID: item.ID, Version: item.Version}, domain.EvidenceReference{Kind: "artifact", ID: capture.OutputArtifact.SHA256, SHA256: capture.OutputArtifact.SHA256}); err != nil {
 		return domain.KnowledgeItem{}, err
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -257,13 +257,14 @@ func (r *Repository) RecordReview(ctx context.Context, review domain.ReviewRecor
 	}
 	if review.Verdict == "revise" && review.ImprovedContent != "" {
 		result, err := tx.Exec(ctx, `UPDATE knowledge_items
-			SET content=$2,validation_evidence=$3,version=version+1
-			WHERE id::text=$1 AND status='pending'`, review.KnowledgeID, review.ImprovedContent, nonNilStrings(review.ValidationEvidence))
+			SET content=$2,validation_evidence=$3,version=version+1,
+			    summary=COALESCE(NULLIF($4,''),summary),title=COALESCE(NULLIF($4,''),title)
+			WHERE id::text=$1 AND status='pending' AND ($5=0 OR version=$5)`, review.KnowledgeID, review.ImprovedContent, nonNilStrings(review.ValidationEvidence), review.ImprovedSummary, review.ExpectedVersion)
 		if err != nil {
 			return err
 		}
 		if result.RowsAffected() != 1 {
-			return fmt.Errorf("pending knowledge candidate %q not found for revision", review.KnowledgeID)
+			return fmt.Errorf("%w: pending knowledge candidate changed before revision", domain.ErrVersionConflict)
 		}
 	}
 	return tx.Commit(ctx)

@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hybrid-ai-gateway
+spec:
+  template:
+    spec:
+      containers:
+        - name: gateway
+          image: ghcr.io/example/hybrid-ai-gateway-source-verifier:0.1.0
+          volumeMounts:
+            - {name: repository-snapshots, mountPath: /repository-snapshots, readOnly: true}
+            - {name: scratch, mountPath: /tmp}
+      volumes:
+        - name: repository-snapshots
+          persistentVolumeClaim:
+            claimName: hybrid-ai-repository-snapshots
+            readOnly: true
+        - name: scratch
+          emptyDir: {sizeLimit: 256Mi}

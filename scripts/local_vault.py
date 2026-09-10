@@ -302,11 +302,16 @@ def read_passphrase(
         assert_private_regular_file(path, "passphrase file")
         value = path.read_text(encoding="utf-8").rstrip("\r\n")
     else:
-        value = getpass.getpass(f"{prompt}: ")
-        if confirm:
-            repeated = getpass.getpass(f"Confirm {prompt.lower()}: ")
-            if value != repeated:
-                raise VaultError("vault passphrases do not match")
+        try:
+            value = getpass.getpass(f"{prompt}: ")
+            if confirm:
+                repeated = getpass.getpass(f"Confirm {prompt.lower()}: ")
+                if value != repeated:
+                    raise VaultError("vault passphrases do not match")
+        except EOFError as exc:
+            raise VaultError(
+                "vault passphrase unavailable; unlock interactively or use a private --passphrase-file"
+            ) from exc
     if len(value) < MIN_PASSPHRASE_LENGTH:
         raise VaultError(f"vault passphrase must contain at least {MIN_PASSPHRASE_LENGTH} characters")
     return value

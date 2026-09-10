@@ -870,6 +870,11 @@ See [enterprise-deployment.md](docs/enterprise-deployment.md) and the [enterpris
 
 The [gap checklist](docs/agent-ready-gap-checklist.md) tracks implementation,
 validation, pilot completion and deployment work with evidence for each item.
+The [real local pilot](docs/agent-ready-pilot-20260910.md) completed both tasks;
+[release preparation](docs/agent-ready-release-20260910.md) records the verified
+restore/upgrade and remaining rollout prerequisites. Short-lived
+[task credentials](docs/task-delegation.md) keep delegated development scoped
+to the human issuer's authority and one active task.
 
 The [implementation checkpoint](docs/agent-ready-data-plan.md) and
 [operations runbook](docs/agent-ready-data-operations.md) cover governed metrics,

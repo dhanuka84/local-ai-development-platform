@@ -43,8 +43,8 @@ func TestServerPublishesValidatedToolSchemasAndSafetyHints(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(result.Tools) != 31 {
-		t.Fatalf("tool count = %d, want 31", len(result.Tools))
+	if len(result.Tools) != 32 {
+		t.Fatalf("tool count = %d, want 32", len(result.Tools))
 	}
 	tools := make(map[string]*mcp.Tool, len(result.Tools))
 	for _, tool := range result.Tools {

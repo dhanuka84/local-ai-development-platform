@@ -412,6 +412,10 @@ func (s *Service) RecordReview(ctx context.Context, review domain.ReviewRecord) 
 	review.Model = strings.TrimSpace(review.Model)
 	review.Verdict = strings.ToLower(strings.TrimSpace(review.Verdict))
 	review.ValidationEvidence = cleanList(review.ValidationEvidence)
+	review.ImprovedSummary = strings.TrimSpace(review.ImprovedSummary)
+	if review.ExpectedVersion < 0 || (review.ImprovedSummary != "" && (review.Verdict != "revise" || review.ExpectedVersion < 1)) {
+		return domain.ReviewRecord{}, fmt.Errorf("%w: summary revision requires revise and expected_version", ErrInvalidInput)
+	}
 	if review.KnowledgeID == "" || review.Reviewer == "" || review.Verdict == "" {
 		return domain.ReviewRecord{}, fmt.Errorf("%w: knowledge_id, reviewer, and verdict are required", ErrInvalidInput)
 	}
