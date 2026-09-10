@@ -273,7 +273,9 @@ func safeEnvironment() []string {
 			environment = append(environment, key+"="+value)
 		}
 	}
-	return append(environment, "CI=1", "GIT_TERMINAL_PROMPT=0", "GIT_CONFIG_NOSYSTEM=1")
+	// Imports during a Python check must not create bytecode in the reviewed
+	// checkout. Keep the untracked-file gate strict for all other side effects.
+	return append(environment, "CI=1", "GIT_TERMINAL_PROMPT=0", "GIT_CONFIG_NOSYSTEM=1", "PYTHONDONTWRITEBYTECODE=1")
 }
 
 type limitedBuffer struct {

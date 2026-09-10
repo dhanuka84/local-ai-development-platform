@@ -1,0 +1,103 @@
+# Standalone disposable services. No live env files, credentials, networks,
+# database volumes or published ports are used by this acceptance profile.
+services:
+  postgres:
+    image: apache/age:release_PG17_1.6.0@sha256:fe8b33905a61549a067f8512808b88011bdcaa82ab65d8788f39fb07a04aa5be
+    environment:
+      POSTGRES_DB: hybrid
+      POSTGRES_USER: hybrid
+      POSTGRES_PASSWORD: synthetic-acceptance-only
+    tmpfs: [/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U hybrid -d hybrid"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.25
+    command: [etcd, --advertise-client-urls=http://etcd:2379, --listen-client-urls=http://0.0.0.0:2379, --data-dir=/etcd]
+    environment:
+      ETCD_AUTO_COMPACTION_MODE: revision
+      ETCD_AUTO_COMPACTION_RETENTION: "1000"
+    healthcheck:
+      test: [CMD, etcdctl, endpoint, health]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  minio:
+    image: minio/minio:RELEASE.2024-12-18T13-15-44Z
+    command: [minio, server, /data]
+    environment:
+      MINIO_ROOT_USER: synthetic-acceptance
+      MINIO_ROOT_PASSWORD: synthetic-acceptance-only
+    healthcheck:
+      test: [CMD, mc, ready, local]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  milvus:
+    image: milvusdb/milvus:v2.6.21
+    command: [milvus, run, standalone]
+    security_opt: [seccomp:unconfined]
+    environment:
+      ETCD_ENDPOINTS: etcd:2379
+      MINIO_ADDRESS: minio:9000
+      MINIO_ACCESS_KEY_ID: synthetic-acceptance
+      MINIO_SECRET_ACCESS_KEY: synthetic-acceptance-only
+      MQ_TYPE: woodpecker
+    healthcheck:
+      test: [CMD, curl, -f, http://localhost:9091/healthz]
+      interval: 5s
+      start_period: 90s
+      timeout: 5s
+      retries: 30
+    depends_on:
+      etcd: {condition: service_healthy}
+      minio: {condition: service_healthy}
+
+  cerbos:
+    image: ghcr.io/cerbos/cerbos:0.54.0@sha256:211c261f6031675522a35c6055b13fd719c4aff13747307e4bcb6907326537ef
+    command: [server, --config=/config/config.yaml]
+    environment:
+      CERBOS_NO_TELEMETRY: "1"
+    volumes:
+      - ../../policies/cerbos:/policies:ro
+      - ../cerbos/config.yaml:/config/config.yaml:ro
+    tmpfs: [/var/lib/cerbos/audit]
+    healthcheck:
+      test: [CMD, /cerbos, healthcheck, --config=/config/config.yaml]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  otel-collector:
+    image: otel/opentelemetry-collector:0.160.0@sha256:e495787f07dbe432ce763ebaf5bc3d113850e9eee2250ade7a3da6a882d0d69a
+    command: [--config=/etc/otelcol/config.yaml]
+    volumes:
+      - ../otel-collector/config.yaml:/etc/otelcol/config.yaml:ro
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+
+  checks:
+    build:
+      context: ../..
+      target: agent-ready-check
+    environment:
+      TEST_DATABASE_URL: postgres://hybrid:synthetic-acceptance-only@postgres:5432/hybrid?sslmode=disable
+      TEST_AGE_DATABASE_URL: postgres://hybrid:synthetic-acceptance-only@postgres:5432/hybrid?sslmode=disable
+      TEST_MILVUS_ADDRESS: milvus:19530
+      TEST_CERBOS_ADDRESS: cerbos:3593
+      TEST_OTEL_ENDPOINT: http://otel-collector:4318/v1/traces
+    depends_on:
+      postgres: {condition: service_healthy}
+      milvus: {condition: service_healthy}
+      cerbos: {condition: service_healthy}
+      otel-collector: {condition: service_started}
+
+networks:
+  default:
+    internal: true

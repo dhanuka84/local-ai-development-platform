@@ -868,6 +868,9 @@ See [enterprise-deployment.md](docs/enterprise-deployment.md) and the [enterpris
 
 ## Agent-ready data follow-up
 
+The [gap checklist](docs/agent-ready-gap-checklist.md) tracks implementation,
+validation, pilot completion and deployment work with evidence for each item.
+
 The [implementation checkpoint](docs/agent-ready-data-plan.md) and
 [operations runbook](docs/agent-ready-data-operations.md) cover governed metrics,
 Milvus semantic definitions, trace evidence, explicit validated reuse, and the

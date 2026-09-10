@@ -2,7 +2,10 @@ SHELL := /bin/sh
 .DEFAULT_GOAL := help
 BUILD_CHECK_IMAGE ?= local-ai-platform-buildcheck:go1.26.8
 
-.PHONY: agent-ready-acceptance agent-ready-pilot
+.PHONY: agent-ready-acceptance agent-ready-integration agent-ready-pilot
+agent-ready-integration: ## Build and run all agent-ready integration checks in isolated disposable services
+	sh scripts/agent_ready_acceptance.sh
+
 agent-ready-acceptance: ## Run the deterministic two-task scenario against explicitly disposable services
 	@test -n "$$TEST_DATABASE_URL" && test -n "$$TEST_MILVUS_ADDRESS" && test -n "$$TEST_CERBOS_ADDRESS" || { echo 'Set disposable TEST_DATABASE_URL, TEST_MILVUS_ADDRESS and TEST_CERBOS_ADDRESS'; exit 1; }
 	go test -race -count=1 -run TestAgentReadyAcceptanceIntegration -v ./internal/service

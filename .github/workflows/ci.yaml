@@ -54,6 +54,14 @@ jobs:
           TEST_DATABASE_URL: postgres://hybrid:integration-only@localhost:5432/hybrid?sslmode=disable
         run: go test -race -count=1 ./internal/postgres
 
+  agent-ready-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Disposable PostgreSQL, AGE, Milvus, Cerbos and two-task acceptance
+        run: make agent-ready-integration
+
   configuration:
     runs-on: ubuntu-latest
     steps:

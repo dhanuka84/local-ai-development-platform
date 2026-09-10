@@ -50,3 +50,55 @@ func TestRepairEvidenceRequiresExactTaskAndSuccessfulArtifactReceipt(t *testing.
 		t.Fatal("failed storage receipt accepted")
 	}
 }
+
+func TestCheckRepairAnswer(t *testing.T) {
+	prev := patchAnswer{Patch: "@@ -1,2 +1,3 @@\nold", Summary: "s", Lesson: "l"}
+	// Unchanged
+	if err := checkRepairAnswer(prev, prev); err == nil || !strings.Contains(err.Error(), "unchanged") {
+		t.Fatal("expected unchanged error")
+	}
+	// Count only change
+	changed := patchAnswer{Patch: "@@ -1,2 +1,4 @@\nold", Summary: "s", Lesson: "l"}
+	if err := checkRepairAnswer(prev, changed); err != nil {
+		t.Fatalf("expected no error for count-only change, got %v", err)
+	}
+	// Source change
+	srcChange := patchAnswer{Patch: "@@ -1,2 +1,3 @@\nnew", Summary: "s", Lesson: "l"}
+	if err := checkRepairAnswer(prev, srcChange); err == nil || !strings.Contains(err.Error(), "more than hunk") {
+		t.Fatal("expected source change error")
+	}
+	// Lesson change
+	lessChange := patchAnswer{Patch: "@@ -1,2 +1,3 @@\nold", Summary: "s", Lesson: "x"}
+	if err := checkRepairAnswer(prev, lessChange); err == nil || !strings.Contains(err.Error(), "lesson") {
+		t.Fatal("expected lesson change error")
+	}
+	// Summary change
+	sumChange := patchAnswer{Patch: "@@ -1,2 +1,3 @@\nold", Summary: "x", Lesson: "l"}
+	if err := checkRepairAnswer(prev, sumChange); err == nil || !strings.Contains(err.Error(), "summary") {
+		t.Fatal("expected summary change error")
+	}
+}
+
+func TestRecountHunksPreservesSourceAndCountsOnlyContent(t *testing.T) {
+	for _, tc := range []struct{ name, before, want string }{
+		{"new file", "--- /dev/null\n+++ b/a.py\n@@ -0,0 +1,3 @@\n+pass\n", "--- /dev/null\n+++ b/a.py\n@@ -0,0 +1,1 @@\n+pass\n"},
+		{"context removal and blank addition", "--- a/a\n+++ b/a\n@@ -2,9 +2,8 @@ func\n same\n-old\n+new\n+\n", "--- a/a\n+++ b/a\n@@ -2,2 +2,3 @@ func\n same\n-old\n+new\n+\n"},
+		{"multiple files and newline marker", "--- a/a\n+++ b/a\n@@ -1,7 +1,7 @@\n-x\n+y\n\\ No newline at end of file\n--- /dev/null\n+++ b/b\n@@ -0,0 +1,4 @@\n+z\n", "--- a/a\n+++ b/a\n@@ -1,1 +1,1 @@\n-x\n+y\n\\ No newline at end of file\n--- /dev/null\n+++ b/b\n@@ -0,0 +1,1 @@\n+z\n"},
+		{"multiple hunks", "--- a/a\n+++ b/a\n@@ -1,9 +1,9 @@\n-x\n+y\n@@ -8,9 +8,9 @@\n next\n-z\n", "--- a/a\n+++ b/a\n@@ -1,1 +1,1 @@\n-x\n+y\n@@ -8,2 +8,1 @@\n next\n-z\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := recountHunks(tc.before)
+			if err != nil || got != tc.want {
+				t.Fatalf("recount: %v\ngot %q\nwant %q", err, got, tc.want)
+			}
+			if !hunkCountsOnly(tc.before, got) {
+				t.Fatal("recount changed protected bytes")
+			}
+		})
+	}
+	for _, invalid := range []string{"not a diff\n", "@@ -0,0 +1,2 @@\n+pass", "@@ -0,0 +1,2 @@\n+pass\n\n", "@@ -0,0 +1,2 @@\ninvalid\n"} {
+		if _, err := recountHunks(invalid); err == nil {
+			t.Fatalf("malformed input accepted: %q", invalid)
+		}
+	}
+}

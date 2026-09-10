@@ -1,12 +1,14 @@
 # Agent-ready knowledge: operations
 
 This runbook covers validation, quality controls, trace evidence, governed
-semantic metrics, and the two-task acceptance/pilot implementation. The real
-Ollama pilot is paused at failed Task A verification/correction; live rollout
-has not been executed. Synthetic test
+semantic metrics, and the two-task acceptance/pilot implementation. The retained
+real-Ollama Task A passed local verification on September 10 and is awaiting
+human publication; Task B and live rollout have not run. Synthetic test
 approvals are not human approval of real knowledge. See
 [the design](agent-ready-data-plan.md) and the
 [real-pilot receipt](agent-ready-pilot-20260906.md).
+The [September 10 recovery receipt](agent-ready-pilot-20260910.md) and
+[gap checklist](agent-ready-gap-checklist.md) carry the current status.
 
 ## Upgrade behavior
 
@@ -58,6 +60,9 @@ repository source. The verifier executes in a disposable checkout and stores
 actual command outputs as content-addressed artifacts. No cloud review is
 invoked. The QA environment must deny unapproved egress; the verifier does not
 provide an OS/network sandbox by itself.
+The verifier pins `PYTHONDONTWRITEBYTECODE=1` so Python imports do not write
+bytecode into the checked-out source; all other untracked-file checks remain
+mandatory.
 
 Repository sources require a full commit ID and named local branch. An optional
 `applicable_through_revision` explicitly bounds applicability: the current local
@@ -173,6 +178,20 @@ it does not erase immutable evidence. Choose archival and deletion controls
 separately for the deployment. An unknown original outcome is never rewritten
 as success just because a later retry or projection check succeeds.
 
+The opt-in `deploy/compose/compose.telemetry.yaml` overlay connects gateway and
+worker to a collector on an internal trace network without a published port.
+It uses the pinned [Collector 0.160.0 release](https://github.com/open-telemetry/opentelemetry-collector-releases/releases/tag/v0.160.0).
+Render the combined configuration before a coordinated application rollout:
+
+```sh
+docker compose --env-file .env.example -f deploy/compose/compose.yaml -f deploy/compose/compose.telemetry.yaml config --quiet
+```
+
+The disposable `make agent-ready-integration` profile exercises the actual
+receiver with synthetic receipts. The production overlay uses the same
+configuration, but deploying it to the live platform remains a separate rollout
+item. Its debug exporter is an operational view, not an archival backend.
+
 ## Governed semantic context and metrics
 
 `context://registry/v1` publishes source-controlled definitions for inspection;
@@ -280,6 +299,16 @@ checks still execute in a disposable clone. Original failures and correction
 output remain separate immutable evidence. This does not revise the lesson or
 approve it; other failure classes require their normal explicit recovery.
 
+For a syntactically corrupt hunk count, `repair_task_a.method: "recount"` selects
+the deterministic `hunk-recount-v1` recovery. This option counts actual context,
+added and removed lines, preserves all other bytes, and refuses malformed hunk
+content. The original exact model output remains unchanged; a separate
+`pilot.patch_repair.derived` artifact identifies the method, input digests and
+derived patch. It still requires the same checkpoint, candidate/version, bound
+corrupt-patch evidence and every original verifier check. The default method
+(`local_model`) retains model-assisted correction. Both routes record a durable
+repair outcome; neither publishes knowledge.
+
 Local HTTP fixture tests separately verify exact output/disclosure capture and
 failed-response preservation. Those tests do not prove model quality or
 substitute for the actual human approval checkpoint.
@@ -287,6 +316,15 @@ substitute for the actual human approval checkpoint.
 ## Verification
 
 Run `make check`, `make contracts-check`, and `make authz-policy-test`.
+For a complete disposable environment, run `make agent-ready-integration`.
+It builds a test image with dependencies, starts uniquely named PostgreSQL/AGE,
+Milvus, etcd, MinIO and Cerbos containers on a private network without published
+ports, waits for readiness, and runs all adapter suites plus the two-task
+acceptance. It cleans up only its own containers and data on exit. No local
+runtime credentials, live database, model provider or retained pilot is used.
+CI runs this same command. Initial image/dependency downloads need network
+access; test execution uses the private network.
+
 Adapter integration suites require explicitly disposable dependencies:
 
 ```sh

@@ -1,11 +1,15 @@
 # Agent-ready data: design and implementation plan
 
-Status: the five-gap local implementation and deterministic two-task acceptance
-scenario are committed at `e44cbb4`. The isolated real-Ollama pilot is paused
-after failed Task A patch verification and a correction timeout. Passing local
-validation, accountable human publication, Task B reuse and live rollout remain
-outstanding. See the [real-pilot evidence](agent-ready-pilot-20260906.md),
-checkpoint and [operator runbook](agent-ready-data-operations.md).
+Track follow-up work and validation evidence in the
+[gap checklist](agent-ready-gap-checklist.md).
+
+Status as of 2026-09-10: the five-gap local implementation and deterministic
+acceptance are available. The retained real-Ollama Task A has now passed local
+validation after a recorded syntax-only repair. Accountable human publication,
+Task B reuse and live rollout remain outstanding. See the
+[recovery evidence](agent-ready-pilot-20260910.md),
+[original attempt history](agent-ready-pilot-20260906.md) and
+[operator runbook](agent-ready-data-operations.md).
 
 Prepared: 2026-09-06. Baseline revision: `4af9954a35ada0818d69ee7888216574e59d57aa`.
 

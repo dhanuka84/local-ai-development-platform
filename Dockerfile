@@ -8,6 +8,15 @@ RUN apt-get update && apt-get install --yes --no-install-recommends python3 && \
     rm -rf /var/lib/apt/lists/*
 WORKDIR /src
 
+# Build dependencies before attaching the acceptance runner to its private test
+# network. Test execution needs no public network or model provider.
+FROM buildcheck AS agent-ready-check
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+ENV GOFLAGS=-buildvcs=false
+CMD ["sh", "-ec", "go test -race -count=1 ./internal/postgres; go test -count=1 ./internal/age; go test -count=1 ./internal/milvus; go test -count=1 ./internal/telemetry; make agent-ready-acceptance"]
+
 FROM go-toolchain AS build
 WORKDIR /src
 COPY go.mod go.sum ./

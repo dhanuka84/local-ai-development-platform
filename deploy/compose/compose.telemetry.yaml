@@ -1,0 +1,27 @@
+# Opt-in local collector. Apply together with compose.yaml after reviewing the
+# application rollout. This derived view does not replace PostgreSQL evidence.
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector:0.160.0@sha256:e495787f07dbe432ce763ebaf5bc3d113850e9eee2250ade7a3da6a882d0d69a
+    command: [--config=/etc/otelcol/config.yaml]
+    volumes:
+      - ../otel-collector/config.yaml:/etc/otelcol/config.yaml:ro
+    networks: [trace]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+
+  gateway:
+    environment:
+      TRACE_EXPORT_ENDPOINT: http://otel-collector:4318/v1/traces
+    networks: [default, trace]
+
+  worker:
+    environment:
+      TRACE_EXPORT_ENDPOINT: http://otel-collector:4318/v1/traces
+    networks: [default, trace]
+
+networks:
+  trace:
+    internal: true
