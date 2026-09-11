@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-FROM golang:1.26.8-bookworm AS go-toolchain
+FROM golang:1.27.1-bookworm AS go-toolchain
 
 # Reproducible local checks, including the Python setup tests. No source or
 # runtime credentials are baked into this target; make mounts the workspace.
