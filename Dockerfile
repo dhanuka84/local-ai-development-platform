@@ -35,7 +35,7 @@ ENTRYPOINT ["/gateway"]
 # Compiler-backed SCIP indexers for TypeScript, JavaScript, and Python. The
 # package versions and multi-architecture Node image are pinned for repeatable
 # local builds.
-FROM node:20.19.5-bookworm-slim@sha256:9e70124bd00f47dd023e349cd587132ae61892acc0e47ed641416c3e18f401c3 AS scip-node
+FROM node:26.8-bookworm-slim@sha256:cd9f682fa2885cd1056e830424764158570061c59736a1da836bc3d73df095ae AS scip-node
 RUN npm install --global --ignore-scripts \
     @sourcegraph/scip-typescript@0.4.0 \
     @sourcegraph/scip-python@0.6.6
