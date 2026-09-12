@@ -1,17 +1,26 @@
 # Agent-ready data gap checklist
 
+Navigation: [Documentation index](README.md) · [Developer guide](developer-guide.md) ·
+[End-to-end test guide](agent-ready-e2e.md).
+
 Updated: 2026-09-12. Baseline: `ce8b7d3`; continuation baseline: `a999db0`.
 Implementation branch: `fix/agent-ready-gaps-20260910`.
 
-Completion: **22 of 28 items**. The six open rows require actual metric
-publication, vault unlock for live activation, measured autonomy cohorts,
-accountable ownership assignments, production retention requirements, or a
-target enterprise environment. They are not recorded as completed by this work.
+Current task scope: **local functionality**, as requested on 2026-09-12.
+Run `make agent-ready-functional` for the functional result across all 28 mapped
+requirements. The generated `functional-acceptance.md` and `summary.json` report
+the executed tests and track deferred acceptance separately.
+
+The original full rollout/adoption register remains **22 of 28 items** below.
+Its six open items are deferred from this functional pass. They cover retained
+runtime publication, live cutover, measured adoption cohorts, named deployment
+owners, production retention integrations and target enterprise certification.
+They do not block local implementation or functional testing.
 
 Every row now has an explicit automated regression mapping and evidence
 boundary in the [end-to-end test guide](agent-ready-e2e.md). Run
 `make agent-ready-e2e` for actual gateway/CLI/worker/pilot paths and disposable
-dependencies. Test coverage and real delivery completion are separate results.
+dependencies. Functional acceptance does not mark the deferred rollout items done.
 
 This is the working completion register for the
 [five-gap plan](agent-ready-data-plan.md),
@@ -29,11 +38,28 @@ accountable human decision.
 
 The user's standing task authorization now permits validated definition decisions
 without another confirmation prompt; see [autonomous local operation](operations.md#autonomous-local-operation).
-L12 still needs access to the retained runtime, current exact-version validation,
-recorded decisions and successful governed queries. A configuration change does
-not execute those steps or unlock the vault.
+L12's functional criterion is a complete trace and correct governed queries
+after validated definition decisions in disposable services. Publishing into
+the retained real-pilot runtime is a deferred rollout step.
 
-## Local release
+## Functional scope of the six deferred items
+
+| ID | Local functionality accepted by E2E | Deferred from this pass |
+|---|---|---|
+| L12 | Registry validation, attributed definition decisions, correct metrics and complete task traces | Publication and queries in the retained real-pilot runtime |
+| L18 | Startup, restart, checkpoint/KB-state preservation, authorization and collector export | Existing vault unlock and live cutover |
+| E02 | Bounded local execution, credential expiry/revocation and immediate loss of delegated authority | Representative 7/14-day observation and adoption-stage decisions; no automatic stage-promotion service is claimed |
+| E06 | Definition ownership, immutable decision attribution, stale withdrawal and fresh revalidation | Named deployment ownership and escalation assignments |
+| E07 | Immutable local evidence, retention review/hold alerts, export and restart persistence | Production retention policy and storage selection, and any required archival/deletion implementation |
+| E08 | Project isolation, invalid enterprise-configuration rejection and denial persistence | Target identity/cluster/storage integration and measured failover/recovery |
+
+Production archival/deletion and target-specific enterprise integrations remain
+future implementation where required; the local functional scope does not claim
+those capabilities. Every functional criterion is named in the
+[coverage map](../tests/agent-ready-coverage.json). Missing, skipped or failed
+tests still fail functional acceptance, including tests for deferred rows.
+
+## Original local rollout register
 
 | Done | ID | Requirement | Owner role | Evidence / remaining work |
 |---|---|---|---|---|
@@ -56,7 +82,7 @@ not execute those steps or unlock the vault.
 | [x] | L17 | Document and check the September 10 implementation slice | Platform development / QA | Checklist, pilot, credential, source-mount and release documents updated; required checks and full disposable acceptance cover the current changes. Remaining gates are explicit. |
 | [ ] | L18 | Activate the compatible live release and collector | Operations | Required `make vault-materialize` could not obtain the vault passphrase noninteractively. Unlock the existing vault, pass `make mcp-preflight`, then follow the prepared cutover. No live service or vault generation was replaced. |
 
-## Broader article and deployment coverage
+## Original broader adoption and deployment register
 
 These items keep previously deferred or incompletely mapped topics visible.
 They are not prerequisites invented for the bounded local pilot. Deployment

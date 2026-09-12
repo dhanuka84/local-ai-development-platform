@@ -2,6 +2,12 @@
 
 **Status:** Accepted
 
+September 12, 2026 clarification: OpenClaw owns model invocation; the MCP
+service enforces activation-time routes and durable transitions. General
+automatic classification and disclosure packaging remain planned.
+[ADR-0011](0011-scoped-autonomy-and-functional-acceptance.md) adds the current
+publication distinction and validated-reuse completion path.
+
 ## Decision
 
 Keep model routing and execution in OpenClaw. Keep the existing MCP gateway

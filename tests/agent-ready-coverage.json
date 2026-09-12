@@ -8,7 +8,9 @@
         "internal/e2e:TestAgentReadyGatewayE2E/ValidationAndPublication",
         "internal/postgres:TestKnowledgePromotionTransactionIntegration"
       ],
-      "boundary": "Default four-role developer bootstrap, attributed explicit lesson decisions, and executable version-bound gate across actual CLI/MCP and PostgreSQL; synthetic approvals only."
+      "boundary": "Default four-role developer bootstrap, attributed explicit lesson decisions, and executable version-bound gate across actual CLI/MCP and PostgreSQL; synthetic approvals only.",
+      "functional_requirement": "Validate and publish an exact KB version with attributed approval; reject missing evidence and unauthorized callers.",
+      "deferred_acceptance": []
     },
     {
       "id": "L02",
@@ -16,7 +18,9 @@
         "internal/e2e:TestAgentReadyGatewayE2E/ValidationAndPublication",
         "contracts:TestVersionedContractsAndFixtures"
       ],
-      "boundary": "Actual work-packet validation plus positive/negative contract fixtures."
+      "boundary": "Actual work-packet validation plus positive/negative contract fixtures.",
+      "functional_requirement": "Execute bounded work-packet checks and validate positive and negative contract fixtures.",
+      "deferred_acceptance": []
     },
     {
       "id": "L03",
@@ -25,7 +29,9 @@
         "internal/postgres:TestKnowledgeQualityAcrossRetrievalAndRecoveryIntegration",
         "internal/milvus:TestVersionedKnowledgeProjectionIntegration"
       ],
-      "boundary": "Live local adapters exercise source/validation/projection eligibility, recovery and hydration in disposable services."
+      "boundary": "Live local adapters exercise source/validation/projection eligibility, recovery and hydration in disposable services.",
+      "functional_requirement": "Exclude stale or quarantined KB content and verify authoritative source and index state.",
+      "deferred_acceptance": []
     },
     {
       "id": "L04",
@@ -35,7 +41,9 @@
         "internal/e2e:TestAgentReadyGatewayE2E/EvidenceRetentionAndExport",
         "internal/postgres:TestEvidenceTransactionAndUnknownOutcomeIntegration"
       ],
-      "boundary": "Owned trace and immutable evidence; external unobserved actions remain outside trace coverage."
+      "boundary": "Owned trace and immutable evidence; external unobserved actions remain outside trace coverage.",
+      "functional_requirement": "Reconstruct task decisions and preserve exact successful, failed and unknown operation evidence.",
+      "deferred_acceptance": []
     },
     {
       "id": "L05",
@@ -43,7 +51,9 @@
         "internal/e2e:TestAgentReadyGatewayE2E/GovernedDefinitionsAndMetrics",
         "internal/service:TestAgentReadyAcceptanceIntegration"
       ],
-      "boundary": "All six test definitions and fixed metric queries; publication of real definitions requires its own decision."
+      "boundary": "All six test definitions and fixed metric queries; publication of real definitions requires its own decision.",
+      "functional_requirement": "Validate, decide, index and query domain, capability and metric definitions.",
+      "deferred_acceptance": []
     },
     {
       "id": "L06",
@@ -52,7 +62,9 @@
         "internal/e2e:TestAgentReadyGatewayE2E/ReuseAndTrace",
         "internal/service:TestAgentReadyAcceptanceIntegration"
       ],
-      "boundary": "Complete two-task synthetic transition and reuse path."
+      "boundary": "Complete two-task synthetic transition and reuse path.",
+      "functional_requirement": "Complete the two-task capture, validation, publication and reuse flow.",
+      "deferred_acceptance": []
     },
     {
       "id": "L07",
@@ -63,7 +75,9 @@
         "cmd/agent-ready-pilot:TestRepairEvidenceRequiresExactTaskAndSuccessfulArtifactReceipt",
         "internal/e2e:TestAgentReadyGatewayE2E/ReuseAndTrace"
       ],
-      "boundary": "Actual pilot executable exercises malformed output, unchanged repair failure, deterministic recount, stale revision denial and successful Task B revision with retained exact artifacts. Protocol outputs are synthetic; real-model evidence remains in the retained pilot."
+      "boundary": "Actual pilot executable exercises malformed output, unchanged repair failure, deterministic recount, stale revision denial and successful Task B revision with retained exact artifacts. Protocol outputs are synthetic; real-model evidence remains in the retained pilot.",
+      "functional_requirement": "Preserve failed repairs and accept only a bounded verified correction or revision.",
+      "deferred_acceptance": []
     },
     {
       "id": "L08",
@@ -72,7 +86,9 @@
         "internal/e2e:TestAgentReadyGatewayE2E/ValidationAndPublication",
         "components/workpacket:TestPythonVerificationSuppressesBytecodeButRejectsOtherSideEffects"
       ],
-      "boundary": "Actual local verifier and behavior checks with deterministic patch fixtures; actual local-model quality is evidenced by the retained pilot, not these tests."
+      "boundary": "Actual local verifier and behavior checks with deterministic patch fixtures; actual local-model quality is evidenced by the retained pilot, not these tests.",
+      "functional_requirement": "Execute actual Git and Python verification in an isolated clone with deterministic generation fixtures.",
+      "deferred_acceptance": []
     },
     {
       "id": "L09",
@@ -80,7 +96,9 @@
         "internal/e2e:TestAgentReadyPilotRecoveryE2E",
         "internal/e2e:TestAgentReadyGatewayE2E/ValidationAndPublication"
       ],
-      "boundary": "Synthetic identity exercises exact approval. Existing real Task A approval is documented separately; test execution grants no real approval."
+      "boundary": "Synthetic identity exercises exact approval. Existing real Task A approval is documented separately; test execution grants no real approval.",
+      "functional_requirement": "Apply an explicit operator decision to the exact validated KB entry.",
+      "deferred_acceptance": []
     },
     {
       "id": "L10",
@@ -89,7 +107,9 @@
         "internal/e2e:TestAgentReadyGatewayE2E/ValidationAndPublication",
         "internal/milvus:TestVersionedKnowledgeProjectionIntegration"
       ],
-      "boundary": "Actual worker publication and exact Milvus read-back; historical real-pilot publication remains separately recorded."
+      "boundary": "Actual worker publication and exact Milvus read-back; historical real-pilot publication remains separately recorded.",
+      "functional_requirement": "Publish through the real worker and verify exact Milvus read-back.",
+      "deferred_acceptance": []
     },
     {
       "id": "L11",
@@ -99,7 +119,9 @@
         "cmd/agent-ready-pilot:TestGenerationSeparatesReferenceLessonFromCurrentTask",
         "cmd/agent-ready-pilot:TestLocalRevisionRefusesStaleOrUnboundCheckpoint"
       ],
-      "boundary": "Actual pilot executable completes retrieval, explicit use, failed Task B output and version-2 local revision without publishing Task B. Generated answers are deterministic fixtures; real-model quality is evidenced separately."
+      "boundary": "Actual pilot executable completes retrieval, explicit use, failed Task B output and version-2 local revision without publishing Task B. Generated answers are deterministic fixtures; real-model quality is evidenced separately.",
+      "functional_requirement": "Retrieve and use existing KB context, revise a failed task and leave its new KB entry pending.",
+      "deferred_acceptance": []
     },
     {
       "id": "L12",
@@ -107,7 +129,11 @@
         "internal/e2e:TestAgentReadyGatewayE2E/GovernedDefinitionsAndMetrics",
         "internal/e2e:TestAgentReadyGatewayE2E/ReuseAndTrace"
       ],
-      "boundary": "Real-pilot definitions remain pending exact-version human decisions; synthetic query success does not close L12."
+      "boundary": "Functional trace and metric behavior is tested through real local binaries; publication of retained real-pilot definitions is deferred rollout acceptance.",
+      "functional_requirement": "Produce complete task traces and correct governed metrics after exact definition decisions.",
+      "deferred_acceptance": [
+        "Publish the retained real-pilot definitions and run governed queries there when authenticated runtime access is available."
+      ]
     },
     {
       "id": "L13",
@@ -115,7 +141,9 @@
         "internal/e2e:TestAgentReadyGatewayE2E/TransportDiscovery",
         "internal/service:TestAgentReadyAcceptanceIntegration"
       ],
-      "boundary": "Self-provisioning isolated suite must execute all mapped checks; missing/skipped required tests fail the report."
+      "boundary": "Self-provisioning isolated suite must execute all mapped checks; missing/skipped required tests fail the report.",
+      "functional_requirement": "Provision disposable dependencies and require every mapped E2E test to execute successfully.",
+      "deferred_acceptance": []
     },
     {
       "id": "L14",
@@ -123,16 +151,21 @@
         "internal/postgres:TestUpgradeFromV7PreservesLegacyEvidenceIntegration",
         "internal/e2e:TestAgentReadyGatewayE2E/TransportDiscovery"
       ],
-      "boundary": "Migration/legacy-evidence regression and actual admin migration; protected local dump restore is separately documented, not rerun against live data."
+      "boundary": "Migration/legacy-evidence regression and actual admin migration; protected local dump restore is separately documented, not rerun against live data.",
+      "functional_requirement": "Upgrade migration-7 data without losing legacy evidence and run the actual migration CLI.",
+      "deferred_acceptance": []
     },
     {
       "id": "L15",
       "checks": [
         "internal/e2e:TestAgentReadyGatewayE2E/TransportDiscovery",
         "internal/e2e:TestAgentReadyGatewayE2E/ValidationAndPublication",
-        "internal/e2e:TestAgentReadyGatewayE2E/EvidenceRetentionAndExport"
+        "internal/e2e:TestAgentReadyGatewayE2E/EvidenceRetentionAndExport",
+        "internal/e2e:TestAgentReadyGatewayE2E/RestartPreservesState"
       ],
-      "boundary": "Matching built gateway/worker/admin and real policies start successfully in the disposable stack; no live cutover claimed."
+      "boundary": "Matching built gateway/worker/admin and real policies start successfully in the disposable stack; no live cutover claimed.",
+      "functional_requirement": "Start compatible gateway, worker, CLI and policies and preserve application state across restart.",
+      "deferred_acceptance": []
     },
     {
       "id": "L16",
@@ -140,7 +173,9 @@
         "internal/e2e:TestAgentReadyGatewayE2E/EvidenceRetentionAndExport",
         "internal/telemetry:TestActualLocalCollectorAcceptsDurableReceiptIntegration"
       ],
-      "boundary": "Actual worker durable queue and actual local collector accept receipts."
+      "boundary": "Actual worker durable queue and actual local collector accept receipts.",
+      "functional_requirement": "Export durable worker evidence to an actual local collector.",
+      "deferred_acceptance": []
     },
     {
       "id": "L17",
@@ -149,15 +184,22 @@
         "internal/service:TestAgentReadyAcceptanceIntegration",
         "contracts:TestVersionedContractsAndFixtures"
       ],
-      "boundary": "Mapped automated suite supplements required make check and documentation review; this is not a production readiness assertion."
+      "boundary": "Mapped automated suite supplements required make check and documentation review; this is not a production readiness assertion.",
+      "functional_requirement": "Expose the current tool and contract interfaces to the acceptance suite.",
+      "deferred_acceptance": []
     },
     {
       "id": "L18",
       "checks": [
         "internal/e2e:TestAgentReadyGatewayE2E/TransportDiscovery",
-        "internal/e2e:TestAgentReadyGatewayE2E/EvidenceRetentionAndExport"
+        "internal/e2e:TestAgentReadyGatewayE2E/EvidenceRetentionAndExport",
+        "internal/e2e:TestAgentReadyGatewayE2E/RestartPreservesState"
       ],
-      "boundary": "Disposable activation rehearsal only. Live activation remains blocked on the existing encrypted vault unlock and actual cutover checks."
+      "boundary": "Disposable startup and restart prove local runtime behavior; existing live vault unlock and cutover are deferred rollout acceptance.",
+      "functional_requirement": "Start and restart local services; retain checkpoints, pending KB entries, access denials and collector export.",
+      "deferred_acceptance": [
+        "Unlock the existing vault and execute the prepared live cutover and target-service checks."
+      ]
     },
     {
       "id": "E01",
@@ -165,15 +207,22 @@
         "internal/e2e:TestAgentReadyGatewayE2E/TaskDelegation",
         "internal/service:TestAgentReadyAcceptanceIntegration/scoped_task_delegation"
       ],
-      "boundary": "Actual CLI task issuance and HTTP revocation plus service expiry/live-authority cases; enterprise federation remains outside local certification."
+      "boundary": "Actual CLI task issuance and HTTP revocation plus service expiry/live-authority cases; enterprise federation remains outside local certification.",
+      "functional_requirement": "Issue scoped task credentials and enforce expiry, revocation and the issuer's current roles.",
+      "deferred_acceptance": []
     },
     {
       "id": "E02",
       "checks": [
         "internal/e2e:TestAgentReadyGatewayE2E/ValidationAndPublication",
-        "components/workpacket:TestEvaluateMaintenanceFailsClosed"
+        "components/workpacket:TestEvaluateMaintenanceFailsClosed",
+        "internal/e2e:TestAgentReadyGatewayE2E/TaskDelegation"
       ],
-      "boundary": "Tests existing mandatory authority gates only. Representative 7/14-day cohorts and accountable stage adoption cannot be replaced by synthetic tests."
+      "boundary": "Tests existing mandatory authority gates only. Representative 7/14-day cohorts and accountable stage adoption cannot be replaced by synthetic tests.",
+      "functional_requirement": "Enforce bounded local execution and immediately withdraw delegated access when authority expires or is revoked.",
+      "deferred_acceptance": [
+        "Collect representative 7/14-day cohorts and record an evidence-backed adoption-stage decision. No automatic stage-promotion service is claimed."
+      ]
     },
     {
       "id": "E03",
@@ -181,14 +230,18 @@
         "internal/e2e:TestAgentReadyGatewayE2E/ValidationAndPublication",
         "internal/e2e:TestAgentReadyGatewayE2E/QualityAndFreshness"
       ],
-      "boundary": "Pending/raw access, validated publication and current eligible retrieval are exercised over MCP."
+      "boundary": "Pending/raw access, validated publication and current eligible retrieval are exercised over MCP.",
+      "functional_requirement": "Keep pending KB entries out of normal retrieval and serve only currently eligible approved versions.",
+      "deferred_acceptance": []
     },
     {
       "id": "E04",
       "checks": [
         "internal/e2e:TestAgentReadyGatewayE2E/ReuseAndTrace"
       ],
-      "boundary": "Current applicable curation mechanism captures a pending lesson after reuse. Warehouse applicability remains the documented scoped decision."
+      "boundary": "Current applicable curation mechanism captures a pending lesson after reuse. Warehouse applicability remains the documented scoped decision.",
+      "functional_requirement": "Capture the result of KB reuse as a pending proposed KB entry.",
+      "deferred_acceptance": []
     },
     {
       "id": "E05",
@@ -196,21 +249,32 @@
         "internal/e2e:TestAgentReadyGatewayE2E/QualityAndFreshness",
         "internal/service:TestAgentReadyAcceptanceIntegration/candidate_text_quality"
       ],
-      "boundary": "Exact-version duplicate inspection and foreign/quarantined exclusions with authoritative candidates; OCR/PDF and production corpus recall are outside supported scope."
+      "boundary": "Exact-version duplicate inspection and foreign/quarantined exclusions with authoritative candidates; OCR/PDF and production corpus recall are outside supported scope.",
+      "functional_requirement": "Inspect exact-version text quality and authoritative duplicates without exposing foreign or quarantined entries.",
+      "deferred_acceptance": []
     },
     {
       "id": "E06",
       "checks": [
         "internal/e2e:TestAgentReadyGatewayE2E/GovernedDefinitionsAndMetrics"
       ],
-      "boundary": "Executable stale-definition withdrawal and owner-attributed synthetic decisions; named deployment ownership and acceptance remain unspecified."
+      "boundary": "Executable stale-definition withdrawal and owner-attributed synthetic decisions; named deployment ownership and acceptance remain unspecified.",
+      "functional_requirement": "Retain definition ownership and decision attribution; withdraw stale definitions and restore them through fresh validation.",
+      "deferred_acceptance": [
+        "Assign and obtain acceptance from named deployment owners, QA and operations contacts and escalation replacements."
+      ]
     },
     {
       "id": "E07",
       "checks": [
-        "internal/e2e:TestAgentReadyGatewayE2E/EvidenceRetentionAndExport"
+        "internal/e2e:TestAgentReadyGatewayE2E/EvidenceRetentionAndExport",
+        "internal/e2e:TestAgentReadyGatewayE2E/RestartPreservesState"
       ],
-      "boundary": "Local review/hold, immutable storage and collector export only. Production archival, hold authority and deletion requirements remain unspecified."
+      "boundary": "Local review/hold, immutable storage and collector export only. Production archival, hold authority and deletion requirements remain unspecified.",
+      "functional_requirement": "Retain immutable local evidence, report review/hold obligations and preserve alerts and export through service restarts.",
+      "deferred_acceptance": [
+        "Select production retention/storage/hold requirements, then implement and validate any required archival or deletion integration. The current functional scope is immutable retention with review/hold alerts."
+      ]
     },
     {
       "id": "E08",
@@ -218,9 +282,14 @@
         "internal/e2e:TestAgentReadyGatewayE2E/TaskDelegation",
         "internal/e2e:TestAgentReadyGatewayE2E/TransportDiscovery",
         "internal/config:TestLoadRejectsUnauthenticatedEnterprise",
-        "internal/config:TestLoadRejectsAuthorizationDisabledOutsideLocal"
+        "internal/config:TestLoadRejectsAuthorizationDisabledOutsideLocal",
+        "internal/e2e:TestAgentReadyGatewayE2E/RestartPreservesState"
       ],
-      "boundary": "Project isolation and configuration denials are local regression evidence. Target identity, cluster, storage and measured availability/recovery are still required."
+      "boundary": "Project isolation and configuration denials are local regression evidence. Target identity, cluster, storage and measured availability/recovery are still required.",
+      "functional_requirement": "Enforce project isolation, reject invalid enterprise authentication settings and preserve denials after restart.",
+      "deferred_acceptance": [
+        "Configure the target enterprise identity, tenant mapping, cluster and storage, then measure failover and recovery. Local tests do not implement or certify those target integrations."
+      ]
     },
     {
       "id": "E09",
@@ -228,7 +297,9 @@
         "internal/e2e:TestAgentReadyGatewayE2E/QualityAndFreshness",
         "components/workpacket:TestVerifyPatchUsesDisposableCloneAndEnforcesScope"
       ],
-      "boundary": "Local source/verifier regressions supplement the retained rendered-overlay/read-only mount receipt; this run does not deploy Kubernetes."
+      "boundary": "Local source/verifier regressions supplement the retained rendered-overlay/read-only mount receipt; this run does not deploy Kubernetes.",
+      "functional_requirement": "Verify local source freshness and enforce work-packet file boundaries in disposable clones.",
+      "deferred_acceptance": []
     },
     {
       "id": "E10",
@@ -236,7 +307,9 @@
         "internal/e2e:TestAgentReadyGatewayE2E/TransportDiscovery",
         "internal/service:TestAgentReadyAcceptanceIntegration"
       ],
-      "boundary": "Coverage loader requires all checklist IDs exactly once. Manual/production evidence limits are explicit per row."
+      "boundary": "Coverage loader requires all checklist IDs exactly once. Manual/production evidence limits are explicit per row.",
+      "functional_requirement": "Bind every checklist item to executed checks and preserve evidence boundaries in the acceptance report.",
+      "deferred_acceptance": []
     }
   ]
 }

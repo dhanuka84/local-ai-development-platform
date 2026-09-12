@@ -30,8 +30,15 @@ def load_coverage(root=ROOT):
         raise ValueError("coverage must map every checklist ID exactly once")
     for row in rows:
         row["delivery_status"] = completion[row["id"]]
-        if not row.get("checks") or not row.get("boundary"):
-            raise ValueError(f"{row['id']}: checks and evidence boundary are required")
+        if not row.get("checks") or not row.get("boundary") or not row.get("functional_requirement"):
+            raise ValueError(f"{row['id']}: checks, functional requirement and evidence boundary are required")
+        deferred = row.setdefault("deferred_acceptance", [])
+        if not isinstance(deferred, list) or any(not isinstance(item, str) or not item.strip() for item in deferred):
+            raise ValueError(f"{row['id']}: deferred acceptance must list concrete remaining requirements")
+        if row["delivery_status"] == "open" and not deferred:
+            raise ValueError(f"{row['id']}: open delivery needs an explicit deferred requirement")
+        if row["delivery_status"] == "complete" and deferred:
+            raise ValueError(f"{row['id']}: completed delivery cannot contain deferred requirements")
         for check in row["checks"]:
             package, name = check.split(":", 1)
             if package not in PACKAGES or not name.startswith("Test"):
@@ -56,9 +63,40 @@ def coverage_report(rows, outcomes):
     report = []
     for row in rows:
         checks = {name: outcomes.get(name, "missing") for name in row["checks"]}
+        passed = all(v == "pass" for v in checks.values())
         report.append({**row, "checks": checks,
-                       "regression_status": "pass" if all(v == "pass" for v in checks.values()) else "fail"})
+                       "regression_status": "pass" if passed else "fail",
+                       "functional_status": "pass" if passed else "fail"})
     return report
+
+
+def functional_summary(coverage, suites):
+    failed_ids = [row["id"] for row in coverage if row["functional_status"] != "pass"]
+    failed_suites = [suite["package"] for suite in suites if suite["exit_code"] != 0]
+    return {
+        "status": "pass" if coverage and suites and not failed_ids and not failed_suites else "fail",
+        "passed": len(coverage) - len(failed_ids), "total": len(coverage),
+        "failed_ids": failed_ids, "failed_suites": failed_suites,
+    }
+
+
+def functional_markdown(coverage, acceptance):
+    lines = ["# Local functional acceptance", "",
+             f"Result: **{acceptance['status']}**; {acceptance['passed']}/{acceptance['total']} mapped requirements passed.", "",
+             "Scope: existing local KB functionality tested with disposable services and synthetic data.",
+             "Generated KB entries stay pending unless an explicit operator decision is supplied.", "",
+             "| ID | Result | Functional requirement |", "|---|---|---|"]
+    for row in coverage:
+        requirement = row["functional_requirement"].replace("|", "\\|").replace("\n", " ")
+        lines.append(f"| {row['id']} | {row['functional_status']} | {requirement} |")
+    if acceptance["failed_suites"]:
+        lines += ["", "Failed suites: " + ", ".join(acceptance["failed_suites"])]
+    lines += ["", "## Deferred rollout and adoption acceptance", "",
+              "These requirements are outside this functional pass. Their deferral never excuses a failed functional test.", ""]
+    for row in coverage:
+        for item in row.get("deferred_acceptance", []):
+            lines.append(f"- **{row['id']}**: {item}")
+    return "\n".join(lines) + "\n"
 
 
 def source_digest(root):
@@ -107,7 +145,8 @@ def run(output):
                     print(event["Output"], end="", flush=True)
             print((output / (name + ".stderr")).read_text(), flush=True)
     coverage = coverage_report(rows, outcomes)
-    passed = all(r["exit_code"] == 0 for r in results) and all(r["regression_status"] == "pass" for r in coverage)
+    acceptance = functional_summary(coverage, results)
+    passed = acceptance["status"] == "pass"
     summary = {
         "schema_version": "hybrid-ai/checklist-regression/v1",
         "started_at": started, "completed_at": datetime.now(timezone.utc).isoformat(),
@@ -116,6 +155,10 @@ def run(output):
         "source_snapshot_sha256": digest,
         "inference": {"provider": "none", "model": "none", "embedding_protocol_fixture": "ollama/synthetic-e2e-fixture"},
         "scope": "Synthetic regression evidence; does not approve real knowledge or certify live/enterprise deployment or autonomy cohorts.",
+        "acceptance_scope": "local-functionality",
+        "functional_acceptance": acceptance,
+        "deferred_acceptance": [{"id": row["id"], "requirements": row["deferred_acceptance"]}
+                                for row in coverage if row["deferred_acceptance"]],
         "delivery_completion": {"complete": sum(row["delivery_status"] == "complete" for row in rows),
                                 "total": len(rows), "open_ids": [row["id"] for row in rows if row["delivery_status"] == "open"]},
         "suites": results, "checklist": coverage,
@@ -126,6 +169,8 @@ def run(output):
     with (output / "source-manifest.json").open("x") as handle:
         json.dump(sources, handle, indent=2)
         handle.write("\n")
+    with (output / "functional-acceptance.md").open("x") as handle:
+        handle.write(functional_markdown(coverage, acceptance))
     hashes = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(output.iterdir()) if p.is_file()}
     with (output / "evidence-sha256.json").open("x") as handle:
         json.dump(hashes, handle, indent=2)
@@ -138,7 +183,8 @@ def run(output):
         if failed:
             print(f"{row['id']}: required tests did not pass: {', '.join(failed)}", flush=True)
     print(f"Checklist regressions: {sum(row['regression_status'] == 'pass' for row in coverage)}/{len(rows)}; receipt /evidence/summary.json", flush=True)
-    print(f"Delivery completion remains {summary['delivery_completion']['complete']}/{len(rows)}; see per-item evidence boundaries", flush=True)
+    print(f"Local functional acceptance: {acceptance['status'].upper()} ({acceptance['passed']}/{acceptance['total']}); receipt /evidence/functional-acceptance.md", flush=True)
+    print(f"Rollout/adoption acceptance deferred for {len(summary['deferred_acceptance'])} items; tracked separately from functional acceptance", flush=True)
     return 0 if passed else 1
 
 

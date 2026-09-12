@@ -21,4 +21,7 @@ Cloud-model quality does not make output authoritative. Capturing raw responses 
 - Review and approval are distinct MCP operations.
 - Raw review evidence remains auditable but is not embedded automatically.
 - Revision of approved records requires a future new-version workflow; the current service only revises pending records.
-- Auto-approval exists for isolated experiments but defaults off and must not be enabled in shared production.
+- Updated 2026-09-12: `AUTO_APPROVE_LOCAL=true` is rejected in every environment.
+  Generated KB entries require the user's explicit exact-version decision.
+  Validated domain/capability/metric definitions use a separate delegated
+  authorization rule; see [ADR-0011](0011-scoped-autonomy-and-functional-acceptance.md).

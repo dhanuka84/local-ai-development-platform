@@ -1,5 +1,9 @@
 # Real local pilot — 2026-09-06
 
+Historical receipt; original observations and counts are preserved. For the
+September 12 functional scope, use the [current status](README.md#current-status)
+and [validation receipt](agent-ready-validation-20260912.md#functional-acceptance-continuation).
+
 This is the preserved September 6 attempt history. For the current state and
 completed two-task workflow, see the [September 10 recovery](agent-ready-pilot-20260910.md).
 

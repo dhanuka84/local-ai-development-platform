@@ -1,5 +1,8 @@
 # Operations Runbook
 
+Updated September 12, 2026. [Documentation index](README.md) ·
+[Developer guide](developer-guide.md) · [Functional E2E guide](agent-ready-e2e.md).
+
 Use this document to set up, start, verify, and stop the local platform. The
 commands are safe defaults for a single developer. Team and regulated identity
 options are explained after the local setup. For unfamiliar terms, use the
@@ -22,16 +25,18 @@ security boundaries. Do not reuse one credential for another service.
 
 | Boundary | Credential | Required for this deployment | Billing/data boundary |
 |---|---|---:|---|
-| Codex CLI -> OpenAI models | ChatGPT sign-in | Yes for the recommended Codex workflow | Uses the signed-in ChatGPT account/workspace entitlements and limits. It does not require OpenAI Platform API-key billing. |
+| Codex CLI -> OpenAI models | ChatGPT sign-in | Only for the explicitly selected cloud Codex route | Uses the signed-in ChatGPT account/workspace entitlements and limits. It does not require OpenAI Platform API-key billing. |
 | Codex CLI -> local MCP gateway | `HYBRID_AI_MCP_TOKEN` in the Codex process | Yes in HTTP mode | Local bearer secret; it must equal the gateway's vault-backed `AUTH_TOKEN`. It is not an OpenAI token and has no model-usage charge. |
 | OpenClaw -> local MCP gateway | `CONTROLLER_AUTH_TOKEN` | Yes for orchestration | Separate non-human controller identity. It cannot perform QA/Product Owner human gates. |
 | OpenClaw -> Kimi cloud | Moonshot/Kimi API key | Only for an explicitly selected cloud-review workflow | Moonshot cloud billing and disclosure boundary. Store it through OpenClaw's provider onboarding, not in this repository's `.env`. |
 | OpenClaw -> Ollama | No real cloud credential | Yes for local inference | Local-machine inference. A provider may require a non-secret placeholder such as `OLLAMA_API_KEY=ollama-local`. |
 
 This runbook uses ChatGPT sign-in for Codex, so `OPENAI_API_KEY` is not needed.
-Codex still uses a cloud model even though its CLI runs locally and connects to
-the local MCP server. Local-only maintenance must use OpenClaw and Ollama, not
-Codex or Kimi.
+The standard Codex target uses a cloud model even though the CLI and MCP server
+run locally. The explicit `codex-local` targets select Ollama; their launcher
+configuration is tested, while deferred MCP tool use remains a version-specific
+limitation. Use the OpenClaw/Ollama route for governed local maintenance and
+never introduce a cloud fallback. See the [developer guide](developer-guide.md).
 
 See the official [Codex authentication](https://learn.chatgpt.com/docs/auth) and [Codex MCP](https://learn.chatgpt.com/docs/extend/mcp) documentation.
 
@@ -316,6 +321,18 @@ Missing credentials, real observation windows, named deployment owners, and
 target-environment requirements remain factual prerequisites. Record them and
 continue independent tasks; do not manufacture evidence or count synthetic
 approvals as publication of real records. Maintenance remains local-model-only.
+
+## Functional acceptance without live credentials
+
+Run `make agent-ready-functional` from the implementation checkout. It provisions
+its own disposable PostgreSQL/AGE, Milvus, Cerbos and collector, builds the actual
+application binaries and retains a per-requirement report. It needs no live vault
+or model credentials. `make check` remains required but does not replace E2E.
+
+The [current checklist](agent-ready-gap-checklist.md) separates tested local
+functionality from live cutover, adoption and enterprise prerequisites. Missing
+runtime access does not justify disabling authentication or overwriting a vault.
+Retention emits review/hold alerts; it does not delete evidence.
 
 ## Normal checks
 

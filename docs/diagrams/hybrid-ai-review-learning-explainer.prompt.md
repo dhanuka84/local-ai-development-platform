@@ -1,7 +1,11 @@
 # Review-learning explainer generation prompt
 
-The PNG was generated with the built-in image-generation tool from this prompt.
-The editable Mermaid diagram remains the exact technical source of truth.
+Historical prompt for the former AI-generated illustration. On September 12,
+2026, the current [PNG](hybrid-ai-review-learning-explainer.png) and
+[SVG](hybrid-ai-review-learning-explainer.svg) were replaced by locally rendered
+[Mermaid source](hybrid-ai-review-learning-explainer.mmd) showing the separate
+KB-entry and definition publication paths. The prompt below is retained as
+design history; it was not used to generate the current assets.
 
 ```text
 Use case: infographic-diagram

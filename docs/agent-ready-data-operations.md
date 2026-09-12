@@ -1,5 +1,9 @@
 # Agent-ready knowledge: operations
 
+Navigation: [Developer guide](developer-guide.md) ·
+[Publication paths diagram](diagrams/hybrid-ai-review-learning-explainer.png) ·
+[Documentation index](README.md).
+
 This runbook covers validation, quality controls, trace evidence, governed
 semantic metrics, and the two-task acceptance/pilot implementation. The retained
 real-Ollama pilot completed on September 10, including explicit Task A approval
@@ -13,7 +17,10 @@ approvals are not human approval of real knowledge. See
 The [September 10 recovery receipt](agent-ready-pilot-20260910.md) and
 [gap checklist](agent-ready-gap-checklist.md) carry the current status.
 
-For full regression validation, run `make agent-ready-e2e`. The
+For the current functionality-focused pass, run `make agent-ready-functional`.
+Live cutover, measured adoption and target-specific production requirements are
+[deferred acceptance](agent-ready-gap-checklist.md#functional-scope-of-the-six-deferred-items).
+The
 [E2E guide](agent-ready-e2e.md) maps every checklist row to exact tests, records
 the required manual/deployment evidence, and explains the retained JSON test
 receipts. The suite uses disposable services and deterministic local protocol
@@ -225,13 +232,17 @@ item. Its debug exporter is an operational view, not an archival backend.
 ## Governed semantic context and metrics
 
 `context://registry/v1` publishes source-controlled definitions for inspection;
-it does not authorize execution. Human QA runs `context_registry_validate` for
-the project. The server executes contract fixtures and PostgreSQL query
-preparation, stores evidence, and stages six pending definitions. A human
-Product Owner then calls `context_definition_decide` with project, definition
-ID, expected version/hash, validation ID, reason and idempotency key. No model
-can approve the registry. Revalidation checks contracts/SQL preparation; it
-does not claim an integration test just ran.
+it does not authorize execution. An authenticated operator with QA authority
+runs `context_registry_validate` for the project. The server executes contract
+fixtures and PostgreSQL query preparation, stores evidence, and stages six
+pending definitions. Under standing task authorization, the agent may execute
+`context_definition_decide` using that operator's Product Owner authority, with
+project, definition ID, exact version/hash, validation ID, an accurately
+attributed delegated-task reason and idempotency key. No additional per-item
+confirmation is needed for these definitions. A model's own review is never
+approval evidence; generated KB entries still require the user's explicit
+exact-version decision. Revalidation checks contracts/SQL preparation and does
+not claim an integration test just ran.
 
 Approved definitions are embedded locally through Ollama and indexed in Milvus.
 `context_definition_search` treats hits as candidates and hydrates current,

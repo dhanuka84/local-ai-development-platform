@@ -2,7 +2,9 @@ SHELL := /bin/sh
 .DEFAULT_GOAL := help
 BUILD_CHECK_IMAGE ?= local-ai-platform-buildcheck:go1.26.8
 
-.PHONY: agent-ready-acceptance agent-ready-integration agent-ready-e2e agent-ready-pilot
+.PHONY: agent-ready-acceptance agent-ready-integration agent-ready-e2e agent-ready-functional agent-ready-pilot
+agent-ready-functional: agent-ready-e2e ## Verify local functionality and report deferred rollout/adoption requirements separately
+
 agent-ready-e2e: agent-ready-integration ## Run checklist-mapped E2E and integration tests and retain machine-readable evidence
 
 agent-ready-integration: ## Build and run all agent-ready integration checks in isolated disposable services
@@ -844,25 +846,31 @@ workpacket-verify: workpacket-build ## Verify PATCH=/path/to/change.patch in an 
 	@test -n "$(PATCH)" || { echo "usage: make workpacket-verify PACKET=/path/to/work-packet.json PATCH=/path/to/change.patch" >&2; exit 1; }
 	./bin/workpacket verify --packet "$(PACKET)" --patch "$(PATCH)"
 
-diagram-local-architecture: ## Render the local architecture Mermaid diagram as SVG and high-resolution PNG
-	npx -y @mermaid-js/mermaid-cli@11.16.0 -p docs/diagrams/puppeteer-config.json -i docs/diagrams/hybrid-ai-local-architecture.mmd -o docs/diagrams/hybrid-ai-local-architecture.svg -b '#ffffff'
-	npx -y @mermaid-js/mermaid-cli@11.16.0 -p docs/diagrams/puppeteer-config.json -i docs/diagrams/hybrid-ai-local-architecture.mmd -o docs/diagrams/hybrid-ai-local-architecture.png -b '#ffffff' -w 6400 -s 3
+.PHONY: diagrams docs-check diagram-local-architecture diagram-enterprise-architecture diagram-local-to-enterprise diagram-review-loop diagram-agentic-workflow diagram-knowledge-publication
 
-diagram-enterprise-architecture: ## Render the enterprise architecture Mermaid diagram as SVG and high-resolution PNG
-	npx -y @mermaid-js/mermaid-cli@11.16.0 -p docs/diagrams/puppeteer-config.json -i docs/diagrams/hybrid-ai-enterprise-architecture.mmd -o docs/diagrams/hybrid-ai-enterprise-architecture.svg -b '#ffffff'
-	npx -y @mermaid-js/mermaid-cli@11.16.0 -p docs/diagrams/puppeteer-config.json -i docs/diagrams/hybrid-ai-enterprise-architecture.mmd -o docs/diagrams/hybrid-ai-enterprise-architecture.png -b '#ffffff' -w 7680 -s 3
+diagrams: ## Render all Mermaid sources as SVG/PNG and refresh their evidence manifest
+	python3 scripts/render_diagrams.py
 
-diagram-local-to-enterprise: ## Render the local-to-enterprise Mermaid diagram as SVG and high-resolution PNG
-	npx -y @mermaid-js/mermaid-cli@11.16.0 -p docs/diagrams/puppeteer-config.json -i docs/diagrams/hybrid-ai-local-to-enterprise-evolution.mmd -o docs/diagrams/hybrid-ai-local-to-enterprise-evolution.svg -b '#ffffff'
-	npx -y @mermaid-js/mermaid-cli@11.16.0 -p docs/diagrams/puppeteer-config.json -i docs/diagrams/hybrid-ai-local-to-enterprise-evolution.mmd -o docs/diagrams/hybrid-ai-local-to-enterprise-evolution.png -b '#ffffff' -w 7680 -s 3
+docs-check: ## Validate local documentation links, navigation and diagram export freshness
+	python3 scripts/docs_check.py
 
-diagram-review-loop: ## Render the review-learning Mermaid diagram as SVG and high-resolution PNG
-	npx -y @mermaid-js/mermaid-cli@11.16.0 -p docs/diagrams/puppeteer-config.json -i docs/diagrams/hybrid-ai-review-learning-loop.mmd -o docs/diagrams/hybrid-ai-review-learning-loop.svg -b '#ffffff'
-	npx -y @mermaid-js/mermaid-cli@11.16.0 -p docs/diagrams/puppeteer-config.json -i docs/diagrams/hybrid-ai-review-learning-loop.mmd -o docs/diagrams/hybrid-ai-review-learning-loop.png -b '#ffffff' -w 6400 -s 3
+diagram-local-architecture: ## Render hybrid-ai-local-architecture as SVG/PNG and update its manifest entry
+	python3 scripts/render_diagrams.py --name hybrid-ai-local-architecture
 
-diagram-agentic-workflow: ## Render the OpenClaw/Cerbos workflow as SVG and high-resolution PNG
-	npx -y @mermaid-js/mermaid-cli@11.16.0 -p docs/diagrams/puppeteer-config.json -i docs/diagrams/openclaw-agentic-automation-workflow.mmd -o docs/diagrams/openclaw-agentic-automation-workflow.svg -b '#ffffff'
-	npx -y @mermaid-js/mermaid-cli@11.16.0 -p docs/diagrams/puppeteer-config.json -i docs/diagrams/openclaw-agentic-automation-workflow.mmd -o docs/diagrams/openclaw-agentic-automation-workflow.png -b '#ffffff' -w 7680 -s 3
+diagram-enterprise-architecture: ## Render hybrid-ai-enterprise-architecture as SVG/PNG and update its manifest entry
+	python3 scripts/render_diagrams.py --name hybrid-ai-enterprise-architecture
+
+diagram-local-to-enterprise: ## Render hybrid-ai-local-to-enterprise-evolution as SVG/PNG and update its manifest entry
+	python3 scripts/render_diagrams.py --name hybrid-ai-local-to-enterprise-evolution
+
+diagram-review-loop: ## Render hybrid-ai-review-learning-loop as SVG/PNG and update its manifest entry
+	python3 scripts/render_diagrams.py --name hybrid-ai-review-learning-loop
+
+diagram-agentic-workflow: ## Render openclaw-agentic-automation-workflow as SVG/PNG and update its manifest entry
+	python3 scripts/render_diagrams.py --name openclaw-agentic-automation-workflow
+
+diagram-knowledge-publication: ## Render hybrid-ai-review-learning-explainer as SVG/PNG and update its manifest entry
+	python3 scripts/render_diagrams.py --name hybrid-ai-review-learning-explainer
 
 pull-local-model: ## Pull the recommended GBX100 coding model
 	docker compose --env-file .env -f deploy/compose/compose.yaml exec ollama ollama pull "$${LOCAL_CHAT_MODEL:-qwen3.6:35b}"

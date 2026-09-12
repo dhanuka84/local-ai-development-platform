@@ -1,12 +1,16 @@
 # Security Model
 
+Updated September 12, 2026. Current task authority and publication semantics
+are recorded in [ADR-0011](adr/0011-scoped-autonomy-and-functional-acceptance.md).
+
 ## What this means in practice
 
 - Keep local service ports on `127.0.0.1`.
 - Never put secrets or private customer data in a Codex or Kimi review package.
 - Use the separate human and OpenClaw controller tokens created by
   `make env-init`.
-- Treat all model output as untrusted until checks and human review pass.
+- Validate model output against source and executed checks. Publishing a
+  generated KB entry additionally requires the user's explicit exact-version decision.
 - Keep maintenance on Ollama with no cloud fallback.
 - Use [scoped task credentials](task-delegation.md) for delegated local work;
   give the bearer to the local supervisor through a private file, not model context.
@@ -79,11 +83,19 @@ agent's auth store or environment.
   it does not remove disclosure policy or knowledge approval.
 - Cloud review runs with a read-only Codex sandbox and read-only repository
   mount. The cloud identity cannot revise candidates or approve knowledge.
-- Milvus read-back of the promoted PostgreSQL UUID is required before the next
-  queued task activates.
+- New-knowledge publication requires Milvus read-back of the promoted SQL UUID
+  before task completion. Validated reuse can complete with eligible recorded
+  context and a trusted validation ID while its new candidate stays pending.
 - SQL constraints enforce workflow states, relation types, confidence bounds, and no self-edges between repository records; recursive code calls remain valid graph facts.
 - Only approved knowledge is vectorized and returned.
-- MCP tool hints and Codex approval settings distinguish reads from writes.
+- Client unattended settings allow authorized task work to proceed. Definition
+  decisions retain exact validation and actor evidence; generated KB decisions
+  retain explicit user approval. These settings do not grant server permissions.
+- `AUTO_APPROVE_LOCAL=true` is rejected in every environment.
+- Task credentials are workload identities limited by current issuer authority,
+  parent expiry, task scope and revocation; they cannot approve KB entries.
+- Source changes, stale validation or mismatched projections withdraw retrieval
+  eligibility. Retention creates review/hold alerts and never deletes evidence.
 - PostgreSQL outbox transactions prevent an approval without a durable indexing request.
 - Code analysis resolves symlinks, enforces explicit filesystem roots and size caps, checks revisions, and rejects dirty worktrees by default.
 - Organization synchronization enumerates repositories through the authenticated
@@ -131,7 +143,7 @@ Before internet or enterprise exposure, add:
 | Sensitive context hidden in a review artifact | Minimize and scan before cloud export; encrypt artifact storage, restrict evidence access, and apply retention/deletion policy independently of approved knowledge. |
 | Reviewer response cannot be tied to disclosed input | Store the exact response and JSON context manifest by SHA-256 on the same PostgreSQL review record. |
 | Stale/deleted vector result | PostgreSQL hydration and approved-status check. |
-| Agent self-publishes its output | A separate non-human controller credential, human-only Cerbos gates, authenticated actor derivation, and explicit approval prompts. |
+| Agent self-publishes its output | Separate controller/task identities, trusted actor derivation, Cerbos and database gates, exact local validation, and explicit user approval of generated KB versions. A client prompt is not the server authorization boundary. |
 | Agent claims another role or changes governance context | Derive identity from authentication, load role/resource facts from PostgreSQL, evaluate Cerbos server-side, and never trust model-supplied authorization attributes. |
 | Cerbos is unavailable or returns an unreadable decision | Fail protected writes closed; preserve workflow state and expose a retryable operational error. |
 | Repository graph poisoning | Evidence required, constrained edge vocabulary, prompted upsert, SQL authority. |
@@ -150,8 +162,8 @@ Before internet or enterprise exposure, add:
 | Worker crash loses indexing | Durable outbox, reclaimable locks, retries, idempotent Milvus upsert. |
 | Multiple workers duplicate vector publication | PostgreSQL row locking with `SKIP LOCKED`, stable UUID primary keys, batched idempotent Milvus upserts, and active-head hydration. |
 | Cloud fallback leaks maintenance data | Strict per-agent local model and empty fallbacks. |
-| Auto mode silently removes accountability | Auto bypasses only review acceptance for policy-allowed data; provider evidence, local validation, Product Owner promotion, and Milvus read-back remain mandatory. |
-| Concurrent tasks use stale RAG or skip learning | FIFO activation and activation-time lookup; the next task stays queued until the prior promoted UUID passes Milvus read-back. |
+| Auto mode silently removes accountability | Auto bypasses only review acceptance for policy-allowed data; provider evidence and local validation remain mandatory. New KB publication also requires explicit user approval and Milvus read-back. |
+| Concurrent tasks use stale RAG or skip gates | FIFO activation and activation-time lookup; new-knowledge completion requires Milvus read-back, while reuse completion rechecks eligible context and trusted validation. |
 
 See [Remote Review and Local Learning](remote-review-learning.md) for the full
 evidence and promotion state machine.

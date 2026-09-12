@@ -1,8 +1,10 @@
 # Agent-ready validation receipt — September 12, 2026
 
-The [definitions-only autonomy continuation](#definitions-only-autonomy-continuation)
-below records the latest configuration, test run and terminology clarification.
-The initial run remains recorded separately here.
+The [functional acceptance continuation](#functional-acceptance-continuation)
+below records acceptance under the user's functionality-focused scope.
+The later [documentation refresh receipt](documentation-validation-20260912.md)
+records the updated guides/diagrams and a repeated complete functional run.
+Earlier configuration and validation runs remain recorded separately here.
 
 Continued on `fix/agent-ready-gaps-20260910` in the implementation worktree,
 from revision `a999db06bcf54a62bfb79afc03a386682805172c`. The initial new test
@@ -140,3 +142,49 @@ KB capture is therefore retained locally for later submission, with its ordered
 procedure, evidence, revision and disclosed provider/model limits. It is not a
 published KB entry. All changes remain in `fix/agent-ready-gaps-20260910`; the
 main checkout was verified clean.
+
+## Functional acceptance continuation
+
+The user asked to finish functionality while deferring blocking rollout and
+adoption inputs. The current scope is the existing local KB functionality, with
+a concrete functional criterion for every checklist row. The six outstanding
+full-rollout items are recorded separately; target-specific archival/deletion
+and enterprise integrations remain future work where required. Generated KB
+entries continue to require explicit user approval before publication.
+
+`make agent-ready-functional` passed **28/28 mapped functional requirements**:
+all **11 suites**, **132 passing test/subtest results**, and zero failures or
+skips. `make check` also passed, including nine reporting regressions and three
+Codex-launcher regressions. The tested revision is
+`4f7e16bf6faf349adfc0d5b28182d6b0caed98db`, with working changes bound by the
+source snapshot below, on `fix/agent-ready-gaps-20260910`.
+
+The additional runtime checks verify immediate loss of delegated access when
+the issuer loses its development role, actual gateway rejection of expired
+credentials, and restoration of stale definitions through fresh validation
+while preserving ownership and publication attribution. Gateway and worker
+restart checks verify completed task checkpoints, pending KB entries,
+quarantined-content rejection, revoked credentials, project isolation,
+retention alerts and export of new evidence to the collector.
+
+The reporter now produces JSON and readable functional acceptance reports with
+the exact deferred rollout/adoption requirements. Deferral never excuses a
+missing, skipped or failed functional test, and any suite failure fails overall
+acceptance. The original full-rollout count is retained for traceability.
+CI invokes the same functional target and runs the reporting regressions.
+Remote CI itself was not executed by this local validation.
+
+| Evidence | Location / digest |
+|---|---|
+| Functional acceptance report | `.local/agent-ready-e2e/run-20260912T161744Z-TgE5Uo/functional-acceptance.md` |
+| JSON receipt | `summary.json` in the same run directory |
+| JSON receipt SHA-256 | `e9ee96aa72c7187569b1b84093ca8b95d54a80f900e5dd21d02f2b0ad4b8c3ca` |
+| Functional report SHA-256 | `58850123f8d3140bc5c16734eeb1b51a110295d76830c187b64ec06350265f29` |
+| Tested source snapshot SHA-256 | `10f44d6f77c294b3547daf3836937bfd627bff92d338db157914319d251b738d` |
+| Required-check/driver logs and pending KB draft | `.local/agent-ready-e2e/functional-handoff-20260912T161744Z/`, with SHA-256 manifest |
+
+All 27 retained evidence files and all 245 source files matched their recorded
+hashes. The suite removed its disposable services. Validation inference used
+provider/model **none/none**, with a synthetic Ollama protocol fixture. Live
+MCP authentication remained unavailable, so the pending KB capture draft is
+retained locally and was not submitted or published.

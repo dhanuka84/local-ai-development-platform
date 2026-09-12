@@ -6,7 +6,14 @@
 **Target host:** ASUS Ascent GX10 / NVIDIA GB10, 128 GB unified memory  
 **Audience:** Platform engineers, software developers, security reviewers, and operators
 
-**Companion:** [Recommended Technology Stack](./hybrid-ai-platform-tech-stack.md)
+**Current companion:** [Implemented Technology Stack](./hybrid-ai-platform-tech-stack.md)
+
+Reviewed September 12, 2026: this archived baseline is preserved as design
+history. Use the [developer guide](developer-guide.md),
+[documentation index](README.md) and [ADR-0011](adr/0011-scoped-autonomy-and-functional-acceptance.md)
+for current functionality, validated reuse and definitions-only delegated
+publication. Model/version recommendations and sample commands below describe
+the original proposal, not today’s executable configuration.
 
 > This is an archived design record, not an implementation or operations
 > guide. Its trust-model discussion remains useful, but model names, commands,

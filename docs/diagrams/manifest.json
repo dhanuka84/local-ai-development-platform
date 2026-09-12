@@ -1,0 +1,65 @@
+{
+  "schema": "hybrid-ai/diagram-manifest/v1",
+  "diagrams": {
+    "hybrid-ai-enterprise-architecture": {
+      "source_sha256": "262ee40c94d5a148c452f3ab549d73e44ee6cf78f52b57e284f5b39b4c52b05d",
+      "svg_sha256": "8c06e702c0f9521dedddf6accb2a97ee76c56d6d0741f8d1d372aef47b91e435",
+      "png_sha256": "e66c95877dbba4d51213e88152368289f180082913aaff07813401eacdcb0065",
+      "png_width": 3552,
+      "png_height": 1958,
+      "renderer": "@mermaid-js/mermaid-cli@11.16.0",
+      "renderer_sha256": "545576961a67865ef41de8c462d1ccd65a8e136b47cce6596a66c96c7b860fb9",
+      "config_sha256": "0478f58fb0233dc0fd5ad6a9e78af7cab3002135762b2bc8b10b7cc729495c3c"
+    },
+    "hybrid-ai-local-architecture": {
+      "source_sha256": "4fdb0677d27de90f1b07223402aefa170121b595b767fd6166c2c4d0f44b5337",
+      "svg_sha256": "843a7ad01a479b4c9ac090c205e0fe4beffac470d89fdf7b3dfce50f955d9346",
+      "png_sha256": "5092145953720d1eb0522d4660dc3aa9ebfae942f2e5b18a389862fbf8cd4594",
+      "png_width": 4768,
+      "png_height": 1818,
+      "renderer": "@mermaid-js/mermaid-cli@11.16.0",
+      "renderer_sha256": "545576961a67865ef41de8c462d1ccd65a8e136b47cce6596a66c96c7b860fb9",
+      "config_sha256": "0478f58fb0233dc0fd5ad6a9e78af7cab3002135762b2bc8b10b7cc729495c3c"
+    },
+    "hybrid-ai-local-to-enterprise-evolution": {
+      "source_sha256": "3bb670f2c557e17445741cdb6e3511b4a82463ebb888839c062b3fce14a25d70",
+      "svg_sha256": "8e2236b824dc81d00d1f85da5f4fd1e7c52c63c3dbe2ee551978702cc4cbfa83",
+      "png_sha256": "c7f98033ff7355a63c72fef7f50f1a7b16654266d287e7b53f7d1b09057d2d76",
+      "png_width": 2040,
+      "png_height": 1920,
+      "renderer": "@mermaid-js/mermaid-cli@11.16.0",
+      "renderer_sha256": "545576961a67865ef41de8c462d1ccd65a8e136b47cce6596a66c96c7b860fb9",
+      "config_sha256": "0478f58fb0233dc0fd5ad6a9e78af7cab3002135762b2bc8b10b7cc729495c3c"
+    },
+    "hybrid-ai-review-learning-explainer": {
+      "source_sha256": "318070247a6c4d196764e30c038ee2ed471bac386bf239ffafc785e4e8a16c2e",
+      "svg_sha256": "9c85a594eabbc234391f5c5605210e636bc689ce278b2a299a435f4941924028",
+      "png_sha256": "aa428016a193bfee9aabca3acb2e23d50fee37460a47ceb5d39eb14a4e8d50b8",
+      "png_width": 3540,
+      "png_height": 1414,
+      "renderer": "@mermaid-js/mermaid-cli@11.16.0",
+      "renderer_sha256": "545576961a67865ef41de8c462d1ccd65a8e136b47cce6596a66c96c7b860fb9",
+      "config_sha256": "0478f58fb0233dc0fd5ad6a9e78af7cab3002135762b2bc8b10b7cc729495c3c"
+    },
+    "hybrid-ai-review-learning-loop": {
+      "source_sha256": "41cbf71cc6c0a99e1b2b3d1421b0cc8707fce7320380b30031e0c234b6c1f96b",
+      "svg_sha256": "25a7e66630eb006ab06b3471d863ca4719734ed85d9b97b7bad5e611804d521f",
+      "png_sha256": "33714617b3a07a386bf270b7aa566c0acb9b39ddcfa7771b1cf0d4134254df6b",
+      "png_width": 1864,
+      "png_height": 4440,
+      "renderer": "@mermaid-js/mermaid-cli@11.16.0",
+      "renderer_sha256": "545576961a67865ef41de8c462d1ccd65a8e136b47cce6596a66c96c7b860fb9",
+      "config_sha256": "0478f58fb0233dc0fd5ad6a9e78af7cab3002135762b2bc8b10b7cc729495c3c"
+    },
+    "openclaw-agentic-automation-workflow": {
+      "source_sha256": "d3e93082b0160fc6173db49127b3329a7611046dbd4413314f6319a5705e9fc0",
+      "svg_sha256": "731aead8db6c915b84313df2e7245fcd3213f6889a032908e97a3cae33be9fe0",
+      "png_sha256": "4862206f06cd21dc42acf913101cb5545e5b988966921085928243acb9953014",
+      "png_width": 2190,
+      "png_height": 3588,
+      "renderer": "@mermaid-js/mermaid-cli@11.16.0",
+      "renderer_sha256": "545576961a67865ef41de8c462d1ccd65a8e136b47cce6596a66c96c7b860fb9",
+      "config_sha256": "0478f58fb0233dc0fd5ad6a9e78af7cab3002135762b2bc8b10b7cc729495c3c"
+    }
+  }
+}

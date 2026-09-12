@@ -1,5 +1,10 @@
 # Manual backup and restore: PostgreSQL, Milvus, and Google Drive
 
+Documentation reviewed September 12, 2026. See the [operations runbook](operations.md)
+for current credential handling and the [developer guide](developer-guide.md)
+for disposable backup tests. Production retention and recovery targets remain
+[deferred acceptance](agent-ready-operating-decisions.md#retention-and-enterprise-deployment).
+
 This runbook covers operator-triggered cold backups of the platform's durable
 Docker volumes. The implementation uses the Google Drive API directly; rclone
 is not required.

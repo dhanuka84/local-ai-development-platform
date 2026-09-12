@@ -1,5 +1,11 @@
 # Hybrid Routing Verification
 
+This guide includes a retained, version-specific routing experiment. Reviewed
+September 12, 2026: use the [developer guide](developer-guide.md) for current
+client choices. `make hybrid-verify` invokes actual local and cloud models and
+is separate from `make agent-ready-functional`, which uses deterministic local
+protocol fixtures and does not prove model tool-use or cloud-route behavior.
+
 ## Outcome
 
 `make hybrid-verify` proves that the local-development and cloud-review lanes

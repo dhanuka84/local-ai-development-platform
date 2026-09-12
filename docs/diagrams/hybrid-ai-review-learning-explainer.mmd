@@ -1,0 +1,36 @@
+---
+title: One KB · two publication paths · September 2026
+---
+%%{init: {"theme":"base","themeVariables":{"fontFamily":"Arial, sans-serif","fontSize":"16px","primaryTextColor":"#14263d","lineColor":"#53677f","edgeLabelBackground":"#ffffff"},"flowchart":{"curve":"basis","htmlLabels":true,"nodeSpacing":28,"rankSpacing":40},"fontFamily":"Arial, sans-serif","themeCSS":".nodeLabel, .edgeLabel, .cluster-label, .flowchartTitleText { font-family: Arial, sans-serif !important; }"}}%%
+flowchart LR
+    subgraph ENTRY["GENERATED KB ENTRY · A FIX, PROCEDURE OR RECOMMENDATION"]
+        GEN["Capture useful result<br/>procedure + exact evidence<br/>revision + provider + model"]:::client
+        PENDING["Pending candidate<br/>source freshness + trusted validation<br/>exact version and digest"]:::pending
+        USER{"User explicitly approves<br/>this exact version?"}:::gate
+        KEEP["Keep pending<br/>continue independent work"]:::pending
+        GEN --> PENDING --> USER
+        USER -->|no decision| KEEP
+    end
+    subgraph DEF["GOVERNED DEFINITION · DOMAIN, CAPABILITY OR METRIC"]
+        REG["Source-controlled registry<br/>fixed reviewed contracts / SQL"]:::client
+        VAL["context_registry_validate<br/>contract fixtures + SQL preparation<br/>staged exact definition versions"]:::service
+        DEC["context_definition_decide<br/>existing operator authority<br/>standing task authorization + audit"]:::gate
+        REG --> VAL --> DEC
+    end
+    COMMIT["PostgreSQL<br/>attributed exact-version decision<br/>transactional outbox"]:::data
+    SEARCH["Local worker → Milvus<br/>current approved records only<br/>hydrate from PostgreSQL before use"]:::done
+    USER -->|explicit approval + valid evidence| COMMIT
+    DEC -->|valid evidence + permitted actor| COMMIT
+    COMMIT --> SEARCH
+    NOTE["A model response or review does not approve either path.<br/>AUTO_APPROVE_LOCAL=true is rejected.<br/>Expired validation or changed source withdraws eligibility."]:::gate
+    COMMIT -.- NOTE
+
+    classDef client fill:#e0e7ff,stroke:#6366f1,color:#25265e,stroke-width:2px;
+    classDef service fill:#e8f1ff,stroke:#3574bd,color:#142f54,stroke-width:2px;
+    classDef local fill:#e5f5eb,stroke:#33845e,color:#163e2a,stroke-width:2px;
+    classDef data fill:#e0f2fe,stroke:#237895,color:#113d50,stroke-width:2px;
+    classDef evidence fill:#f1e8ff,stroke:#8860b5,color:#422760,stroke-width:2px;
+    classDef gate fill:#fff1d6,stroke:#b58128,color:#60440e,stroke-width:2px;
+    classDef pending fill:#fff0e9,stroke:#bf7350,color:#743820,stroke-width:2px;
+    classDef target fill:#f4f5f7,stroke:#778395,color:#374357,stroke-width:2px,stroke-dasharray:5 4;
+    classDef done fill:#d6f5e3,stroke:#268458,color:#16472e,stroke-width:3px;

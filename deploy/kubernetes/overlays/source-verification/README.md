@@ -1,5 +1,10 @@
 # Repository source verification
 
+Documentation reviewed September 12, 2026. Local verification evidence is
+recorded in the [checklist](../../../../docs/agent-ready-gap-checklist.md);
+target-cluster acceptance is still deferred. See the
+[enterprise guide](../../../../docs/enterprise-deployment.md).
+
 This overlay supplies the same read-only Git snapshots and allowed root to the
 gateway and workers. It keeps synchronous repository analysis disabled. Build
 the gateway image with Docker target `gateway-source-verifier`; the distroless

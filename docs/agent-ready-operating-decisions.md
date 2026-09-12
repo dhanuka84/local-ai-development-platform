@@ -1,9 +1,19 @@
 # Remaining agent-ready operating decisions
 
+Updated September 12, 2026. See [ADR-0011](adr/0011-scoped-autonomy-and-functional-acceptance.md)
+for the accepted local authority and functional acceptance boundary.
+
 These decisions keep broader article coverage explicit while the first release
 remains a governed local software-development platform. They do not claim that
 a Kubernetes cluster, enterprise identity provider or production data operating
 model has been deployed.
+
+Under the current functionality-focused task, these rollout and adoption
+decisions are deferred acceptance. Use the
+[functional scope](agent-ready-gap-checklist.md#functional-scope-of-the-six-deferred-items)
+and `make agent-ready-functional` to complete local behavior without waiting
+for those inputs. Production integrations and observation evidence remain
+future work where specified below.
 
 For assigned local tasks, the user's standing authorization permits an agent to
 publish validated domain/capability/metric definitions through the accountable

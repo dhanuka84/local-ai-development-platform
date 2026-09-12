@@ -5,12 +5,19 @@ Ollama runs local models, and the MCP server gives Codex and other agents one
 safe way to use shared knowledge. Codex and Kimi are optional cloud services.
 The platform never sends work to them as a hidden fallback.
 
+Start with the [developer guide](docs/developer-guide.md) for what, why and how,
+or the [documentation index](docs/README.md) for every guide and evidence record.
+The September 12 run passed **28/28 local functional requirements**; live rollout
+and enterprise acceptance remain [explicitly deferred](docs/agent-ready-gap-checklist.md).
+
 ## How it works
 
-1. An agent searches approved lessons and the current code graph.
+1. An agent searches approved KB entries and the current code graph.
 2. A local Ollama model or Codex works on the task and runs checks.
 3. Codex or Kimi may review a small, sanitized package when policy allows it.
-4. A person reviews the result before it becomes reusable knowledge.
+4. Generated KB entries stay pending until the user explicitly approves the
+   exact validated version. Governed definitions use a separate validated,
+   task-authorized publication path.
 5. PostgreSQL saves the official record. Apache AGE expands exact topology and
    Milvus makes approved records easy to find by meaning.
 
@@ -77,11 +84,14 @@ before following calls, references, implementations, imports, or tests.
 | Property-graph traversal | Apache AGE 1.6 / PostgreSQL 17 | Cypher traversal without a separate graph authority or service. |
 | Semantic/hybrid index | Milvus | Vector search that can grow from one machine to a distributed cluster. |
 | Local inference | Ollama | Simple local model serving and local embeddings. |
-| Local coding on GBX100/GB10 | `qwen3.6:35b` | Current open-weight agentic coding model with ample memory headroom on 128 GB. |
+| Local coding on GBX100/GB10 | `qwen3.6:35b` | Configured local coding default; evaluate quality and memory use on the actual task. |
 | Local embeddings | `embeddinggemma` | Small local embedding model; 768 dimensions by default. |
 | Code analysis | Go compiler APIs plus SCIP for JVM, TypeScript/JavaScript, and Python | Deterministic, build-aware evidence without an LLM or editor bridge. |
 | Cloud architecture review | `moonshot/kimi-k3` | Explicit, sanitized review subagent. |
 | Cloud coding and independent code review | Codex/ChatGPT | MCP-connected implementation/review and reusable validated outcome capture. |
+
+These are checked-in choices, not a claim about latest upstream releases. See
+the [current technology stack](docs/hybrid-ai-platform-tech-stack.md).
 
 Go was selected over Python for the long-running production data plane and over Rust for faster team delivery. Python remains a good optional sidecar language for evaluation or ML experiments; Rust is appropriate only for a measured hot path. See [ADR-0001](docs/adr/0001-go-for-the-mcp-data-plane.md).
 
@@ -223,16 +233,21 @@ local vault without printing it. OpenClaw is not required for this Codex workflo
 `make mcp-status` for Codex-only health checks and `make platform-status` only
 when the OpenClaw integration is also expected to be running.
 
-The complete loop is:
+The new-knowledge path is:
 
 ```text
 start MCP/OpenClaw → queue atomic tasks (auto by default)
   → activate FIFO head → search approved RAG
   → Ollama design/implementation/test → capture pending candidate
   → on allowed miss: read-only Codex review → Ollama revision
-  → local deterministic validation → explicit Product Owner decision
+  → trusted local validation → explicit user decision on the KB version
   → local embedding → Milvus read-back → activate next task
 ```
+
+Eligible validated reuse can finish through `VALIDATED_REUSE_COMPLETED` after
+context and trusted validation checks while its newly generated candidate stays
+pending. See the [developer guide](docs/developer-guide.md#follow-one-task-through-the-system)
+for both paths.
 
 ### 1. Perform one-time Codex setup
 
@@ -712,7 +727,7 @@ make platform-status
 This status check fails if a running systemd user service lacks the controller
 credential, even when its listener is otherwise healthy.
 
-Current official references: [Kimi K3 in OpenClaw](https://platform.kimi.ai/docs/guide/use-kimi-in-openclaw), [OpenClaw Ollama provider](https://docs.openclaw.ai/providers/ollama), [managed Task Flows](https://docs.openclaw.ai/automation/taskflow), and [Lobster workflows](https://docs.openclaw.ai/tools/lobster).
+Integration references (check compatibility with the pinned local versions): [Kimi K3 in OpenClaw](https://platform.kimi.ai/docs/guide/use-kimi-in-openclaw), [OpenClaw Ollama provider](https://docs.openclaw.ai/providers/ollama), [managed Task Flows](https://docs.openclaw.ai/automation/taskflow), and [Lobster workflows](https://docs.openclaw.ai/tools/lobster).
 
 ## Bounded local work and review learning
 
@@ -732,8 +747,9 @@ read-only Codex review and then an Ollama revision; maintenance or protected
 data takes the local-only miss route. Exact review output and the context
 manifest are immutable evidence, and the checkpoint verifies both hashes
 against a matching PostgreSQL review row. Only locally validated, generalized,
-explicitly approved improvements are embedded in Milvus, and successful
-Milvus read-back is required before the next task activates. See
+explicitly user-approved KB entries are embedded in Milvus. New-knowledge
+completion requires exact Milvus read-back. Eligible validated reuse can
+complete with a trusted validation report while its new entry remains pending. See
 [Remote Review and Local Learning](docs/remote-review-learning.md).
 
 Local-model tasks default to `execution_mode=auto`: policy-required cloud
@@ -877,9 +893,12 @@ See [enterprise-deployment.md](docs/enterprise-deployment.md) and the [enterpris
 
 The [gap checklist](docs/agent-ready-gap-checklist.md) tracks implementation,
 validation, pilot completion and deployment work with evidence for each item.
-Run `make agent-ready-e2e` for the [checklist-mapped end-to-end suite](docs/agent-ready-e2e.md):
+Run `make agent-ready-functional` for the [checklist-mapped end-to-end suite](docs/agent-ready-e2e.md):
 it provisions disposable dependencies, exercises the built gateway, CLI, worker
-and pilot, and retains exact results separately from delivery completion.
+and pilot, and produces functional acceptance plus a separate list of deferred
+rollout/adoption requirements. The live vault, production inputs and observation
+periods do not block this functional pass. `make agent-ready-e2e` remains an alias
+for the same suite.
 The [real local pilot](docs/agent-ready-pilot-20260910.md) completed both tasks;
 [release preparation](docs/agent-ready-release-20260910.md) records the verified
 restore/upgrade and remaining rollout prerequisites. Short-lived
@@ -890,7 +909,8 @@ The [implementation checkpoint](docs/agent-ready-data-plan.md) and
 [operations runbook](docs/agent-ready-data-operations.md) cover governed metrics,
 Milvus semantic definitions, trace evidence, explicit validated reuse, and the
 human-gated local pilot. Run `make agent-ready-acceptance` only against disposable
-services; real knowledge and semantic definitions are never auto-approved.
+services. Generated KB entries stay pending for explicit approval; validated
+domain/capability/metric definitions can be published under task authorization.
 
 ## License
 

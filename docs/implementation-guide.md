@@ -1,5 +1,9 @@
 # Implementation Guide
 
+Updated September 12, 2026. Start with the [developer guide](developer-guide.md)
+for the what, why and daily development workflow, or the
+[documentation index](README.md) for current status and evidence.
+
 ## Scope
 
 This guide explains how the code fits together. It covers the local system and
@@ -28,6 +32,9 @@ approved records, and Ollama runs local models and creates embeddings.
 | Admin CLI | `cmd/admin` | Runs setup, health checks, candidate decisions, repository catalog registration, outbox compaction, and full reindexing. |
 | Work-packet verifier | `cmd/workpacket`, `components/workpacket` | Checks task policy and validates a patch in a disposable clone. |
 | Authorization | `internal/authorization`, `policies/cerbos` | Asks Cerbos whether an authenticated identity may perform an action. |
+| Governed registry | `internal/contextregistry` | Binds domain/capability definitions, fixed metric SQL, contract fixtures and exact registry hashes. |
+| Evidence operations | `internal/telemetry` | Correlates durable events, retention review/hold alerts and optional collector export. |
+| Local pilot | `cmd/agent-ready-pilot` | Runs the resumable local-model generation, repair, validation and reuse scenario. |
 | Workflow controller | `automation/openclaw-plugin` | Mirrors managed OpenClaw tasks through MCP without direct database access. |
 
 The domain package contains interfaces, so local implementations can be replaced independently without changing MCP contracts.
@@ -48,8 +55,10 @@ result, route, score threshold, and artifact hash for audit.
 The service layer enforces provider and state transitions. Ollama owns local
 result, revision, and validation. OpenAI owns only read-only review. Product
 Owner approval is accepted at `promotion_required`; the outbox projects the
-approved PostgreSQL candidate to Milvus. A task completes only after a search
-from backend `milvus` returns the same UUID. Completion activates the next FIFO
+approved PostgreSQL candidate to Milvus. The new-knowledge path completes only after a search
+from backend `milvus` returns the same UUID. Validated reuse can complete with
+eligible recorded context and a trusted validation report while leaving its new
+candidate pending. Completion activates the next FIFO
 entry. Manual `TASK_REJECTED` is the only rejection path for queued work.
 
 ### Checkpoint persistence and transitions
@@ -80,13 +89,18 @@ The executable transitions are:
 | `review_approval_required` | `CLOUD_REVIEW_APPROVED` | `cloud_review_required` |
 | `cloud_review_required` | `CLOUD_REVIEW_RECORDED` | `local_revision_required` |
 | `local_revision_required` | `LOCAL_REVISION_RECORDED` | `validation_required` |
-| `validation_required` | `VALIDATION_PASSED` | `promotion_required` |
+| `validation_required` | `VALIDATION_PASSED` | `promotion_required` with a passing trusted report |
+| `validation_required` | `VALIDATED_REUSE_COMPLETED` | `completed` after validation and context eligibility checks; new candidate stays pending |
+| `validation_required` | `VALIDATION_FAILED` | `local_revision_required` |
 | `promotion_required` | `LEARNING_PROMOTED` | `rag_readback_required` |
 | `rag_readback_required` | `RAG_READBACK_VERIFIED` | `completed`, then next FIFO activation |
 
 `execution_mode=auto` is applied in the service and the SQL default. It goes
 directly to `cloud_review_required` for an allowed miss. `manual` inserts the
-review-acceptance state. Both modes retain the later human promotion decision.
+review-acceptance state. Both modes retain the explicit user decision when
+publishing generated KB entries. Validated reuse has a separate completion path
+that leaves its new candidate pending; see
+[knowledge operations](agent-ready-data-operations.md).
 
 For delegated patch work, OpenClaw creates a `hybrid-ai/work-packet/v1`
 document before asking the local Ollama worker to generate a patch. Evaluate it
@@ -181,6 +195,41 @@ Repeated or corrected analysis runs can enqueue the same stable entity UUID
 more than once. `make compact-code-outbox` completes superseded and non-active
 pending events while retaining the newest event for every entity in an active
 snapshot. It preserves audit rows and is recoverable through `make reindex`.
+
+## Validation, freshness and governed definitions
+
+A captured validation-evidence string describes a run; it is not a trusted
+command-execution attestation. The validation executor runs the bounded work
+packet against the exact revision and retains the report. Publication and task
+completion bind that report to the candidate version and source manifest.
+`knowledge_validation_record` is a human QA attestation endpoint and cannot
+claim that it executed a command. See the
+[validation runbook](agent-ready-data-operations.md#validate-and-decide).
+
+Approved records can become ineligible without erasing approval history.
+Changed source, stale validation or mismatched projection/model metadata causes
+withholding during PostgreSQL hydration. The worker records source checks and
+projection evidence; operations can inspect the quality queue and revalidate
+current versions. A vector outage does not bypass these checks.
+
+The source-controlled registry defines six items: one domain, one capability
+and four fixed metrics. `context_registry_validate` executes contract fixtures
+and PostgreSQL query preparation and binds their exact hashes. Authorized
+`context_definition_decide` calls record version, validation, owner and reason.
+Standing task authorization permits these decisions under the existing operator
+roles. It does not approve generated KB entries. Definitions expire without
+renewed validation; revalidation checks the same executable meaning.
+
+`platform_metric_query` executes only the reviewed fixed SQL in a consistent
+snapshot, with bounded dates and allowed dimensions. It never executes SQL
+produced by a model. The runtime E2E verifies formula arithmetic, bad dimensions,
+expiry, revalidation and audit ownership using synthetic definitions.
+
+Task traces and immutable artifacts survive service restart. Retention settings
+create review/hold alerts, not deletion. The worker exports durable evidence
+through the optional collector; export failure does not replace PostgreSQL as
+authority. Target storage/retention and enterprise recovery remain separate
+acceptance work.
 
 ## Regenerating similar outputs locally
 
@@ -308,7 +357,7 @@ The reusable analyzer boundary is isolated under `components/codegraph` and MPL-
 
 ## MCP contract and safety
 
-The service uses the official Go MCP SDK. Input and output schemas are inferred from typed structs. Tool annotations distinguish read-only and additive writes. Codex uses `approval_policy = "never"` and `default_tools_approval_mode = "approve"` for assigned local tasks. Definition decisions, repository relationships and indexing use `approve`; `knowledge_candidate_decide` retains `prompt` so reusable lessons stay pending for an explicit user decision. The authenticated operator still needs the relevant roles and exact validation evidence. See [autonomous local operation](operations.md#autonomous-local-operation). `code_repository_index` is registered only when synchronous local analysis is enabled; code search and graph traversal remain available in query-only enterprise gateways.
+The service uses the official Go MCP SDK. Input and output schemas are inferred from typed structs. Tool annotations distinguish read-only and additive writes. Codex uses `approval_policy = "never"` and `default_tools_approval_mode = "approve"` for assigned local tasks. Definition decisions, repository relationships and indexing use `approve`; `knowledge_candidate_decide` retains `prompt` so generated KB entries stay pending for an explicit user decision. The authenticated operator still needs the relevant roles and exact validation evidence. See [autonomous local operation](operations.md#autonomous-local-operation). `code_repository_index` is registered only when synchronous local analysis is enabled; code search and graph traversal remain available in query-only enterprise gateways.
 
 HTTP endpoints:
 
@@ -351,7 +400,7 @@ Important values:
 | `OLLAMA_EMBEDDING_MODEL` | `embeddinggemma` | Must match the configured dimension. |
 | `EMBEDDING_DIMENSION` | `768` | A dimension change requires a new collection name/reindex. |
 | `MILVUS_COLLECTION` | `approved_knowledge_v1` | Version the name when schema/embedding changes. |
-| `AUTO_APPROVE_LOCAL` | `false` | Leave false for shared or production use. |
+| `AUTO_APPROVE_LOCAL` | `false` | `true` is rejected in every environment; generated KB entries always start pending. |
 | `SEARCH_LEXICAL_FALLBACK` | `true` | Returns a visible backend marker. |
 | `CODEGRAPH_ENABLED` | `true` locally | Enables the synchronous local indexing tool; defaults false in enterprise mode. |
 | `CODEGRAPH_ALLOWED_ROOTS` | `.` | OS path-list of roots the analyzer may read; set explicitly for services. |
@@ -401,4 +450,7 @@ Milvus is intentionally versioned by collection name. To change the embedding mo
 - Repository relationship discovery is explicit. An automated scanner can propose edges from manifests later, but proposals should still require evidence and approval.
 - The local MCP gateway performs analysis synchronously. Enterprise scale requires queued jobs and sandboxed analyzer workers; OpenClaw should orchestrate those workers, not generate graph facts itself.
 - Removed symbols can leave stale Milvus rows until collection rebuild; active PostgreSQL hydration prevents them from being returned as facts.
-- PostgreSQL integration tests require a running service; unit tests isolate pure application and transport behavior.
+- `make agent-ready-functional` provisions disposable services and exercises all
+  mapped local requirements. `make check` alone skips service-dependent tests.
+- Retention currently emits review/hold alerts; it does not delete evidence.
+  Enterprise storage, retention and recovery acceptance remain deferred.

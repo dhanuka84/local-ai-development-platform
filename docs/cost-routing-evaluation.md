@@ -1,5 +1,10 @@
 # Local Execution and Remote Review Evaluation
 
+Updated September 12, 2026. The [developer guide](developer-guide.md) and
+[functional E2E guide](agent-ready-e2e.md) describe the tested local behavior.
+This evaluation protocol addresses representative quality, cost and adoption
+claims that remain unmeasured; passing functional tests does not establish them.
+
 ## Outcome
 
 The platform already has a stronger knowledge and evidence foundation than a
@@ -27,18 +32,18 @@ Status meanings:
 
 | Target capability | Status | Current evidence | Remaining proof or work |
 |---|---|---|---|
-| Local model handles routine development | Configured | OpenClaw `developer` uses local Ollama with no fallback. | Run representative tasks and record local worker participation and validation success. |
+| Local model handles routine development | Demonstrated for a bounded pilot; broader quality unmeasured | Retained real-Ollama Task A/Task B pilot and actual pilot-executable E2E using deterministic model fixtures. | Run representative cohorts with local worker participation, failures, retries and validation outcomes. |
 | Maintenance is local-only | Configured + policy-tested | OpenClaw uses an `ollama/*` allowlist; work-packet policy rejects maintenance cloud review. | Deploy a hard-offline maintenance process and pass negative egress tests when this is a compliance boundary. |
 | Task classification | Partial | Work packets require `development` or `maintenance`, mode, data class, and categories. | Add an OpenClaw coordinator step that always emits the packet before delegated execution. |
 | Risk assessment | Implemented at packet boundary | Protected categories, destructive actions, restricted data, approvals, and disclosure rules are evaluated deterministically. | Add organization-specific category rules and actor authorization at the enterprise gateway. |
 | Bounded context and write scope | Partial | Allowed/forbidden file patterns, patch-byte, file-count, and diff-line limits are enforced; supplied review manifests are stored immutably. | Build an automatic minimal cloud context packager with secret/DLP scanning before export. |
 | Result verification | Implemented locally | Candidate patches apply in a disposable clone; exact argv checks run with timeouts; scope, diff limits, side effects, and binary patches are checked. | Run the verifier inside an egress-denied OS/container sandbox for untrusted repositories. |
-| Cheap/local worker delegation | Configured | OpenClaw is the orchestrator; Ollama is the default worker. | Add routing telemetry and end-to-end execution fixtures. |
+| Bounded local delegation | Implemented and functionally tested | Task-scoped CLI credentials, actual gateway expiry/revocation, issuer-role withdrawal, packet verification and complete traces. OpenClaw controller contracts remain separate. | Complete the general isolated runner and representative adoption evaluation. |
 | Codex final review | Configured + persistence implemented | An allowed RAG miss enters the provider-gated read-only OpenAI lane; `review_record` stores reviewer/model/verdict plus raw-output and context-manifest artifacts. Cloud cannot revise candidate content. | Automate sanitized package issuance and record a complete live review trace. |
-| Review improvements become reusable | Implemented with approval/read-back gates | Ollama-revised content is validated and approved in PostgreSQL, embedded by the outbox worker, and must pass Milvus UUID read-back before queue advancement. | Build quality/freshness evaluation for promoted review lessons. |
+| Validated improvements become reusable | Implemented with explicit user approval/read-back gates | Actual gateway/worker E2E verifies trusted validation, exact-version publication, source withdrawal, stale projections and Task B reuse with its new entry pending. | Measure retrieval and outcome quality on representative review-derived KB entries. |
 | PostgreSQL knowledge authority | Implemented | Workflow state, provenance, approvals, relationships, code snapshots, and outbox are canonical. | Add enterprise tenant isolation and managed HA operation. |
 | Semantic reuse through Milvus | Implemented | Approved knowledge, repository relationships, and selected code entities use stable PostgreSQL IDs. | Measure retrieval precision and local regeneration quality. |
-| Transparent and measurable routing | Implemented for checkpoint provenance; usage metrics partial | PostgreSQL stores route, mode, model/provider, RAG results, influence, candidate, evidence, authorization, and every transition. | Add model tokens/cost and latency as first-class metrics. |
+| Transparent and measurable routing | Implemented provenance, governed metrics and trace export; model economics unmeasured | PostgreSQL records routes, providers, exact artifacts and decisions. Four fixed metric formulas and actual collector export are functionally tested. | Publish retained real definitions with current validation/access and run representative model cost/latency benchmarks. |
 | 40–70% savings | Unmeasured | No platform-specific A/B benchmark exists. | Run the protocol below; report measured distributions, not a marketing estimate. |
 | Faster delivery without lower quality | Unmeasured | Unit/integration tests cover platform controls, not representative coding-task throughput. | Compare wall time, validation rate, review findings, and accepted outcomes against Codex-only and local-only baselines. |
 
@@ -46,7 +51,8 @@ Status meanings:
 
 Remote review is advisory and policy-selected, never a provider fallback.
 `execution_mode=auto` starts a required review without a human acceptance
-prompt; `manual` adds that prompt. Both retain human knowledge approval:
+prompt; `manual` adds that prompt. Both retain explicit user approval when
+publishing generated KB entries. This diagram is the new-knowledge path:
 
 ```text
 FIFO activation -> approved RAG lookup
@@ -61,6 +67,9 @@ FIFO activation -> approved RAG lookup
   -> outbox-driven embedding in Milvus
   -> Milvus UUID read-back -> next FIFO task
 ```
+
+Eligible validated reuse has a separate completion event after recorded context
+and trusted validation checks; its newly generated candidate remains pending.
 
 Raw review output is valuable evidence but is not automatically searchable
 knowledge. PostgreSQL and the artifact store retain it while pending. Milvus

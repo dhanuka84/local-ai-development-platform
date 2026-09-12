@@ -1,5 +1,9 @@
 # Scoped local task credentials
 
+Updated September 12, 2026. See the [developer guide](developer-guide.md) for
+the operator/controller/task identity distinction and [E2E guide](agent-ready-e2e.md)
+for the reproducible test boundary.
+
 An authenticated human developer can issue a short-lived credential for one
 existing active task. The delegate receives only the intersection with the
 issuer's current development authority for that project. It is always a
@@ -62,4 +66,7 @@ The full disposable acceptance includes real PostgreSQL and Cerbos checks for
 role attenuation, task/candidate scope, recursive delegation, TTL, parent and
 delegate revocation, stale request contexts, lost parent authority, terminal
 tasks, immutable attribution, token non-disclosure and failed-evidence rollback.
-It uses synthetic identities and does not issue a live user delegation.
+The actual gateway E2E also verifies immediate access withdrawal when the
+issuer loses its role, expired-credential rejection, explicit revocation and
+continued denial after gateway/worker restart. Run `make agent-ready-functional`.
+The suite uses synthetic identities and does not issue a live user delegation.

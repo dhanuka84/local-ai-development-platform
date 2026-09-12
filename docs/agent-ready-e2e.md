@@ -1,16 +1,20 @@
 # Agent-ready end-to-end regression tests
 
+Updated September 12, 2026. See the [developer guide](developer-guide.md#test-each-requirement-end-to-end)
+for adding coverage when implementing a feature.
+
 The [September 12 validation receipt](agent-ready-validation-20260912.md)
 records the completed local run, exact evidence digests and remaining delivery
 prerequisites.
 
-Run the full local suite from the implementation checkout:
+Run the full local functional acceptance suite from the implementation checkout:
 
 ```sh
-make agent-ready-e2e
+make agent-ready-functional
 ```
 
-`make agent-ready-integration` runs the same suite. Each invocation creates an
+`make agent-ready-e2e` and `make agent-ready-integration` run the same suite.
+Each invocation creates an
 independent Compose project on an internal network, with disposable PostgreSQL,
 AGE, Milvus, Cerbos and an actual OpenTelemetry collector. It builds and runs the
 gateway, worker, admin CLI and pilot executable from the current source. No live
@@ -25,14 +29,20 @@ test database. These tests measure implementation behavior, not model quality,
 human adoption, production retention compliance or enterprise availability.
 
 The gateway and pilot use the actual default local-developer bootstrap, with
-its four operator roles. Explicit synthetic lesson decisions retain operator
-attribution, and the subsequent reusable lesson stays pending. Publication still
+its four operator roles. Explicit synthetic KB-entry decisions retain operator
+attribution, and the subsequent generated KB entry stays pending. Publication still
 rejects missing validation, stale versions and unauthorized workload/development
 credentials. `make check` also executes all four Codex launcher paths with a
 synthetic vault token, loopback health server and recording CLI fixture to check
-the effective arguments, the lesson decision prompt, autonomous definition
+the effective arguments, the KB-entry decision prompt, autonomous definition
 decisions and local provider selection. That launcher regression
 does not invoke a model or claim a live Codex-to-MCP round trip.
+
+The runtime scenario also checks immediate withdrawal of delegated access after
+the issuer loses its development role, credential expiry at the gateway,
+definition revalidation after expiry, and a complete gateway/worker restart.
+The restart must preserve completed checkpoints, pending KB entries, revoked
+access and retention alerts, and the restarted worker must export new evidence.
 
 ## Scenarios and checklist mapping
 
@@ -61,7 +71,7 @@ they are not relabelled as complete deployment tests.
 | L15 | Compatible built gateway, worker, admin and policies in the disposable stack |
 | L16 | Worker durable export queue through the actual collector |
 | L17 | Required checks, contract fixtures and complete coverage mapping |
-| L18 | Disposable startup/export rehearsal; actual live cutover still requires vault unlock |
+| L18 | Disposable startup, gateway/worker restart and new collector export; actual live cutover still requires vault unlock |
 | E01 | CLI task credential issuance, HTTP revocation, expiry and live authority intersection |
 | E02 | Existing authority and maintenance boundaries; representative timed cohorts and stage decisions remain external |
 | E03 | Pending access, exact validated publication and currently eligible retrieval |
@@ -73,9 +83,13 @@ they are not relabelled as complete deployment tests.
 | E09 | Source/verifier regressions supplement the retained overlay and read-only-mount receipt; this suite does not deploy Kubernetes |
 | E10 | Every checklist ID must have explicit tests and an acceptance boundary |
 
-The six open delivery rows stay open: passing a synthetic gate test cannot
-publish the real metric definitions, unlock a vault, provide a 7/14-day measured
-cohort, assign an accountable owner or certify an unspecified production target.
+Functional acceptance is the current completion target. The six remaining
+rollout/adoption requirements are explicitly deferred in the
+[scope table](agent-ready-gap-checklist.md#functional-scope-of-the-six-deferred-items).
+The report evaluates the concrete local criterion for each row independently
+of that deferral. A deferred row with a missing, skipped or failed functional
+test still fails acceptance. Any failed suite also fails the overall result,
+including failures outside the named per-row tests.
 
 ## Retained evidence
 
@@ -83,7 +97,10 @@ Each run prints its unique directory under `.local/agent-ready-e2e/`. It retains
 
 - Exact `go test -json` output and stderr for every suite, including failures.
 - `summary.json`: command exit codes, per-checklist test outcomes, source
-  revision, source snapshot digest and explicit synthetic scope.
+  revision, source snapshot digest, functional acceptance and deferred
+  rollout/adoption requirements. The original full-delivery count is retained.
+- `functional-acceptance.md`: readable functional results and the exact deferred
+  requirements, generated from the same test outcomes as the JSON receipt.
 - `source-manifest.json`: hashes of the source files used by the check image,
   including uncommitted new tests; `working-tree.patch` records tracked edits.
   The host hashes its excluded CI configuration in `ci-workflow.sha256`.

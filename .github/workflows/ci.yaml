@@ -29,6 +29,10 @@ jobs:
         run: go test -race -coverprofile=coverage.out ./...
       - name: Build
         run: go build ./cmd/...
+      - name: Acceptance reporting and Codex launcher regressions
+        run: |
+          python3 scripts/agent_ready_e2e_test.py
+          python3 scripts/codex_launch_test.py
 
   postgres-integration:
     runs-on: ubuntu-latest
@@ -59,8 +63,8 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
-      - name: Checklist-mapped gateway, CLI, worker and adapter E2E
-        run: make agent-ready-e2e
+      - name: Local functionality through gateway, CLI, worker and adapter E2E
+        run: make agent-ready-functional
       - name: Retain exact test results and checklist coverage
         if: always()
         uses: actions/upload-artifact@v4
@@ -69,6 +73,13 @@ jobs:
           path: .local/agent-ready-e2e/
           include-hidden-files: true
           if-no-files-found: error
+
+  documentation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Documentation links and diagram exports
+        run: make docs-check
 
   configuration:
     runs-on: ubuntu-latest

@@ -1,5 +1,11 @@
 # Retained pilot recovery — 2026-09-10
 
+Historical pilot receipt; original identities, decisions, hashes and counts are
+preserved. See the [current status](README.md#current-status) and
+[developer guide](developer-guide.md). Standing task authority now covers
+validated definitions once current evidence and authenticated access are
+available; it does not publish the pending Task B KB entry.
+
 Status: the real local-model pilot completed at **2026-09-10T22:11:14Z**.
 Task A was explicitly approved by the user, published and verified in Milvus.
 Task B reused it and passed local verification. Task B's revised lesson and the

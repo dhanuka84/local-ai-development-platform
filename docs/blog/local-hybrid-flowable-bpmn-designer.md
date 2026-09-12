@@ -1,5 +1,10 @@
 # From Repository Scan to BPMN Designer: A Local Hybrid AI Development Workflow
 
+Historical worked example. Commands, model observations, repository counts and
+screenshots below describe that experiment. For current setup and feature work,
+use the [developer guide](../developer-guide.md),
+[indexing runbook](../local-setup-and-indexing.md) and [documentation index](../README.md).
+
 Large repositories expose the weakness of a purely conversational coding
 assistant: the model can read only a fraction of the code at once, and a
 plausible answer is not necessarily grounded in the branch actually being

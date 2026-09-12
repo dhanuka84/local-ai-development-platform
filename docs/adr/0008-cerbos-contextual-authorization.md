@@ -1,6 +1,13 @@
 # ADR-0008: Cerbos for contextual authorization
 
-**Status:** Proposed
+**Status:** Implemented locally; enterprise identity and two-person approval integration remain proposed.
+
+September 12, 2026 clarification: local authentication, trusted policy context,
+Cerbos decisions, audit correlation and allow/deny tests are implemented. The
+governance profiles below describe intended separation; a complete two-person
+approval protocol and target enterprise integration remain future work. See
+[ADR-0011](0011-scoped-autonomy-and-functional-acceptance.md) for current local
+authority and the [E2E guide](../agent-ready-e2e.md) for executed evidence.
 
 ## Context
 
