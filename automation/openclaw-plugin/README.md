@@ -24,5 +24,8 @@ Set the configured controller token environment variable before starting the
 OpenClaw Gateway. The default local setup uses the separate
 `CONTROLLER_AUTH_TOKEN` workload principal with the `controller` role. Never
 give OpenClaw the human `AUTH_TOKEN`: the all-roles solo developer uses that
-credential in Codex or another local human approval surface to exercise
-Development, QA, Product Owner, and Operations gates explicitly.
+credential in an authorized Codex operator session to exercise Development, QA,
+Product Owner, and Operations gates. Standing task authorization permits
+validated definition publication; reusable lessons stay pending for an explicit
+user decision. See
+[autonomous local operation](../../docs/operations.md#autonomous-local-operation).

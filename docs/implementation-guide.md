@@ -308,7 +308,7 @@ The reusable analyzer boundary is isolated under `components/codegraph` and MPL-
 
 ## MCP contract and safety
 
-The service uses the official Go MCP SDK. Input and output schemas are inferred from typed structs. Tool annotations distinguish read-only and additive writes. Codex is configured with `default_tools_approval_mode = "writes"`; approval, repository-relationship, and code-index writes have explicit prompt overrides. `code_repository_index` is registered only when synchronous local analysis is enabled; code search and graph traversal remain available in query-only enterprise gateways.
+The service uses the official Go MCP SDK. Input and output schemas are inferred from typed structs. Tool annotations distinguish read-only and additive writes. Codex uses `approval_policy = "never"` and `default_tools_approval_mode = "approve"` for assigned local tasks. Definition decisions, repository relationships and indexing use `approve`; `knowledge_candidate_decide` retains `prompt` so reusable lessons stay pending for an explicit user decision. The authenticated operator still needs the relevant roles and exact validation evidence. See [autonomous local operation](operations.md#autonomous-local-operation). `code_repository_index` is registered only when synchronous local analysis is enabled; code search and graph traversal remain available in query-only enterprise gateways.
 
 HTTP endpoints:
 

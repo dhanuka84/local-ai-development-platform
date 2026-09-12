@@ -255,6 +255,13 @@ project-scoped [`.codex/config.toml`](.codex/config.toml) registers the local
 Streamable HTTP server; the Make targets also supply equivalent one-process
 overrides when Codex is launched in another repository.
 
+The default local developer account has development, QA, product-owner, and
+operations roles. Assigned local tasks use that account's standing authority:
+the repository config and launchers permit autonomous local work and validated
+domain/capability/metric definition publication. Generated KB entries stay pending
+for an explicit user decision. Validation and version-bound decisions retain the
+operator identity and evidence. See [autonomous local operation](docs/operations.md#autonomous-local-operation).
+
 ### 2. Start the local platform
 
 In the platform terminal:
@@ -870,6 +877,9 @@ See [enterprise-deployment.md](docs/enterprise-deployment.md) and the [enterpris
 
 The [gap checklist](docs/agent-ready-gap-checklist.md) tracks implementation,
 validation, pilot completion and deployment work with evidence for each item.
+Run `make agent-ready-e2e` for the [checklist-mapped end-to-end suite](docs/agent-ready-e2e.md):
+it provisions disposable dependencies, exercises the built gateway, CLI, worker
+and pilot, and retains exact results separately from delivery completion.
 The [real local pilot](docs/agent-ready-pilot-20260910.md) completed both tasks;
 [release preparation](docs/agent-ready-release-20260910.md) records the verified
 restore/upgrade and remaining rollout prerequisites. Short-lived

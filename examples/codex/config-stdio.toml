@@ -1,11 +1,14 @@
 # Alternative with no listening MCP port. Build first with `make build`, then
 # replace /ABSOLUTE/PATH with this repository's absolute path.
+# Apply in a trusted project for already-authorized local tasks.
+approval_policy = "never"
+
 [mcp_servers.hybrid_knowledge_local]
 command = "/ABSOLUTE/PATH/bin/gateway"
 cwd = "/ABSOLUTE/PATH"
 startup_timeout_sec = 20
 tool_timeout_sec = 1200
-default_tools_approval_mode = "writes"
+default_tools_approval_mode = "approve"
 
 [mcp_servers.hybrid_knowledge_local.env]
 APP_ENV = "local"
@@ -22,4 +25,10 @@ CODEGRAPH_MAX_ENTITIES = "200000"
 CODEGRAPH_MAX_RELATIONS = "1000000"
 
 [mcp_servers.hybrid_knowledge_local.tools.code_repository_index]
+approval_mode = "approve"
+
+[mcp_servers.hybrid_knowledge_local.tools.knowledge_candidate_decide]
 approval_mode = "prompt"
+
+[mcp_servers.hybrid_knowledge_local.tools.context_definition_decide]
+approval_mode = "approve"

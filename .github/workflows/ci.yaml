@@ -59,8 +59,16 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
-      - name: Disposable PostgreSQL, AGE, Milvus, Cerbos and two-task acceptance
-        run: make agent-ready-integration
+      - name: Checklist-mapped gateway, CLI, worker and adapter E2E
+        run: make agent-ready-e2e
+      - name: Retain exact test results and checklist coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-ready-e2e
+          path: .local/agent-ready-e2e/
+          include-hidden-files: true
+          if-no-files-found: error
 
   configuration:
     runs-on: ubuntu-latest

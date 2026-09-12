@@ -15,7 +15,8 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 ENV GOFLAGS=-buildvcs=false
-CMD ["sh", "-ec", "go test -race -count=1 ./internal/postgres; go test -count=1 ./internal/age; go test -count=1 ./internal/milvus; go test -count=1 ./internal/telemetry; make agent-ready-acceptance"]
+RUN mkdir -p /opt/agent-ready-bin && go build -o /opt/agent-ready-bin/ ./cmd/gateway ./cmd/worker ./cmd/admin ./cmd/agent-ready-pilot
+CMD ["python3", "scripts/agent_ready_e2e.py", "run", "--output", "/evidence"]
 
 FROM go-toolchain AS build
 WORKDIR /src

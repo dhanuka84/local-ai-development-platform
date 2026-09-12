@@ -1,0 +1,242 @@
+{
+  "schema_version": "hybrid-ai/checklist-coverage/v1",
+  "items": [
+    {
+      "id": "L01",
+      "checks": [
+        "internal/e2e:TestAgentReadyGatewayE2E/DefaultDeveloperAuthority",
+        "internal/e2e:TestAgentReadyGatewayE2E/ValidationAndPublication",
+        "internal/postgres:TestKnowledgePromotionTransactionIntegration"
+      ],
+      "boundary": "Default four-role developer bootstrap, attributed explicit lesson decisions, and executable version-bound gate across actual CLI/MCP and PostgreSQL; synthetic approvals only."
+    },
+    {
+      "id": "L02",
+      "checks": [
+        "internal/e2e:TestAgentReadyGatewayE2E/ValidationAndPublication",
+        "contracts:TestVersionedContractsAndFixtures"
+      ],
+      "boundary": "Actual work-packet validation plus positive/negative contract fixtures."
+    },
+    {
+      "id": "L03",
+      "checks": [
+        "internal/e2e:TestAgentReadyGatewayE2E/QualityAndFreshness",
+        "internal/postgres:TestKnowledgeQualityAcrossRetrievalAndRecoveryIntegration",
+        "internal/milvus:TestVersionedKnowledgeProjectionIntegration"
+      ],
+      "boundary": "Live local adapters exercise source/validation/projection eligibility, recovery and hydration in disposable services."
+    },
+    {
+      "id": "L04",
+      "checks": [
+        "internal/e2e:TestAgentReadyPilotRecoveryE2E",
+        "internal/e2e:TestAgentReadyGatewayE2E/ReuseAndTrace",
+        "internal/e2e:TestAgentReadyGatewayE2E/EvidenceRetentionAndExport",
+        "internal/postgres:TestEvidenceTransactionAndUnknownOutcomeIntegration"
+      ],
+      "boundary": "Owned trace and immutable evidence; external unobserved actions remain outside trace coverage."
+    },
+    {
+      "id": "L05",
+      "checks": [
+        "internal/e2e:TestAgentReadyGatewayE2E/GovernedDefinitionsAndMetrics",
+        "internal/service:TestAgentReadyAcceptanceIntegration"
+      ],
+      "boundary": "All six test definitions and fixed metric queries; publication of real definitions requires its own decision."
+    },
+    {
+      "id": "L06",
+      "checks": [
+        "internal/e2e:TestAgentReadyPilotRecoveryE2E",
+        "internal/e2e:TestAgentReadyGatewayE2E/ReuseAndTrace",
+        "internal/service:TestAgentReadyAcceptanceIntegration"
+      ],
+      "boundary": "Complete two-task synthetic transition and reuse path."
+    },
+    {
+      "id": "L07",
+      "checks": [
+        "internal/e2e:TestAgentReadyPilotRecoveryE2E",
+        "cmd/agent-ready-pilot:TestCheckRepairAnswer",
+        "cmd/agent-ready-pilot:TestRepairChangesOnlyHunkCounts",
+        "cmd/agent-ready-pilot:TestRepairEvidenceRequiresExactTaskAndSuccessfulArtifactReceipt",
+        "internal/e2e:TestAgentReadyGatewayE2E/ReuseAndTrace"
+      ],
+      "boundary": "Actual pilot executable exercises malformed output, unchanged repair failure, deterministic recount, stale revision denial and successful Task B revision with retained exact artifacts. Protocol outputs are synthetic; real-model evidence remains in the retained pilot."
+    },
+    {
+      "id": "L08",
+      "checks": [
+        "internal/e2e:TestAgentReadyPilotRecoveryE2E",
+        "internal/e2e:TestAgentReadyGatewayE2E/ValidationAndPublication",
+        "components/workpacket:TestPythonVerificationSuppressesBytecodeButRejectsOtherSideEffects"
+      ],
+      "boundary": "Actual local verifier and behavior checks with deterministic patch fixtures; actual local-model quality is evidenced by the retained pilot, not these tests."
+    },
+    {
+      "id": "L09",
+      "checks": [
+        "internal/e2e:TestAgentReadyPilotRecoveryE2E",
+        "internal/e2e:TestAgentReadyGatewayE2E/ValidationAndPublication"
+      ],
+      "boundary": "Synthetic identity exercises exact approval. Existing real Task A approval is documented separately; test execution grants no real approval."
+    },
+    {
+      "id": "L10",
+      "checks": [
+        "internal/e2e:TestAgentReadyPilotRecoveryE2E",
+        "internal/e2e:TestAgentReadyGatewayE2E/ValidationAndPublication",
+        "internal/milvus:TestVersionedKnowledgeProjectionIntegration"
+      ],
+      "boundary": "Actual worker publication and exact Milvus read-back; historical real-pilot publication remains separately recorded."
+    },
+    {
+      "id": "L11",
+      "checks": [
+        "internal/e2e:TestAgentReadyPilotRecoveryE2E",
+        "internal/e2e:TestAgentReadyGatewayE2E/ReuseAndTrace",
+        "cmd/agent-ready-pilot:TestGenerationSeparatesReferenceLessonFromCurrentTask",
+        "cmd/agent-ready-pilot:TestLocalRevisionRefusesStaleOrUnboundCheckpoint"
+      ],
+      "boundary": "Actual pilot executable completes retrieval, explicit use, failed Task B output and version-2 local revision without publishing Task B. Generated answers are deterministic fixtures; real-model quality is evidenced separately."
+    },
+    {
+      "id": "L12",
+      "checks": [
+        "internal/e2e:TestAgentReadyGatewayE2E/GovernedDefinitionsAndMetrics",
+        "internal/e2e:TestAgentReadyGatewayE2E/ReuseAndTrace"
+      ],
+      "boundary": "Real-pilot definitions remain pending exact-version human decisions; synthetic query success does not close L12."
+    },
+    {
+      "id": "L13",
+      "checks": [
+        "internal/e2e:TestAgentReadyGatewayE2E/TransportDiscovery",
+        "internal/service:TestAgentReadyAcceptanceIntegration"
+      ],
+      "boundary": "Self-provisioning isolated suite must execute all mapped checks; missing/skipped required tests fail the report."
+    },
+    {
+      "id": "L14",
+      "checks": [
+        "internal/postgres:TestUpgradeFromV7PreservesLegacyEvidenceIntegration",
+        "internal/e2e:TestAgentReadyGatewayE2E/TransportDiscovery"
+      ],
+      "boundary": "Migration/legacy-evidence regression and actual admin migration; protected local dump restore is separately documented, not rerun against live data."
+    },
+    {
+      "id": "L15",
+      "checks": [
+        "internal/e2e:TestAgentReadyGatewayE2E/TransportDiscovery",
+        "internal/e2e:TestAgentReadyGatewayE2E/ValidationAndPublication",
+        "internal/e2e:TestAgentReadyGatewayE2E/EvidenceRetentionAndExport"
+      ],
+      "boundary": "Matching built gateway/worker/admin and real policies start successfully in the disposable stack; no live cutover claimed."
+    },
+    {
+      "id": "L16",
+      "checks": [
+        "internal/e2e:TestAgentReadyGatewayE2E/EvidenceRetentionAndExport",
+        "internal/telemetry:TestActualLocalCollectorAcceptsDurableReceiptIntegration"
+      ],
+      "boundary": "Actual worker durable queue and actual local collector accept receipts."
+    },
+    {
+      "id": "L17",
+      "checks": [
+        "internal/e2e:TestAgentReadyGatewayE2E/TransportDiscovery",
+        "internal/service:TestAgentReadyAcceptanceIntegration",
+        "contracts:TestVersionedContractsAndFixtures"
+      ],
+      "boundary": "Mapped automated suite supplements required make check and documentation review; this is not a production readiness assertion."
+    },
+    {
+      "id": "L18",
+      "checks": [
+        "internal/e2e:TestAgentReadyGatewayE2E/TransportDiscovery",
+        "internal/e2e:TestAgentReadyGatewayE2E/EvidenceRetentionAndExport"
+      ],
+      "boundary": "Disposable activation rehearsal only. Live activation remains blocked on the existing encrypted vault unlock and actual cutover checks."
+    },
+    {
+      "id": "E01",
+      "checks": [
+        "internal/e2e:TestAgentReadyGatewayE2E/TaskDelegation",
+        "internal/service:TestAgentReadyAcceptanceIntegration/scoped_task_delegation"
+      ],
+      "boundary": "Actual CLI task issuance and HTTP revocation plus service expiry/live-authority cases; enterprise federation remains outside local certification."
+    },
+    {
+      "id": "E02",
+      "checks": [
+        "internal/e2e:TestAgentReadyGatewayE2E/ValidationAndPublication",
+        "components/workpacket:TestEvaluateMaintenanceFailsClosed"
+      ],
+      "boundary": "Tests existing mandatory authority gates only. Representative 7/14-day cohorts and accountable stage adoption cannot be replaced by synthetic tests."
+    },
+    {
+      "id": "E03",
+      "checks": [
+        "internal/e2e:TestAgentReadyGatewayE2E/ValidationAndPublication",
+        "internal/e2e:TestAgentReadyGatewayE2E/QualityAndFreshness"
+      ],
+      "boundary": "Pending/raw access, validated publication and current eligible retrieval are exercised over MCP."
+    },
+    {
+      "id": "E04",
+      "checks": [
+        "internal/e2e:TestAgentReadyGatewayE2E/ReuseAndTrace"
+      ],
+      "boundary": "Current applicable curation mechanism captures a pending lesson after reuse. Warehouse applicability remains the documented scoped decision."
+    },
+    {
+      "id": "E05",
+      "checks": [
+        "internal/e2e:TestAgentReadyGatewayE2E/QualityAndFreshness",
+        "internal/service:TestAgentReadyAcceptanceIntegration/candidate_text_quality"
+      ],
+      "boundary": "Exact-version duplicate inspection and foreign/quarantined exclusions with authoritative candidates; OCR/PDF and production corpus recall are outside supported scope."
+    },
+    {
+      "id": "E06",
+      "checks": [
+        "internal/e2e:TestAgentReadyGatewayE2E/GovernedDefinitionsAndMetrics"
+      ],
+      "boundary": "Executable stale-definition withdrawal and owner-attributed synthetic decisions; named deployment ownership and acceptance remain unspecified."
+    },
+    {
+      "id": "E07",
+      "checks": [
+        "internal/e2e:TestAgentReadyGatewayE2E/EvidenceRetentionAndExport"
+      ],
+      "boundary": "Local review/hold, immutable storage and collector export only. Production archival, hold authority and deletion requirements remain unspecified."
+    },
+    {
+      "id": "E08",
+      "checks": [
+        "internal/e2e:TestAgentReadyGatewayE2E/TaskDelegation",
+        "internal/e2e:TestAgentReadyGatewayE2E/TransportDiscovery",
+        "internal/config:TestLoadRejectsUnauthenticatedEnterprise",
+        "internal/config:TestLoadRejectsAuthorizationDisabledOutsideLocal"
+      ],
+      "boundary": "Project isolation and configuration denials are local regression evidence. Target identity, cluster, storage and measured availability/recovery are still required."
+    },
+    {
+      "id": "E09",
+      "checks": [
+        "internal/e2e:TestAgentReadyGatewayE2E/QualityAndFreshness",
+        "components/workpacket:TestVerifyPatchUsesDisposableCloneAndEnforcesScope"
+      ],
+      "boundary": "Local source/verifier regressions supplement the retained rendered-overlay/read-only mount receipt; this run does not deploy Kubernetes."
+    },
+    {
+      "id": "E10",
+      "checks": [
+        "internal/e2e:TestAgentReadyGatewayE2E/TransportDiscovery",
+        "internal/service:TestAgentReadyAcceptanceIntegration"
+      ],
+      "boundary": "Coverage loader requires all checklist IDs exactly once. Manual/production evidence limits are explicit per row."
+    }
+  ]
+}

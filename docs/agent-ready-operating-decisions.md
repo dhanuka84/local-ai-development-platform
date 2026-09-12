@@ -5,6 +5,15 @@ remains a governed local software-development platform. They do not claim that
 a Kubernetes cluster, enterprise identity provider or production data operating
 model has been deployed.
 
+For assigned local tasks, the user's standing authorization permits an agent to
+publish validated domain/capability/metric definitions through the accountable
+operator's existing roles; generated KB entries stay pending for an explicit user
+decision. See [autonomous local operation](operations.md#autonomous-local-operation).
+References below to human decision gates identify that authority and its audit
+record. Definition publication does not require another user confirmation for
+each delegated action; KB-entry publication requires an explicit decision.
+The measured adoption criteria and actual deployment inputs are still required.
+
 ## Adaptive Gold applicability
 
 The current data product is reusable software knowledge. Its adaptive output is

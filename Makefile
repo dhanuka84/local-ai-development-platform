@@ -2,7 +2,9 @@ SHELL := /bin/sh
 .DEFAULT_GOAL := help
 BUILD_CHECK_IMAGE ?= local-ai-platform-buildcheck:go1.26.8
 
-.PHONY: agent-ready-acceptance agent-ready-integration agent-ready-pilot
+.PHONY: agent-ready-acceptance agent-ready-integration agent-ready-e2e agent-ready-pilot
+agent-ready-e2e: agent-ready-integration ## Run checklist-mapped E2E and integration tests and retain machine-readable evidence
+
 agent-ready-integration: ## Build and run all agent-ready integration checks in isolated disposable services
 	sh scripts/agent_ready_acceptance.sh
 
@@ -10,7 +12,7 @@ agent-ready-acceptance: ## Run the deterministic two-task scenario against expli
 	@test -n "$$TEST_DATABASE_URL" && test -n "$$TEST_MILVUS_ADDRESS" && test -n "$$TEST_CERBOS_ADDRESS" || { echo 'Set disposable TEST_DATABASE_URL, TEST_MILVUS_ADDRESS and TEST_CERBOS_ADDRESS'; exit 1; }
 	go test -race -count=1 -run TestAgentReadyAcceptanceIntegration -v ./internal/service
 
-agent-ready-pilot: ## Run the local Ollama pilot using PILOT_SPEC; stops at real human approval
+agent-ready-pilot: ## Run the local Ollama pilot using PILOT_SPEC; returns at the explicit lesson approval step
 	@test -n "$(PILOT_SPEC)" || { echo 'Set PILOT_SPEC to the reviewed isolated pilot input'; exit 1; }
 	go run ./cmd/agent-ready-pilot "$(PILOT_SPEC)"
 
@@ -75,16 +77,18 @@ OPENCLAW_PLUGIN_ID := hybrid-workflow-controller
 OPENCLAW_CONFIG_PATCH := examples/openclaw/openclaw.hybrid.json5
 OPENCLAW_MCP_SERVER := hybridKnowledge
 CODEX_MCP_ARGS := \
+	-c 'approval_policy="never"' \
 	-c 'mcp_servers.hybrid_knowledge.url="$(MCP_URL)"' \
 	-c 'mcp_servers.hybrid_knowledge.bearer_token_env_var="HYBRID_AI_MCP_TOKEN"' \
 	-c 'mcp_servers.hybrid_knowledge.enabled=true' \
 	-c 'mcp_servers.hybrid_knowledge.required=true' \
 	-c 'mcp_servers.hybrid_knowledge.startup_timeout_sec=20' \
 	-c 'mcp_servers.hybrid_knowledge.tool_timeout_sec=1200' \
-	-c 'mcp_servers.hybrid_knowledge.default_tools_approval_mode="writes"' \
+	-c 'mcp_servers.hybrid_knowledge.default_tools_approval_mode="approve"' \
 	-c 'mcp_servers.hybrid_knowledge.tools.knowledge_candidate_decide.approval_mode="prompt"' \
-	-c 'mcp_servers.hybrid_knowledge.tools.repository_relation_upsert.approval_mode="prompt"' \
-	-c 'mcp_servers.hybrid_knowledge.tools.code_repository_index.approval_mode="prompt"'
+	-c 'mcp_servers.hybrid_knowledge.tools.context_definition_decide.approval_mode="approve"' \
+	-c 'mcp_servers.hybrid_knowledge.tools.repository_relation_upsert.approval_mode="approve"' \
+	-c 'mcp_servers.hybrid_knowledge.tools.code_repository_index.approval_mode="approve"'
 CODEX_LOCAL_ARGS := \
 	--oss \
 	--local-provider ollama \
@@ -314,6 +318,8 @@ check: ## Run formatting, vet, and unit tests
 	bash -n scripts/*.sh
 	python3 -c 'import ast,pathlib; [ast.parse(pathlib.Path(path).read_text()) for path in ("scripts/local_vault.py","scripts/local_vault_test.py","scripts/gdrive_client.py","scripts/gdrive_client_test.py","scripts/manual_backup_restore_test.py")]'
 	python3 scripts/agent_ready_pilot_prepare_test.py
+	python3 scripts/agent_ready_e2e_test.py
+	python3 scripts/codex_launch_test.py
 
 check-container: buildcheck-image ## Run make check with the pinned build-check image
 	docker run --rm -v "$(CURDIR):/src" -w /src "$(BUILD_CHECK_IMAGE)" make check
@@ -805,6 +811,7 @@ codex-repo: mcp-preflight ## Start Codex for REPO=/absolute/path with this HTTP 
 	@codex login status >/dev/null || { echo "Codex is signed out; run 'make codex-login'" >&2; exit 1; }
 	@curl --fail --silent --show-error --max-time 5 "$(MCP_BASE_URL)/healthz" >/dev/null || { echo "MCP gateway is unavailable; start Terminal 1 first" >&2; exit 1; }
 	@auth_token_value=$$(cat "$(VAULT_RUNTIME_DIR)/AUTH_TOKEN"); \
+	case "$$auth_token_value" in "") echo "vault AUTH_TOKEN is empty" >&2; exit 1;; esac; \
 	repository_path=$$(cd "$(REPO)" 2>/dev/null && pwd -P) || { echo "REPO is not an accessible directory: $(REPO)" >&2; exit 1; }; \
 	HYBRID_AI_MCP_TOKEN="$$auth_token_value" exec codex -C "$$repository_path" $(CODEX_MCP_ARGS)
 

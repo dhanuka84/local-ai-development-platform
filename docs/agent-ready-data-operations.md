@@ -3,13 +3,21 @@
 This runbook covers validation, quality controls, trace evidence, governed
 semantic metrics, and the two-task acceptance/pilot implementation. The retained
 real-Ollama pilot completed on September 10, including explicit Task A approval
-and locally verified Task B reuse. Metric definitions remain pending a separate
-decision; live rollout awaits vault unlock. Synthetic test
+and locally verified Task B reuse. Metric definitions still need their actual
+validated decisions under the user's standing task authorization; live rollout
+awaits vault unlock. See [autonomous local operation](operations.md#autonomous-local-operation).
+Synthetic test
 approvals are not human approval of real knowledge. See
 [the design](agent-ready-data-plan.md) and the
 [real-pilot receipt](agent-ready-pilot-20260906.md).
 The [September 10 recovery receipt](agent-ready-pilot-20260910.md) and
 [gap checklist](agent-ready-gap-checklist.md) carry the current status.
+
+For full regression validation, run `make agent-ready-e2e`. The
+[E2E guide](agent-ready-e2e.md) maps every checklist row to exact tests, records
+the required manual/deployment evidence, and explains the retained JSON test
+receipts. The suite uses disposable services and deterministic local protocol
+fixtures; it does not require the live vault or publish real knowledge.
 
 ## Upgrade behavior
 

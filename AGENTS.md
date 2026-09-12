@@ -1,12 +1,16 @@
 # Repository agent guidance
 
+- Work autonomously within the assigned task. The user's task instruction is standing authorization for necessary implementation, fixes, tests, local recovery, repository indexing, and validated domain/capability/metric definition publication. Do not request the same permission again at each step. Generated KB entries (called lessons in the pilot) stay pending.
+- The default local account, `human:local-developer`, has `development`, `qa`, `product_owner`, and `operations` roles. Use the authenticated operator's existing authority for authorized local work; the `development` role alone is narrower. Keep the OpenClaw controller and task credentials separate from the operator credential.
+- Complete every actionable checklist item and run its end-to-end tests. If credentials, measured observation windows, or deployment requirements are unavailable, record the exact remaining prerequisite and continue independent work. Do not invent evidence or mark blocked delivery work complete.
 - Run `knowledge_search` before substantial design or debugging work when the MCP server is available.
 - Use `repository_graph_get` when a change may affect another repository in the same product.
 - Treat Milvus results as candidates and hydrate authoritative content from PostgreSQL through MCP tools.
-- Never approve knowledge merely because a model generated or reviewed it. Approval requires an accountable actor and relevant validation evidence.
-- After a useful, validated outcome, offer to record it with `generation_capture`. Include ordered procedure, validation evidence, repository revision, provider, and model.
+- Never approve knowledge merely because a model generated or reviewed it. Before any publication, inspect its exact version, execute the relevant local validation, and check source freshness. Generated KB entries require the user's explicit approval of the exact candidate version; a general instruction to finish the task does not approve them. Do not approve KB entries through MCP, CLI, or direct database writes under standing task authorization.
+- Standing task authorization permits validated domain, capability, and metric definition decisions through `context_registry_validate` and `context_definition_decide` under the authenticated operator's existing roles without another confirmation prompt. Record the exact version/digest, validation ID, and a reason identifying the user-delegated task. Describe delegated execution accurately; do not claim that the user manually reviewed each item. Authentication, Cerbos policy, database checks, and immutable audit evidence still apply.
+- After a useful, validated outcome, record it with `generation_capture` as pending knowledge without a separate permission request. Include ordered procedure, validation evidence, repository revision, provider, and model. Leave generated KB entries pending for an explicit user decision; continue independent work without waiting for that decision.
 - Maintenance tasks must use local models only. Do not invoke cloud review or introduce a cloud fallback.
 - For an OpenClaw-delegated patch, require a `hybrid-ai/work-packet/v1` contract and pass `workpacket-verify` before accepting the patch. Remote review is advisory and happens only after local verification.
-- Capture exact Codex/Kimi output and the disclosed-context manifest as immutable evidence. Keep proposed improvements pending; embed only locally validated, generalized, explicitly approved knowledge.
+- Capture exact Codex/Kimi output and the disclosed-context manifest as immutable evidence. Keep proposed KB entries pending until locally validated and explicitly approved by the user; embed only locally validated, generalized, approved knowledge.
 - Never send secrets, credentials, personal data, production dumps, or unrestricted repository content to Kimi, OpenAI, or another cloud provider.
 - Run `make check` before handing off repository changes.

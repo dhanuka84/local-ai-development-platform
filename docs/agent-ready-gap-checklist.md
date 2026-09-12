@@ -1,12 +1,17 @@
 # Agent-ready data gap checklist
 
-Updated: 2026-09-10. Baseline: `ce8b7d3`.
+Updated: 2026-09-12. Baseline: `ce8b7d3`; continuation baseline: `a999db0`.
 Implementation branch: `fix/agent-ready-gaps-20260910`.
 
-Completion: **22 of 28 items**. The six open rows require separate metric
+Completion: **22 of 28 items**. The six open rows require actual metric
 publication, vault unlock for live activation, measured autonomy cohorts,
 accountable ownership assignments, production retention requirements, or a
 target enterprise environment. They are not recorded as completed by this work.
+
+Every row now has an explicit automated regression mapping and evidence
+boundary in the [end-to-end test guide](agent-ready-e2e.md). Run
+`make agent-ready-e2e` for actual gateway/CLI/worker/pilot paths and disposable
+dependencies. Test coverage and real delivery completion are separate results.
 
 This is the working completion register for the
 [five-gap plan](agent-ready-data-plan.md),
@@ -21,6 +26,12 @@ separate outcomes. Role owners below are responsibilities to assign; they do
 not record a person's acceptance or authorize publication. Keep pending
 knowledge pending until its exact version has relevant validation and an
 accountable human decision.
+
+The user's standing task authorization now permits validated definition decisions
+without another confirmation prompt; see [autonomous local operation](operations.md#autonomous-local-operation).
+L12 still needs access to the retained runtime, current exact-version validation,
+recorded decisions and successful governed queries. A configuration change does
+not execute those steps or unlock the vault.
 
 ## Local release
 
@@ -37,7 +48,7 @@ accountable human decision.
 | [x] | L09 | Review and publish the exact validated Task A candidate | Accountable human Product Owner | The user explicitly approved version 1; decision `ca313497-de19-4d33-b1b8-4c17bdfddd20` was recorded under the existing human operator at 22:00 UTC. |
 | [x] | L10 | Verify Task A publication in Milvus | Operations / local worker | Exact ID/version/digest read-back verified at 22:01:28 UTC. |
 | [x] | L11 | Complete actual Task B reuse and its local verification | Local workload / QA | Task B completed with explicit context use and validation `9ebc86be-08b1-42a0-8906-b044cdd0c1ac`; its revised version-2 lesson remains pending. |
-| [ ] | L12 | Produce a complete real-pilot report and inspect governed metrics | QA / Product Owner | Complete report and diagnostic counts are available. The six real definitions passed contract/SQL validation and remain pending their separate exact-version approval; the governed query correctly rejects them. See the [review packet](agent-ready-pilot-20260910.md#metric-definitions-prepared-for-a-separate-decision). |
+| [ ] | L12 | Produce a complete real-pilot report and inspect governed metrics | QA / Product Owner | Complete report and diagnostic counts are available. The six real definitions passed contract/SQL validation. Standing task authorization now covers their exact-version operator decisions; authenticated runtime access, current validation, recorded decisions and successful governed queries remain required. See the [review packet](agent-ready-pilot-20260910.md#metric-definitions-prepared-for-a-separate-decision). |
 | [x] | L13 | Make the full deterministic acceptance environment reproducible | Platform development | `make agent-ready-integration` provisions its own private dependencies, runs the adapters and acceptance, and removes only its own resources. The full command passed locally; the checked-in CI job uses that command. |
 | [x] | L14 | Rehearse upgrade from migration 000007 and inventory legacy evidence | Operations / QA | Synthetic upgrade tests pass. The actual protected local backup restored on the same AGE image and upgraded to migration 18 with all five pending candidates, 130,516 code entities and 14 CAS references preserved. |
 | [x] | L15 | Prepare coordinated live gateway, worker, CLI and policy rollout | Operations | Compatible release images, local restore/upgrade evidence and the cutover/recovery sequence are prepared in the [release receipt](agent-ready-release-20260910.md). Live activation is L18. |

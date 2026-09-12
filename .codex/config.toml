@@ -1,5 +1,8 @@
 # Project-scoped MCP connection. Bare `codex` sessions may start without the
 # project token; use `make codex` or `make codex-local` for required MCP access.
+# Assigned local work uses the operator's standing authorization in AGENTS.md.
+approval_policy = "never"
+
 [mcp_servers.hybrid_knowledge]
 url = "http://127.0.0.1:8080/mcp"
 bearer_token_env_var = "HYBRID_AI_MCP_TOKEN"
@@ -7,13 +10,17 @@ enabled = false
 required = false
 startup_timeout_sec = 20
 tool_timeout_sec = 1200
-default_tools_approval_mode = "writes"
+default_tools_approval_mode = "approve"
 
 [mcp_servers.hybrid_knowledge.tools.knowledge_candidate_decide]
+# Reusable lessons stay pending; their publication needs an explicit decision.
 approval_mode = "prompt"
+
+[mcp_servers.hybrid_knowledge.tools.context_definition_decide]
+approval_mode = "approve"
 
 [mcp_servers.hybrid_knowledge.tools.repository_relation_upsert]
-approval_mode = "prompt"
+approval_mode = "approve"
 
 [mcp_servers.hybrid_knowledge.tools.code_repository_index]
-approval_mode = "prompt"
+approval_mode = "approve"
