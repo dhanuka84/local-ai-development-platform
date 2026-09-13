@@ -1,14 +1,19 @@
 version: 2
+
+multi-ecosystem-groups:
+  all-dependencies:
+    schedule: {interval: weekly}
+
 updates:
   - package-ecosystem: gomod
     directory: /
-    schedule: {interval: weekly}
-    groups:
-      go-minor-patch:
-        update-types: [minor, patch]
+    patterns: ["*"]
+    multi-ecosystem-group: all-dependencies
   - package-ecosystem: docker
     directory: /
-    schedule: {interval: weekly}
+    patterns: ["*"]
+    multi-ecosystem-group: all-dependencies
   - package-ecosystem: github-actions
     directory: /
-    schedule: {interval: weekly}
+    patterns: ["*"]
+    multi-ecosystem-group: all-dependencies
