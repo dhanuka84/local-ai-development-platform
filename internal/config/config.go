@@ -52,6 +52,7 @@ type Config struct {
 	CodeGraphJVMIndexer    string
 	CodeGraphTSIndexer     string
 	CodeGraphPythonIndexer string
+	ProductSourceRegistry  string
 }
 
 func Load() (Config, error) { return load(true) }
@@ -90,6 +91,7 @@ func load(validateAuth bool) (Config, error) {
 	}
 	cfg := Config{
 		Environment:            environment,
+		ProductSourceRegistry:  env("PRODUCT_SOURCE_REGISTRY", ""),
 		LogLevel:               env("LOG_LEVEL", "info"),
 		HTTPAddress:            env("HTTP_ADDRESS", "127.0.0.1:8080"),
 		MCPTransport:           env("MCP_TRANSPORT", "http"),
@@ -293,6 +295,7 @@ func validatePrincipalBootstraps(principals []domain.PrincipalBootstrap) ([]doma
 	allowedRoles := map[string]struct{}{
 		"controller": {}, "development": {}, "qa": {}, "product_owner": {}, "operations": {},
 		"cloud_reviewer": {}, "maintenance_executor": {}, "repository_analyzer": {}, "validation_executor": {},
+		"incident_diagnosis": {},
 	}
 	ids := make(map[string]struct{}, len(principals))
 	tokens := make(map[string]struct{}, len(principals))

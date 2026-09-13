@@ -2,10 +2,11 @@
 
 **Status:** Core foundation implemented; full automatic execution is still planned
 
-**Last updated:** 2026-09-12
+**Last updated:** 2026-09-13
 
-**Scope:** Automate the Operations, Development, QA, and Product Owner
-workflows without removing accountable human approval or PostgreSQL authority.
+**Scope:** Execute the [AI-native SDLC expectations](ai-native-sdlc-expectations.md)
+through a shared structural/semantic product KB, scoped MCP capabilities and
+accountable agent roles, while retaining PostgreSQL authority and required decisions.
 
 ## Plain-English summary
 
@@ -32,6 +33,15 @@ The automatic classifier, isolated worktree runner, cloud-disclosure packager,
 webhook relay, scheduled Operations jobs, and enterprise identity/high-
 availability controls are still planned. Do not describe those parts as fully
 automatic yet.
+
+The [product KB implementation](product-knowledge-and-evaluated-sources.md) adds
+versioned product/intent records, bounded source collection and deterministic
+business reconciliation. The wider scope still needs richer lifecycle links,
+native integrations and independently evaluated agent-delivered outcomes. The [15-stage map](sdlc-guide.md#ai-ownership-across-the-lifecycle)
+and [agent responsibility matrix](ai-native-sdlc-expectations.md#accountable-roles-with-different-responsibilities)
+define that target. The checked-in Development Lobster pipeline requires an
+existing packet and patch; the maintenance example runs platform health and
+reindex commands. Neither is a complete product-feature or incident agent.
 
 ## Current implementation and acceptance
 
@@ -111,7 +121,8 @@ OpenClaw integration boundary.
 ## 3. Design invariants
 
 1. PostgreSQL is authoritative for business workflow and approval state.
-2. Milvus contains only approved semantic projections.
+2. Milvus contains eligible derived projections: approved knowledge/definitions
+   and current authorized repository/code records. PostgreSQL hydration remains mandatory.
 3. OpenClaw may propose a transition but the Go service validates it.
 4. Models cannot approve their own output or impersonate a human actor.
 5. Generated KB-entry publication requires an explicit user decision on the
@@ -120,11 +131,13 @@ OpenClaw integration boundary.
 6. Maintenance model inference remains local-only with no Kimi/OpenAI provider
    or cloud fallback; running a client locally does not prove local inference.
 7. Restricted data never enters a cloud-review package.
-8. Confidential cloud disclosure always waits for an authorized human.
+8. Governed atomic tasks with confidential data remain local. A standalone
+   packet's disclosure field or proposed human gate cannot override that route.
 9. Every model call, tool run, patch, context manifest, test result, review, and
    decision is linked by stable workflow/step IDs and immutable artifacts.
-10. Every side effect is idempotent, bounded, cancellable, and has a rollback
-    or compensation instruction.
+10. Every action has bounded scope, effect read-back and idempotency or explicit
+    reconciliation. Cancellation prevents new work; it does not undo committed
+    effects. Record compensation or an accountable recovery decision where needed.
 11. Retries are limited and policy-driven; a model cannot retry indefinitely.
 12. Workflow cancellation is sticky and prevents new work.
 13. Cerbos decides whether an action is authorized; the Go state machine still
@@ -150,6 +163,9 @@ implement as `development`, inspect the independent automated QA evidence as
 acting-role transitions.
 
 The policy object should support:
+
+This is proposed policy configuration. Existing confidential atomic tasks still
+take the local-only route; this example does not grant disclosure authority.
 
 ```json
 {
@@ -218,7 +234,8 @@ Configuration requirements:
 - explicit `allowAgents` containing only Development, QA, and configured review
   agents;
 - `maxSpawnDepth=1` initially;
-- bounded concurrency, preferably two to four local child tasks;
+- one local execution worker and a separately controlled validator initially;
+  increase concurrency only after dependency, isolation and resource evidence;
 - isolated context by default;
 - a workflow ID is required on every agent task.
 
@@ -842,6 +859,9 @@ workflow_id · openclaw_flow_id · task_id · step_id · attempt
 project_id · repository_id · revision · agent_id · role
 provider · model · artifact hashes · approval_id · candidate_id
 cerbos_call_id · policy_version · authorization_decision
+intent/BRS/feature version · incident · delegator · accountable owner
+source/query/schema version · time window/offset/snapshot · classification
+validation/interpretation status · observed effect · partial/denied/failed result
 ```
 
 Metrics:
@@ -859,6 +879,11 @@ Metrics:
 
 Logs must be structured and redacted. Raw prompts, source, review responses, and
 approval previews belong in access-controlled artifacts, not logs.
+
+The [full audit contract](ai-native-sdlc-expectations.md#audit-every-read-write-and-decision)
+applies to reads, writes, handoffs and unsuccessful attempts as well as workflow
+transitions. Existing platform traces are a foundation; uninstrumented client
+work and the proposed external-source adapters require additional coverage.
 
 ## 16. Implementation phases
 
@@ -1025,7 +1050,8 @@ Exit criteria:
 
 ### Controlled live-model evaluation
 
-Run the existing 30-task benchmark across:
+Construct and version the proposed [30-task evaluation set](cost-routing-evaluation.md#evaluation-protocol),
+then run eligible cases across:
 
 1. manual baseline;
 2. local-only automated flow;
@@ -1052,47 +1078,40 @@ operational rollback drill pass. Start with documentation/tests and small
 localized patches. Exclude authentication, authorization, cryptography,
 schema/data migration, production operations, and ambiguous tasks from A4.
 
-## 19. What remains intentionally manual
+## 19. Decisions retained by accountable authorities
 
-Even after full implementation:
+Agents continue authorized routine work. Missing authority and decisions
+reserved by policy still need an accountable actor:
 
 - initial installation, trust bootstrap, and provider authentication;
 - ambiguous requirements and product tradeoffs;
-- confidential disclosure authorization;
+- any permitted change to disclosure policy; current confidential atomic tasks stay local;
 - high-risk security/architecture waivers;
 - Product Owner knowledge promotion;
-- material production side effects;
+- production effects outside delegated action/environment scope;
 - emergency break-glass activation;
 - periodic review of standing orders, scopes, evaluation results, and retained
   knowledge.
 
-One person may perform every human role in `solo` mode. The target is fewer
-repetitive commands and consistent evidence—not removal of human
-accountability or the collapse of distinct workflow gates.
+One person may perform every human role in `solo` mode. Standing task authority
+covers in-scope operator work and validated definitions. Generated KB entries
+retain their explicit exact-version user decision; agents and controllers
+cannot grant themselves that authority.
 
-## 20. First implementation backlog
+## 20. Implementation status and next increments
 
-| Priority | Item | Primary component |
+| Area | Implemented foundation | Remaining increment |
 |---|---|---|
-| P0 | Workflow state/event/approval migration and transition tests | Go/PostgreSQL |
-| P0 | Local principal/token/scope authentication | Go gateway |
-| P0 | Solo/team/regulated project-governance policy | Go/PostgreSQL |
-| P0 | Cerbos PDP, policy-as-code tests, and Go enforcement adapter | Authorization |
-| P0 | Controller-only workflow MCP tools | Go MCP server |
-| P0 | Workflow JSON schemas | `contracts/workflow/v1` |
-| P0 | OpenClaw plugin skeleton and managed Task Flow dry run | TypeScript plugin |
-| P0 | Role agent workspaces, allowlists, and standing orders | OpenClaw config |
-| P1 | Local Development and QA Lobster pipelines | Automation workflows |
-| P1 | Retrieval/context manifest and secret scanner | Go service/CLI |
-| P1 | Human approval preview and resume binding | Plugin + Go service |
-| P1 | Generation/review/candidate workflow linkage | Go/PostgreSQL |
-| P1 | Webhook/outbox event relay with deduplication | Go worker + plugin |
-| P2 | Operations heartbeat/cron programs | OpenClaw automation |
-| P2 | Codex native/ACP bounded harness | OpenClaw integration |
-| P2 | Evaluation dashboard and routing telemetry | Observability |
-| P3 | OIDC, tenant isolation, distributed workers, event bus | Enterprise platform |
+| Authority and workflow | Principal/project roles, Cerbos, workflow/task state, exact-version evidence and delegated Development credentials | [A06](sdlc-gap-assessment.md#a06): extended agent/source capabilities, budgets and isolation; [A11](sdlc-gap-assessment.md#a11): complete audit |
+| Knowledge and context | Approved lessons/definitions, code/repository graph, authoritative hydration and projections | [A01/A04](sdlc-gap-assessment.md#a04): shared product/BRS/feature/incident model, evaluated observations and executable criteria |
+| Execution | Controller mirror, typed contracts, supplied-patch verification and bounded local pilot | [A02/A03/A05](sdlc-gap-assessment.md#a02): durable local worker loop, versioned packages and independent evaluation |
+| Sources and delivery | Existing platform MCP and local build/CI/runbooks | [A07](sdlc-gap-assessment.md#a07): bounded evidence, forge/CI/artifact/environment adapters and effect reconciliation |
+| Operations and learning | Health/reindex/recovery commands and governed pending capture | [A08/A10](sdlc-gap-assessment.md#a08): KB-driven diagnosis, authorized remedy, measured outcome and evaluated feedback |
+| User and deployment | Current status/decision APIs and local deployment | [A09/A12](sdlc-gap-assessment.md#a09): coherent outcome/exception surface, compatible runtime and target trust/recovery |
 
-The next coding milestone is to finish the remaining Phase 1 step/approval
-APIs and event relay, then exercise the Phase 2 controller against a live
-OpenClaw Gateway restart. Autonomous subagents remain disabled until those
-server-enforced contracts pass end-to-end tests.
+The [primary closure order](sdlc-gap-assessment.md#recommended-closure-order)
+governs new implementation work. Start with a compatible local baseline and a
+small shared-KB/source/role/audit slice, then prove one feature and one incident
+through a bounded serial execution loop. The earlier phases describe component
+design history; they are not a claim that already implemented foundations are
+still missing or that general autonomous execution is complete.

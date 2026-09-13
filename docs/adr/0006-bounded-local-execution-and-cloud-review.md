@@ -8,6 +8,11 @@ automatic classification and disclosure packaging remain planned.
 [ADR-0011](0011-scoped-autonomy-and-functional-acceptance.md) adds the current
 publication distinction and validated-reuse completion path.
 
+September 13 scope clarification: the execution boundary is retained for the
+[AI-native target](../ai-native-sdlc-expectations.md). The current controller
+mirrors state and configured clients/workers supply model work; a general
+durable execution supervisor is still [A02 work](../sdlc-gap-assessment.md#a02).
+
 ## Decision
 
 Keep model routing and execution in OpenClaw. Keep the existing MCP gateway

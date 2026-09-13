@@ -26,7 +26,7 @@ The measured adoption criteria and actual deployment inputs are still required.
 
 ## Adaptive Gold applicability
 
-The current data product is reusable software knowledge. Its adaptive output is
+The current implemented data product is reusable software knowledge. Its adaptive output is
 a pending lesson, with immutable source/generation evidence, local validation,
 human approval and verified index publication. That lifecycle is the applicable
 agent-curation mechanism for this release. Agent-created warehouse tables or
@@ -36,6 +36,17 @@ Revisit that boundary when a named consumer needs agent-curated datasets or
 views and can supply authoritative source contracts, a measured evaluation set,
 an accountable owner, retention rules and a withdrawal/rollback procedure. A
 successful two-task lesson pilot alone does not justify a new warehouse layer.
+
+The [agreed AI-native scope](ai-native-sdlc-expectations.md) now identifies the
+broader consumer: agents throughout product delivery and production diagnosis.
+It requires structural/semantic BRS, feature, code and incident context plus
+evaluated log/metric/Kafka/lake/audit observations. These are product requirements
+for implementation; a particular production connector still needs
+its actual source scope, owner, validation, retention and access policy.
+Link that implementation to [A04](sdlc-gap-assessment.md#a04),
+[A06](sdlc-gap-assessment.md#a06), [A07](sdlc-gap-assessment.md#a07) and
+[A11](sdlc-gap-assessment.md#a11), rather than treating operational knowledge as
+permanently outside the product direction.
 
 ## Staged autonomy
 

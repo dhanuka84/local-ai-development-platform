@@ -313,6 +313,8 @@ func (w *Worker) processEffect(ctx context.Context, event domain.OutboxEvent) er
 		return nil
 	case "context.upsert":
 		return w.indexDefinition(ctx, event)
+	case "product.upsert":
+		return w.indexProduct(ctx, event)
 	case "code_graph.project":
 		if w.projector == nil {
 			return nil

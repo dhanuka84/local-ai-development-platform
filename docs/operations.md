@@ -1,6 +1,6 @@
 # Operations Runbook
 
-Updated September 12, 2026. [Documentation index](README.md) ·
+Updated September 13, 2026. [Documentation index](README.md) ·
 [Developer guide](developer-guide.md) · [Functional E2E guide](agent-ready-e2e.md).
 
 Use this document to set up, start, verify, and stop the local platform. The
@@ -17,6 +17,18 @@ which automated stages are ready and which are still planned. The local stack
 includes Cerbos. The Go gateway identifies the caller from its bearer token,
 asks Cerbos whether the action is allowed, and records the policy decision with
 the workflow event. `make authz-policy-test` checks both allow and deny cases.
+
+The [AI-native operations scope](ai-native-sdlc-expectations.md#production-troubleshooting-walkthrough)
+adds KB-driven product diagnosis using BRS, deployed code, historical incidents
+and evaluated log/metric/Kafka/lake/audit evidence. The
+[bounded source registry and reconciliation tools](product-knowledge-and-evaluated-sources.md)
+are implemented. Native connectors and the diagnosis/remediation supervisor
+remain [A07/A08 work](sdlc-gap-assessment.md#a07).
+`ops-logs`, platform health, trace export and the four fixed platform metrics
+inspect this platform; they are not arbitrary production data-source tools.
+Diagnosis and remediation require separate role/action authority, local
+inference, query limits and correlated audit under the
+[access contract](ai-native-sdlc-expectations.md#access-controls-at-every-boundary).
 
 ## Operating model and authentication boundaries
 
@@ -258,7 +270,8 @@ is wanted.
 `make openclaw-start` loads only `CONTROLLER_AUTH_TOKEN` into the OpenClaw
 process. If a systemd or foreground gateway is already reachable, it exits with
 a corrective message instead of competing for the listener. The controller can
-coordinate state and run bounded work, but it cannot perform human QA or
+coordinate state and track bounded work supplied by an execution worker. The
+plugin does not implement a general agent runner and cannot perform human QA or
 Product Owner decisions. An authorized Codex operator session uses `AUTH_TOKEN`
 for operator actions. Standing task authorization covers validated definition
 decisions; generated KB entries stay pending for explicit approval as described below.
@@ -364,12 +377,19 @@ independently backed up, use `make rebuild-fresh` or
 
 ## Candidate approval
 
-Agents can use MCP with an approval prompt. Operators can also use the local CLI:
+Generated KB publication requires the user's explicit decision on the exact
+candidate version, a current matching validation report and operator authority.
+Use the [QA validation procedure](agent-ready-data-operations.md#validate-and-decide)
+first; `review_record` alone does not create the required report. After the
+decision, replace the placeholders below with inspected IDs and a stable key:
 
 ```bash
-make po-candidate-get ID=<candidate-uuid>
-make po-approve ID=<candidate-uuid>
-# or: make po-reject ID=<candidate-uuid>
+make po-candidate-get ID=CANDIDATE_UUID
+make po-approve ID=CANDIDATE_UUID VERSION=1 VALIDATION_ID=VALIDATION_UUID \
+  DECISION_KEY=UNIQUE_DECISION_KEY REASON='User approved this exact validated version'
+# Or reject that version:
+make po-reject ID=CANDIDATE_UUID VERSION=1 \
+  DECISION_KEY=UNIQUE_REJECTION_KEY REASON='Rejected this candidate after review'
 ```
 
 The CLI authenticates `AUTH_TOKEN`, derives the accountable human identity, and

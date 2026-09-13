@@ -1,11 +1,30 @@
 # Project documentation
 
-Updated September 12, 2026. Start with the [developer guide](developer-guide.md)
+Updated September 13, 2026. Start with the [developer guide](developer-guide.md)
 for what the platform does, why it is built this way, and how to change it.
 The [implementation guide](implementation-guide.md) describes the code and
 contracts; the runbooks describe operating an installed stack.
 
+For the product direction, read the
+[AI-native SDLC expectations and scope diagram](ai-native-sdlc-expectations.md):
+a shared structural/semantic product KB, MCP source ingestion, accountable agent
+roles, access controls, audit and KB-driven troubleshooting. The
+[lifecycle guide](sdlc-guide.md) maps agent responsibilities and KB inputs/outputs
+across all 15 stages. The [gap assessment](sdlc-gap-assessment.md) prioritizes
+12 AI-native capability gaps, cross-maps 16 supporting delivery findings, and
+defines the first feature and incident proofs.
+The [product KB and evaluated-source guide](product-knowledge-and-evaluated-sources.md)
+describes the newly implemented subset and its current boundaries.
+The [September 13 scope validation](documentation-scope-validation-20260913.md)
+reviews every repository Markdown document and diagram, records corrected
+guidance, and distinguishes documentation validation from implementation acceptance.
+
 ## Current status
+
+The [September 13 implementation receipt](ai-native-sdlc-implementation-20260913.md)
+records the new product-KB/source slice: 28/28 existing mapped requirements,
+11 suites and 139 passing test/subtest results. Its new tests cover product
+context, source access and accepted-criterion reconciliation.
 
 Local functional acceptance is complete: **28/28 mapped requirements**, across
 **11 suites and 132 passing test/subtest results**, with no failures or skips.
@@ -38,6 +57,9 @@ approves their exact version. See [ADR-0011](adr/0011-scoped-autonomy-and-functi
 |---|---|
 | [Project overview](../README.md) | Purpose, quick start and public tool examples |
 | [Developer guide](developer-guide.md) | What, why, setup, first change, tests and troubleshooting |
+| [AI-native SDLC expectations and scope](ai-native-sdlc-expectations.md) | Product expectations, architecture diagram, two-dimensional KB, MCP sources, agent accountability and incident walkthrough |
+| [AI-native lifecycle guide](sdlc-guide.md) | Agent responsibilities and KB use through 15 stages, current commands and a worked feature example |
+| [Product KB and evaluated sources](product-knowledge-and-evaluated-sources.md) | Versioned records, accepted intent, source setup, field permissions and business reconciliation |
 | [Implementation guide](implementation-guide.md) | Packages, state transitions, data ownership and configuration |
 | [Current technology stack](hybrid-ai-platform-tech-stack.md) | Checked-in choices and their rationale |
 | [Local setup and indexing](local-setup-and-indexing.md) | Workstation setup and multi-repository ingestion |
@@ -69,6 +91,7 @@ approves their exact version. See [ADR-0011](adr/0011-scoped-autonomy-and-functi
 |---|---|
 | [E2E guide](agent-ready-e2e.md) and [coverage map](../tests/agent-ready-coverage.json) | Reproduce acceptance and map every checklist item to executed tests |
 | [Gap checklist](agent-ready-gap-checklist.md) | Functional completion and deferred rollout requirements |
+| [AI-native SDLC gap assessment](sdlc-gap-assessment.md) | 12 primary capability gaps, source evidence, owners, acceptance tests and a KB-first delivery order |
 | [Operating decisions](agent-ready-operating-decisions.md) | Adoption proposals, ownership, retention and deployment inputs |
 | [Cost and routing evaluation](cost-routing-evaluation.md) | Evidence limits and a future representative benchmark |
 | [Agent-ready data plan](agent-ready-data-plan.md) | Design rationale and the dated implementation checkpoint |

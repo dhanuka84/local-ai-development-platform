@@ -8,6 +8,13 @@ This runbook takes a new workstation from Docker access through a fresh GPU
 deployment, local model installation, multi-repository source analysis, and
 verification. Examples deliberately use generic repository and project names.
 
+Repository indexing supplies the code and repository portion of the
+[shared structural/semantic KB](ai-native-sdlc-expectations.md#what-the-two-kb-dimensions-contain).
+It does not ingest all BRS, feature, release, incident or telemetry sources.
+Use the [product KB and source tools](product-knowledge-and-evaluated-sources.md)
+for those record types and bounded adapter views. Native integrations and
+automatic code-to-product links remain [A04/A07 work](sdlc-gap-assessment.md#a04).
+
 ## 1. Install and verify prerequisites
 
 Required tools:

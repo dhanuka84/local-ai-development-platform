@@ -1,8 +1,17 @@
 # Developer guide: what, why and how
 
-Updated September 12, 2026. This guide describes the implementation on
-`fix/agent-ready-gaps-20260910`. Use the [documentation index](README.md) for
+Updated September 13, 2026. This guide describes the implementation at
+`main` revision `9fba87f23f0e733a6bba0528b505f647bbac5aef`. Use the [documentation index](README.md) for
 runbooks, design history and dated evidence.
+
+The [AI-native expectations and scope](ai-native-sdlc-expectations.md) explain
+the shared structural/semantic KB, MCP sources, agent responsibilities, access
+and audit requirements. For KB use and agent execution across discovery,
+requirements, design, implementation, delivery, operations and retirement,
+follow the [lifecycle guide](sdlc-guide.md) and
+[implementation gap assessment](sdlc-gap-assessment.md).
+The [September 13 documentation review](documentation-scope-validation-20260913.md)
+records how current guides and historical records fit this scope.
 
 ## What this project does
 
@@ -42,7 +51,7 @@ storage and HA require target-specific implementation and deployment evidence.
 |---|---|
 | PostgreSQL is authoritative | Approval, versions, audit and outbox changes commit together. A vector hit cannot override a newer SQL record. |
 | AGE and Milvus are projections | Rebuild indexes from canonical records. Preserve PostgreSQL UUIDs and hydrate results before use. |
-| Capture first creates a pending entry | A successful model response or review is insufficient publication evidence. Preserve the exact output without making it reusable automatically. |
+| Capture first creates a pending entry | A successful model response or review is insufficient publication evidence. Capture preserves exact supplied generation bytes; see [capture behavior](implementation-guide.md#capture-and-knowledge-promotion). |
 | Work packets bind a revision, file scope and checks | A patch must apply to the declared source and pass executed validation in a disposable clone. |
 | Provider routes are explicit | Maintenance stays local. A cloud review is conditional, read-only and recorded; there is no silent fallback. |
 | Principals and roles are separate from client prompts | An unattended client still authenticates and passes Cerbos, service and database checks. |

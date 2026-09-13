@@ -9,6 +9,13 @@ Operations jobs and true two-person decision protocol remain planned.
 [ADR-0011](0011-scoped-autonomy-and-functional-acceptance.md) defines current
 task authority, KB publication and validated reuse.
 
+September 13 scope clarification: the [AI-native target](../ai-native-sdlc-expectations.md)
+extends the roles and data-source contracts described here. Approval-only
+retrieval below refers to generated knowledge; code/repository projections
+retain their separate source eligibility. Proposed confidential-disclosure gates
+do not override the current atomic task route, which keeps confidential and
+restricted tasks local.
+
 ## Context
 
 The local platform provides role-oriented Make commands, bounded patch

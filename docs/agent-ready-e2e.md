@@ -1,11 +1,22 @@
 # Agent-ready end-to-end regression tests
 
-Updated September 12, 2026. See the [developer guide](developer-guide.md#test-each-requirement-end-to-end)
+Updated September 13, 2026. See the [developer guide](developer-guide.md#test-each-requirement-end-to-end)
 for adding coverage when implementing a feature.
 
 The [September 12 validation receipt](agent-ready-validation-20260912.md)
 records the completed local run, exact evidence digests and remaining delivery
 prerequisites.
+
+This suite covers the existing 28-item local platform contract. It does not
+certify every expectation in the [AI-native SDLC scope](ai-native-sdlc-expectations.md).
+The [implementation assessment](sdlc-gap-assessment.md#implementation-alignment-with-each-expectation)
+and proposed [feature/incident proofs](sdlc-gap-assessment.md#first-feature-proof)
+identify additional ontology, source-adapter, agent-execution and role/audit
+coverage. Add executable tests as those capabilities ship; preserve the dated
+28/28 result and its deterministic-model boundary. The
+[September 13 implementation receipt](ai-native-sdlc-implementation-20260913.md)
+records the expanded 139-result run, including product context, AGE projection,
+source ingestion, field restrictions and business reconciliation.
 
 Run the full local functional acceptance suite from the implementation checkout:
 
@@ -71,7 +82,7 @@ they are not relabelled as complete deployment tests.
 | L15 | Compatible built gateway, worker, admin and policies in the disposable stack |
 | L16 | Worker durable export queue through the actual collector |
 | L17 | Required checks, contract fixtures and complete coverage mapping |
-| L18 | Disposable startup, gateway/worker restart and new collector export; actual live cutover still requires vault unlock |
+| L18 | Disposable startup, gateway/worker restart and new collector export; actual live cutover requires verified target credentials and source/schema compatibility |
 | E01 | CLI task credential issuance, HTTP revocation, expiry and live authority intersection |
 | E02 | Existing authority and maintenance boundaries; representative timed cohorts and stage decisions remain external |
 | E03 | Pending access, exact validated publication and currently eligible retrieval |

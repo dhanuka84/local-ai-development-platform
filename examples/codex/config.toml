@@ -15,6 +15,9 @@ default_tools_approval_mode = "approve"
 [mcp_servers.hybrid_knowledge.tools.knowledge_candidate_decide]
 approval_mode = "prompt"
 
+[mcp_servers.hybrid_knowledge.tools.product_record_decide]
+approval_mode = "prompt"
+
 # Task authorization covers locally validated domain/capability/metric definitions.
 [mcp_servers.hybrid_knowledge.tools.context_definition_decide]
 approval_mode = "approve"

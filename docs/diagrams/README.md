@@ -1,6 +1,6 @@
 # Project diagrams
 
-Updated September 12, 2026. These are repository-native Mermaid diagrams with
+Updated September 13, 2026. These are repository-native Mermaid diagrams with
 SVG and PNG exports. Use the [developer guide](../developer-guide.md) for the
 full explanation and the [documentation index](../README.md) for current status.
 
@@ -8,6 +8,8 @@ full explanation and the [documentation index](../README.md) for current status.
 
 | View | Mermaid source | SVG | PNG |
 |---|---|---|---|
+| AI-native SDLC expectations and scope (target) | [Source](ai-native-sdlc-scope.mmd) | [SVG](ai-native-sdlc-scope.svg) | [PNG](ai-native-sdlc-scope.png) |
+| Implemented product KB and evaluated sources | [Source](product-knowledge-and-sources.mmd) | [SVG](product-knowledge-and-sources.svg) | [PNG](product-knowledge-and-sources.png) |
 | Implemented local runtime | [Source](hybrid-ai-local-architecture.mmd) | [SVG](hybrid-ai-local-architecture.svg) | [PNG](hybrid-ai-local-architecture.png) |
 | Governed task lifecycle and validated reuse | [Source](hybrid-ai-review-learning-loop.mmd) | [SVG](hybrid-ai-review-learning-loop.svg) | [PNG](hybrid-ai-review-learning-loop.png) |
 | KB entries versus governed definitions | [Source](hybrid-ai-review-learning-explainer.mmd) | [SVG](hybrid-ai-review-learning-explainer.svg) | [PNG](hybrid-ai-review-learning-explainer.png) |
@@ -30,6 +32,15 @@ KB entries. Dashed gray boxes identify optional, conditional or proposed
 components; the text states which. The enterprise diagram is a reference target,
 not a claim of a deployed cluster.
 
+The [AI-native scope view](../ai-native-sdlc-expectations.md#scope-at-a-glance)
+is also a target architecture. It connects all lifecycle stages to the shared
+structural/semantic KB, MCP source and action capabilities, evaluated ingestion,
+role accountability and audit. Its external-source boxes identify integration
+boundaries. The [gap assessment](../sdlc-gap-assessment.md) distinguishes existing
+foundations from the connectors, ontology and execution capabilities to build.
+The [scope validation receipt](../documentation-scope-validation-20260913.md)
+records the documentation and diagram review against those expectations.
+
 Arrows show calls, data movement or lifecycle progression as labeled. A dotted
 connection to a note supplies context. The local diagram shows logical
 components: the application service and analyzer run inside the gateway; AGE
@@ -43,8 +54,10 @@ runs inside PostgreSQL. They are not all separately deployed services.
   checks approval, source, version, project and projection eligibility.
 - Git holds source, policies, contracts and docs. Runtime KB content is in
   PostgreSQL; there is no automatic Git-wiki publication.
-- Exact model output, disclosed-context manifests and validation receipts go
-  into the SHA-256 artifact store. Raw model review is evidence, not approval.
+- Supplied evidence bytes, disclosed-context manifests and validation receipts
+  go into the SHA-256 artifact store. Generation capture preserves original
+  prompt/response whitespace and line endings.
+  Raw model review is evidence, not approval.
 - Generated KB entries require the user's explicit exact-version decision.
   Validated domain/capability/metric definitions may use standing task authority
   under the existing operator roles and recorded validation.
@@ -85,6 +98,7 @@ make diagram-local-to-enterprise
 make diagram-review-loop
 make diagram-agentic-workflow
 make diagram-knowledge-publication
+python3 scripts/render_diagrams.py --name ai-native-sdlc-scope
 ```
 
 A single target updates only its diagram's manifest entry. After changing the

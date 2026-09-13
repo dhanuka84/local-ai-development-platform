@@ -219,11 +219,13 @@ services:
       CODEGRAPH_ENABLED: "true"
       CODEGRAPH_ALLOWED_ROOTS: /workspace
       CODEGRAPH_ANALYZER_CACHE_ROOT: /var/cache/hybrid-analyzer
+      PRODUCT_SOURCE_REGISTRY: /etc/hybrid-ai/product-sources.json
     ports:
       - "127.0.0.1:8080:8080"
     volumes:
       - artifact-data:/var/lib/hybrid-ai/artifacts
       - analyzer-cache:/var/cache/hybrid-analyzer
+      - ${PRODUCT_SOURCE_REGISTRY_HOST_PATH:-../../examples/sources/empty.json}:/etc/hybrid-ai/product-sources.json:ro
       - ${CODEGRAPH_HOST_ROOT:-../..}:/workspace:ro
     secrets:
       - postgres_password

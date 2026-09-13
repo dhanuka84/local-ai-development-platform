@@ -88,6 +88,7 @@ CODEX_MCP_ARGS := \
 	-c 'mcp_servers.hybrid_knowledge.tool_timeout_sec=1200' \
 	-c 'mcp_servers.hybrid_knowledge.default_tools_approval_mode="approve"' \
 	-c 'mcp_servers.hybrid_knowledge.tools.knowledge_candidate_decide.approval_mode="prompt"' \
+	-c 'mcp_servers.hybrid_knowledge.tools.product_record_decide.approval_mode="prompt"' \
 	-c 'mcp_servers.hybrid_knowledge.tools.context_definition_decide.approval_mode="approve"' \
 	-c 'mcp_servers.hybrid_knowledge.tools.repository_relation_upsert.approval_mode="approve"' \
 	-c 'mcp_servers.hybrid_knowledge.tools.code_repository_index.approval_mode="approve"'

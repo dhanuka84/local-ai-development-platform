@@ -17,6 +17,11 @@ var tracer = sdktrace.NewTracerProvider().Tracer("hybrid-ai/platform")
 
 type modelKey struct{}
 type roleKey struct{}
+type accountabilityKey struct{}
+
+func WithAccountability(ctx context.Context, product, owner, delegator string) context.Context {
+	return context.WithValue(ctx, accountabilityKey{}, [3]string{product, owner, delegator})
+}
 
 func WithModel(ctx context.Context, provider, model string) context.Context {
 	return context.WithValue(ctx, modelKey{}, [2]string{provider, model})
@@ -50,6 +55,9 @@ func Start(ctx context.Context, name string, scope domain.OperationScope, refs [
 	if model, ok := ctx.Value(modelKey{}).([2]string); ok {
 		record.Provider = model[0]
 		record.Model = model[1]
+	}
+	if accountability, ok := ctx.Value(accountabilityKey{}).([3]string); ok {
+		record.ProductID, record.AccountableOwner, record.DelegatedBy = accountability[0], accountability[1], accountability[2]
 	}
 	if parent.IsValid() {
 		record.ParentSpanID = parent.SpanID().String()

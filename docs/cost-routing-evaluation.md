@@ -1,9 +1,17 @@
 # Local Execution and Remote Review Evaluation
 
-Updated September 12, 2026. The [developer guide](developer-guide.md) and
+Updated September 13, 2026. The [developer guide](developer-guide.md) and
 [functional E2E guide](agent-ready-e2e.md) describe the tested local behavior.
 This evaluation protocol addresses representative quality, cost and adoption
 claims that remain unmeasured; passing functional tests does not establish them.
+
+This routing protocol is one part of
+[AI-native product and agent evaluation](sdlc-guide.md#evaluate-the-product-and-the-agents).
+The wider [A05/A11 scope](sdlc-gap-assessment.md#a05) requires protected product
+criteria, KB/context quality, source correctness, tool/role compliance,
+independent outcomes, uncertainty, recovery and human intervention measures.
+The 30-task suite below is proposed and must be constructed and versioned;
+it is not an existing benchmark result.
 
 ## Outcome
 
@@ -111,6 +119,12 @@ Record for every run:
 - knowledge candidate and approved item IDs.
 
 ## Acceptance gates
+
+For the broader platform, include the
+[feature and incident proofs](sdlc-gap-assessment.md#first-feature-proof) before
+making SDLC completion claims. Preserve expected outcomes and repeated trials,
+including failures and aborted runs; an agent's success message or several
+model opinions cannot replace independent validation.
 
 The platform may advertise a measured optimization only when:
 

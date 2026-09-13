@@ -78,6 +78,7 @@ func (a *API) register(server *mcp.Server) {
 	addTool(a, server, writeTool("workflow_task_begin", "Queue workflow task", "Queue an atomic task. The FIFO head is activated automatically and performs its governed RAG lookup at activation time."), a.workflowTaskBegin)
 	addTool(a, server, readTool("workflow_task_get", "Get workflow task", "Read an atomic task checkpoint, its RAG route, provider provenance, and current gate."), a.workflowTaskGet)
 	a.registerSemantic(server)
+	a.registerProduct(server)
 	addTool(a, server, writeTool("workflow_task_transition", "Transition workflow task", "Record an evidence-backed local, cloud-review, validation, promotion, read-back, or manual rejection event."), a.workflowTaskTransition)
 }
 

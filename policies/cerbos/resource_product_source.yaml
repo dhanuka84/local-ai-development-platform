@@ -1,0 +1,14 @@
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  resource: product_source
+  version: default
+  variables:
+    local:
+      project: request.principal.attr.project_ids.exists(p, p == "*" || p == request.resource.attr.project_id)
+  rules:
+    - actions: ["query", "read_observation"]
+      effect: EFFECT_ALLOW
+      roles: ["operations", "incident_diagnosis"]
+      condition:
+        match:
+          expr: V.project

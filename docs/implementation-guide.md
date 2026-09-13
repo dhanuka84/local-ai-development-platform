@@ -1,6 +1,6 @@
 # Implementation Guide
 
-Updated September 12, 2026. Start with the [developer guide](developer-guide.md)
+Updated September 13, 2026. Start with the [developer guide](developer-guide.md)
 for the what, why and daily development workflow, or the
 [documentation index](README.md) for current status and evidence.
 
@@ -15,6 +15,22 @@ In simple terms, OpenClaw coordinates work, the Go MCP gateway checks and saves
 requests, PostgreSQL holds the official records, Milvus helps find similar
 approved records, and Ollama runs local models and creates embeddings.
 
+These components are the implemented foundation for the
+[AI-native SDLC scope](ai-native-sdlc-expectations.md). Its shared KB combines
+structural and semantic knowledge throughout the lifecycle. Current contracts
+cover code/repository graphs, governed definitions, approved software knowledge,
+versioned product records, accepted intent and bounded source observations.
+The [product KB guide](product-knowledge-and-evaluated-sources.md) explains the
+new structural/semantic context and business-reconciliation tools. Native
+source bridges and the complete agent execution loop remain tracked in
+[A01–A12](sdlc-gap-assessment.md#primary-ai-native-gaps).
+
+OpenClaw and its execution workers own model-driven execution; the current
+plugin mirrors task state. The Go MCP service owns typed data/action boundaries,
+state validation and authoritative records. The target supervisor must connect
+those responsibilities without introducing a second conflicting router inside
+the retrieval service.
+
 ## Components
 
 | Component | Package/binary | Responsibility |
@@ -27,13 +43,14 @@ approved records, and Ollama runs local models and creates embeddings.
 | GraphRAG orchestration | `internal/graphrag` | Combines semantic seeds, authoritative hydration, graph expansion, ranking, and context limits. |
 | Milvus adapter | `internal/milvus` | Searches approved knowledge, repository links, and selected code symbols by meaning. |
 | Ollama adapter | `internal/ollama` | Creates local embeddings in batches through `/api/embed`. |
-| Artifact store | `internal/artifacts` | Saves exact prompts, outputs, reviews, and context manifests by SHA-256 hash. |
+| Artifact store | `internal/artifacts` | Saves exact supplied evidence bytes by SHA-256 hash, including original generation whitespace and line endings. |
 | Index worker | `cmd/worker` | Claims outbox events safely across replicas, batches embeddings and code-entity upserts, and updates Milvus/graph projections. |
 | Admin CLI | `cmd/admin` | Runs setup, health checks, candidate decisions, repository catalog registration, outbox compaction, and full reindexing. |
 | Work-packet verifier | `cmd/workpacket`, `components/workpacket` | Checks task policy and validates a patch in a disposable clone. |
 | Authorization | `internal/authorization`, `policies/cerbos` | Asks Cerbos whether an authenticated identity may perform an action. |
 | Governed registry | `internal/contextregistry` | Binds domain/capability definitions, fixed metric SQL, contract fixtures and exact registry hashes. |
 | Evidence operations | `internal/telemetry` | Correlates durable events, retention review/hold alerts and optional collector export. |
+| Product context and sources | `internal/domain/product.go`, `internal/sources`, `internal/service/product.go` | Immutable product/intent versions, field-scoped source observations, context and deterministic reconciliation. |
 | Local pilot | `cmd/agent-ready-pilot` | Runs the resumable local-model generation, repair, validation and reuse scenario. |
 | Workflow controller | `automation/openclaw-plugin` | Mirrors managed OpenClaw tasks through MCP without direct database access. |
 
@@ -129,16 +146,19 @@ This is local safety isolation, not a hostile-code sandbox. Run the verifier in
 an egress-denied container/VM with CPU, memory, process, and filesystem limits
 when repositories or validation commands are not fully trusted.
 
-For a policy-allowed RAG miss, OpenClaw sends only a sanitized context package
-after the initial local result. `review_record` captures Codex findings and
+For a policy-allowed RAG miss, the configured client/worker must supply a
+sanitized context package after the initial local result; automatic packaging
+is still planned. `review_record` captures Codex findings and
 stores the exact response plus context manifest as immutable artifacts. Codex
 cannot write the repository or revise the candidate. The
 `CLOUD_REVIEW_RECORDED` checkpoint verifies that both SHA-256 values match the
 PostgreSQL row's candidate, workflow, provider, and model; hashes cannot be
 asserted without the underlying review record. Accepted recommendations
 are reproduced and validated by Ollama. Only an accountable approval queues
-embedding into Milvus. Maintenance and protected-data packets cannot request
-cloud review.
+embedding into Milvus. The governed atomic route keeps maintenance,
+confidential and restricted work local. The standalone packet evaluator allows
+confidential review with a nonempty `cloud_approved_by`; that field does not
+grant disclosure authority or override the atomic route. See [A06](sdlc-gap-assessment.md#a06).
 
 See the [remote-review learning design](remote-review-learning.md), the
 [capability evaluation](cost-routing-evaluation.md), the
@@ -168,7 +188,13 @@ Milvus IDs are PostgreSQL UUIDs. Search first returns vector IDs and scores; the
 - Validation evidence such as test commands and outcomes.
 - Language, tags, summary, and success/partial/failure outcome.
 
-Prompt and response bytes are written to the local content-addressed store before the database transaction. PostgreSQL stores their hashes and locations. It creates a pending knowledge candidate that includes the problem, procedure, response, and validation evidence.
+`Service.Capture` rejects blank prompt/response values without changing valid
+input. It preserves leading/trailing whitespace, line endings and Unicode in
+the content-addressed artifacts and database. PostgreSQL stores the hashes
+and locations and creates a pending candidate with problem, procedure, response
+and validation evidence. An explicit JSON envelope remains useful for a
+structured multi-file output or an older deployed gateway; it is no longer
+needed to work around trimming in the current source.
 
 `review_record` stores reviewer/provider/model provenance. Its `raw_output`
 (falling back to `comments`) and JSON `context_manifest` are stored as
@@ -357,7 +383,7 @@ The reusable analyzer boundary is isolated under `components/codegraph` and MPL-
 
 ## MCP contract and safety
 
-The service uses the official Go MCP SDK. Input and output schemas are inferred from typed structs. Tool annotations distinguish read-only and additive writes. Codex uses `approval_policy = "never"` and `default_tools_approval_mode = "approve"` for assigned local tasks. Definition decisions, repository relationships and indexing use `approve`; `knowledge_candidate_decide` retains `prompt` so generated KB entries stay pending for an explicit user decision. The authenticated operator still needs the relevant roles and exact validation evidence. See [autonomous local operation](operations.md#autonomous-local-operation). `code_repository_index` is registered only when synchronous local analysis is enabled; code search and graph traversal remain available in query-only enterprise gateways.
+The service uses the official Go MCP SDK. Input and output schemas are inferred from typed structs. Tool annotations distinguish read-only and additive writes. Codex uses `approval_policy = "never"` and `default_tools_approval_mode = "approve"` for assigned local tasks. Definition decisions, repository relationships and indexing use `approve`; `knowledge_candidate_decide` and `product_record_decide` retain `prompt` so generated KB entries stay pending for an explicit user decision. The authenticated operator still needs the relevant roles and exact validation evidence. See [autonomous local operation](operations.md#autonomous-local-operation). `code_repository_index` is registered only when synchronous local analysis is enabled; code search and graph traversal remain available in query-only enterprise gateways.
 
 HTTP endpoints:
 
@@ -400,6 +426,7 @@ Important values:
 | `OLLAMA_EMBEDDING_MODEL` | `embeddinggemma` | Must match the configured dimension. |
 | `EMBEDDING_DIMENSION` | `768` | A dimension change requires a new collection name/reindex. |
 | `MILVUS_COLLECTION` | `approved_knowledge_v1` | Version the name when schema/embedding changes. |
+| `PRODUCT_SOURCE_REGISTRY` | empty | Path to operator-controlled source JSON; Compose uses a read-only mount. See the [source guide](product-knowledge-and-evaluated-sources.md#configure-a-source). |
 | `AUTO_APPROVE_LOCAL` | `false` | `true` is rejected in every environment; generated KB entries always start pending. |
 | `SEARCH_LEXICAL_FALLBACK` | `true` | Returns a visible backend marker. |
 | `CODEGRAPH_ENABLED` | `true` locally | Enables the synchronous local indexing tool; defaults false in enterprise mode. |
@@ -443,6 +470,17 @@ Milvus is intentionally versioned by collection name. To change the embedding mo
 
 ## Known boundaries
 
+- Product records, accepted intent, source observations and structural/semantic
+  context are implemented. Automatic code-symbol bridging and richer lifecycle
+  relationships remain [A04](sdlc-gap-assessment.md#a04).
+- The bounded HTTP source protocol needs operator-provided native bridges.
+  Forge/CI/artifact/environment actions and production integrations remain
+  [A07](sdlc-gap-assessment.md#a07). Fixed platform metrics remain separate.
+- Four human role bindings, controller/task identities and validation-executor
+  checks are foundations. The wider agent role matrix, source/field/action
+  scopes and complete read/action audit require [A06](sdlc-gap-assessment.md#a06)
+  and [A11](sdlc-gap-assessment.md#a11). Existing traces do not observe arbitrary
+  client or external-system work.
 - The current local artifact store does not compress blobs; content addressing and permissions are implemented. Enterprise object storage should add encryption, retention, and lifecycle policies.
 - Local bearer principals and Cerbos authorization are implemented. Enterprise
   identity federation, token lifecycle administration, and workload identity

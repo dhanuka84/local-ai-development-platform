@@ -30,5 +30,8 @@ approval_mode = "approve"
 [mcp_servers.hybrid_knowledge_local.tools.knowledge_candidate_decide]
 approval_mode = "prompt"
 
+[mcp_servers.hybrid_knowledge_local.tools.product_record_decide]
+approval_mode = "prompt"
+
 [mcp_servers.hybrid_knowledge_local.tools.context_definition_decide]
 approval_mode = "approve"

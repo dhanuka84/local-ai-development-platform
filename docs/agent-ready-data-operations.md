@@ -7,15 +7,18 @@ Navigation: [Developer guide](developer-guide.md) ·
 This runbook covers validation, quality controls, trace evidence, governed
 semantic metrics, and the two-task acceptance/pilot implementation. The retained
 real-Ollama pilot completed on September 10, including explicit Task A approval
-and locally verified Task B reuse. Metric definitions still need their actual
-validated decisions under the user's standing task authorization; live rollout
-awaits vault unlock. See [autonomous local operation](operations.md#autonomous-local-operation).
+and locally verified Task B reuse. The September 10 receipt retained pending
+definition decisions and a vault-dependent live cutover. Recheck deployment
+capabilities, exact definition versions and current validation before subsequent
+work; that receipt does not establish today's image or schema version. See
+[autonomous local operation](operations.md#autonomous-local-operation).
 Synthetic test
 approvals are not human approval of real knowledge. See
 [the design](agent-ready-data-plan.md) and the
 [real-pilot receipt](agent-ready-pilot-20260906.md).
 The [September 10 recovery receipt](agent-ready-pilot-20260910.md) and
-[gap checklist](agent-ready-gap-checklist.md) carry the current status.
+[gap checklist](agent-ready-gap-checklist.md) preserve that acceptance boundary;
+[G01](sdlc-gap-assessment.md#g01) records the later observed MCP-tool mismatch.
 
 For the current functionality-focused pass, run `make agent-ready-functional`.
 Live cutover, measured adoption and target-specific production requirements are
@@ -30,10 +33,11 @@ fixtures; it does not require the live vault or publish real knowledge.
 
 Apply migrations `000008` through `000018` with the usual migration command,
 then rebuild gateway and worker together. Test the upgrade in a disposable
-database first. These changes have not been applied to the live platform during
-development. The live Cerbos profile bind-mounts and watches `policies/cerbos`,
+database first and inspect the target's actual migration state before cutover.
+The local Cerbos profile bind-mounts and watches `policies/cerbos`,
 so editing policies can reload them even without rebuilding application images.
-The live database was confirmed to remain on migration `000007` at handoff.
+The September 10 handoff recorded migration `000007`; this runbook does not
+assume that observation remains current.
 The [release preparation](agent-ready-release-20260910.md) records a successful
 restore and upgrade of its actual PostgreSQL/AGE backup, plus compatible image
 builds and the remaining credential prerequisite. The new
@@ -230,6 +234,13 @@ configuration, but deploying it to the live platform remains a separate rollout
 item. Its debug exporter is an operational view, not an archival backend.
 
 ## Governed semantic context and metrics
+
+These contracts are one part of the shared product KB. The
+[AI-native ingestion scope](ai-native-sdlc-expectations.md#from-collected-data-to-reusable-knowledge)
+now has [product records and evaluated observation tools](product-knowledge-and-evaluated-sources.md).
+Their bounded HTTP protocol still requires operator-provided native log, metric,
+Kafka, lake and external audit bridges. `generation_capture` remains a pending
+generated-KB path; it is not an automatic observation-publication API.
 
 `context://registry/v1` publishes source-controlled definitions for inspection;
 it does not authorize execution. An authenticated operator with QA authority

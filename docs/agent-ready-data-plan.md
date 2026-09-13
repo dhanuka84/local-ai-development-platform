@@ -8,6 +8,11 @@ available; generated KB entries still require the user’s explicit exact-versio
 decision. The dated checkpoint below preserves its original observations. Start
 new development with the [developer guide](developer-guide.md).
 
+The [AI-native expectations](ai-native-sdlc-expectations.md) and
+[implementation assessment](sdlc-gap-assessment.md) extend this foundation to
+the whole product lifecycle, evaluated operational evidence and accountable
+SDLC agents. The dated five-gap plan below retains its original scope and results.
+
 Track follow-up work and validation evidence in the
 [gap checklist](agent-ready-gap-checklist.md).
 

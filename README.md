@@ -1,12 +1,22 @@
 # Hybrid AI Software Engineering Platform
 
-A local-first platform for software development. OpenClaw coordinates the work,
-Ollama runs local models, and the MCP server gives Codex and other agents one
-safe way to use shared knowledge. Codex and Kimi are optional cloud services.
-The platform never sends work to them as a hidden fallback.
+A local-first foundation for an AI-native SDLC platform centered on shared
+structural and semantic product knowledge. OpenClaw provides workflow
+coordination, Ollama runs local models, and MCP gives agents governed access to
+knowledge and tools. Codex and Kimi are optional cloud services; the platform
+never sends work to them as a hidden fallback.
 
 Start with the [developer guide](docs/developer-guide.md) for what, why and how,
 or the [documentation index](docs/README.md) for every guide and evidence record.
+The [expectations and scope diagram](docs/ai-native-sdlc-expectations.md) define
+the shared KB, MCP source connections, accountable agent roles, access controls
+and audit requirements. The [AI-native lifecycle guide](docs/sdlc-guide.md)
+maps them across 15 stages, and the [gap assessment](docs/sdlc-gap-assessment.md)
+identifies the implementation work needed for that target. The
+[September 13 documentation review](docs/documentation-scope-validation-20260913.md)
+records the file-by-file scope assessment and corrected guidance.
+The new [product KB and evaluated-source guide](docs/product-knowledge-and-evaluated-sources.md)
+covers implemented intent, ingestion, permissions and business-reconciliation tools.
 The September 12 run passed **28/28 local functional requirements**; live rollout
 and enterprise acceptance remain [explicitly deferred](docs/agent-ready-gap-checklist.md).
 
@@ -33,7 +43,9 @@ The repository implements:
 - A headless, compiler-aware Go analyzer for revisioned symbols, calls, references, implementations, imports, and tests.
 - Milvus for derived semantic indexes of approved knowledge, repository relationships, selected code symbols, and graph edges.
 - Ollama for local embeddings and local coding inference.
-- Immutable SHA-256 prompt/output artifacts.
+- Immutable SHA-256 prompt/output artifacts, preserving original whitespace and line endings.
+- Versioned product/BRS/feature/intent knowledge, scoped source observations,
+  local semantic discovery, structural context and exact-criterion reconciliation.
 - An asynchronous indexing worker and administrative CLI.
 - A versioned workflow state machine with authenticated principals, Cerbos
   policy enforcement, immutable transition evidence, and optimistic/idempotent
@@ -176,12 +188,13 @@ make gdrive-check
 make backup-gdrive BACKUP_DATA_CLASSIFICATION=approved-for-encrypted-cloud
 ```
 
-Use `make download-gdrive STAMP=<stamp>` to download, authenticate, decrypt,
+Replace `BACKUP_STAMP` with the chosen bundle's actual timestamp.
+Use `make download-gdrive STAMP=BACKUP_STAMP` to download, authenticate, decrypt,
 and checksum a bundle without changing local volumes. Restore requires the
 additional destructive confirmation:
 
 ```bash
-make restore-gdrive STAMP=<stamp> CONFIRM_RESTORE=<stamp>
+make restore-gdrive STAMP=BACKUP_STAMP CONFIRM_RESTORE=BACKUP_STAMP
 ```
 
 New vaults created by `make env-init` already contain
@@ -566,6 +579,9 @@ observed results, applicability, exclusions, rollback guidance, and outcome
 `generation_capture` stores immutable prompt/output artifacts and creates a
 pending candidate. Model generation or self-review never makes that candidate
 approved knowledge.
+Capture preserves the supplied prompt/response bytes, including boundary
+whitespace and line endings, as described in
+[capture behavior](docs/implementation-guide.md#capture-and-knowledge-promotion).
 
 ### 10. Perform independent QA
 
@@ -573,18 +589,19 @@ First rerun the disposable-clone verifier from the platform repository:
 
 ```bash
 make qa-candidates PROJECT=local-development LIMIT=25
-make qa-candidate-get ID=<candidate-uuid>
+make qa-candidate-get ID=CANDIDATE_UUID
 make qa-patch-verify \
   PACKET=/path/to/task.work-packet.json \
   PATCH=/tmp/task.patch
 ```
 
 Then create a fresh QA worktree at the packet's exact base revision, apply the
-candidate patch, and start a new Codex session there:
+candidate patch, and start a new Codex session there. Replace `BASE_REVISION`
+with the packet's full commit and use the actual repository/worktree paths:
 
 ```bash
 git -C /absolute/path/to/software-repository worktree add --detach \
-  /absolute/path/to/qa-worktree <base-revision>
+  /absolute/path/to/qa-worktree BASE_REVISION
 git -C /absolute/path/to/qa-worktree apply /tmp/task.patch
 
 cd /absolute/path/to/local-ai-development-platform
@@ -598,21 +615,35 @@ Independently review candidate <candidate-uuid> and its patch. Verify scope,
 acceptance criteria, tests, error handling, security implications,
 cross-repository impact, reusable-knowledge quality, and rollback guidance.
 Reproduce the important checks. Call review_record with verdict approve,
-reject, revise, or comment and include the exact validation evidence. Do not
-perform the final knowledge decision.
+reject, or comment and include the exact validation evidence. Request any
+candidate revision through the local Ollama path. Do not perform the final
+knowledge decision.
 ```
 
-A `revise` verdict requires improved content and fresh local validation.
+A `revise` verdict requires `provider=ollama`, improved content and fresh local
+validation. Preserve the actual provider identity; a Codex review cannot
+impersonate that local revision path.
 `review_record` preserves review evidence but cannot publish the candidate.
+
+Publication also requires a current exact-version validation report. Follow
+the [QA validation procedure](docs/agent-ready-data-operations.md#validate-and-decide)
+to execute work-packet checks through the authenticated validation CLI, or
+record an appropriate human attestation through `knowledge_validation_record`.
+Preserve the returned `validation_id`; review feedback alone is insufficient.
 
 ### 11. Make the explicit knowledge decision
 
-After checking QA evidence, applicability, exclusions, and business acceptance:
+After the user's explicit decision on the exact candidate version, check its
+matching QA report, source applicability and exclusions. Replace the uppercase
+placeholders with inspected values; version `1` is illustrative:
 
 ```bash
-make po-candidate-get ID=<candidate-uuid>
-make po-approve ID=<candidate-uuid>
-# Or: make po-reject ID=<candidate-uuid>
+make po-candidate-get ID=CANDIDATE_UUID
+make po-approve ID=CANDIDATE_UUID VERSION=1 VALIDATION_ID=VALIDATION_UUID \
+  DECISION_KEY=UNIQUE_DECISION_KEY REASON='User approved this exact validated version'
+# Or reject that version:
+make po-reject ID=CANDIDATE_UUID VERSION=1 \
+  DECISION_KEY=UNIQUE_REJECTION_KEY REASON='Rejected this candidate after review'
 ```
 
 Approval commits the authoritative PostgreSQL decision and queues local Ollama

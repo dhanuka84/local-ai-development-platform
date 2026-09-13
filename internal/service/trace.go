@@ -42,7 +42,7 @@ func (s *Service) BeginToolOperation(ctx context.Context, name string, input []b
 	if fields.ID != "" && name == "knowledge_get" {
 		fields.KnowledgeID = fields.ID
 	}
-	refs := []domain.EvidenceReference{}
+	refs := []domain.EvidenceReference{{Kind: "tool_input", ID: name, SHA256: domain.Digest(input)}}
 	if fields.KnowledgeID != "" {
 		item, err := s.repository.GetKnowledge(ctx, fields.KnowledgeID, true)
 		if err != nil {

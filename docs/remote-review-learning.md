@@ -1,8 +1,14 @@
 # Remote Review and Local Learning
 
-Updated September 12, 2026. See the [developer guide](developer-guide.md) for
+Updated September 13, 2026. See the [developer guide](developer-guide.md) for
 the daily workflow and [ADR-0011](adr/0011-scoped-autonomy-and-functional-acceptance.md)
 for the distinction between KB-entry and definition publication.
+
+This guide describes the existing review and generated-learning contract within
+the [AI-native lifecycle](sdlc-guide.md). The shared structural/semantic product
+KB and evaluated operational ingestion extend that foundation. General source
+connectors and observation retention remain target work; generated diagnoses
+and lessons retain the exact-version approval path described here.
 
 ## Outcome
 
@@ -37,8 +43,12 @@ editable source is retained at
 | Kimi | Architecture, design, optimization, and long-context advisory review. | Direct knowledge promotion. |
 | MCP gateway | Typed retrieval, capture, evidence, validation, decisions, graph operations and enforcement of activation-time routes. | Model invocation or automatic cloud-package construction. |
 | PostgreSQL | Canonical workflow, provenance, review decisions, graph edges, stable IDs, and outbox. | Approximate semantic ranking. |
-| Artifact CAS | Exact prompt, output, raw review, and context-manifest bytes by SHA-256. | Approval state. |
+| Artifact CAS | Supplied evidence bytes by SHA-256; raw review and context-manifest bytes are preserved. | Approval state. |
 | Milvus | Semantic discovery of approved knowledge and selected graph projections. | Canonical records or pending reviewer prose. |
+
+Generation capture now preserves prompt/response boundary whitespace and line
+endings in both artifacts and stored records. Complete external action and
+agent-handoff audit remains [A11](sdlc-gap-assessment.md#a11).
 
 ## Development workflow
 
@@ -90,6 +100,14 @@ local; every supplied prompt, diff, snippet, or MCP result is a disclosure to
 OpenAI.
 
 ## Maintenance workflow
+
+The [production diagnosis walkthrough](ai-native-sdlc-expectations.md#production-troubleshooting-walkthrough)
+adds bounded source collection and comparison with BRS, deployed code and past
+incidents. Existing maintenance policies and runbooks are foundations for that
+target. The [bounded HTTP source protocol](product-knowledge-and-evaluated-sources.md)
+and observation evaluator are implemented; native log/Kafka/lake/audit bridges
+and the full incident agent remain. Diagnostic read scope stays separate from
+remediation authority.
 
 Maintenance uses the same approved knowledge and exact graphs but stops before
 the cloud-review branch:

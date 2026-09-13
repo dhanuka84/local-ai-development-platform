@@ -1,6 +1,6 @@
 # Security Model
 
-Updated September 12, 2026. Current task authority and publication semantics
+Updated September 13, 2026. Current task authority and publication semantics
 are recorded in [ADR-0011](adr/0011-scoped-autonomy-and-functional-acceptance.md).
 
 ## What this means in practice
@@ -117,6 +117,31 @@ enforcement point, constructs trusted principal/resource context from
 authentication and PostgreSQL, fails protected actions closed, and records the
 Cerbos decision correlation with workflow events.
 
+## Controls required by the AI-native scope
+
+The controls above are the current foundation. The
+[role and access contract](ai-native-sdlc-expectations.md#access-controls-at-every-boundary)
+adds workload/role/delegator/owner attribution, product/source/dataset/field,
+environment, purpose, time and action scope for each SDLC capability. New source
+connectors must enforce bounded queries, redaction, partial-result semantics
+and revocation. Diagnostic reads must not confer deployment, data repair or
+consumer-offset write authority.
+
+The [complete audit contract](ai-native-sdlc-expectations.md#audit-every-read-write-and-decision)
+covers source and KB reads, writes, agent handoffs, decisions, denied requests,
+failures and actual effects. Existing platform traces cannot observe arbitrary
+client or external-system actions. Each added adapter/executor needs durable
+correlation, protected evidence and tests for missing authorization/audit.
+
+Validated source observations require their own ingestion policy, classification
+and source/time lineage. Generated diagnoses, summaries and lessons remain
+pending until relevant validation and explicit exact-version approval; calling
+an inference an observation cannot bypass that gate. Product troubleshooting
+and maintenance inference stay local with no cloud fallback. These requirements
+remain implementation work in [A04](sdlc-gap-assessment.md#a04),
+[A06](sdlc-gap-assessment.md#a06), [A07](sdlc-gap-assessment.md#a07) and
+[A11](sdlc-gap-assessment.md#a11).
+
 ## Production requirements
 
 Before internet or enterprise exposure, add:
@@ -169,3 +194,15 @@ See [Remote Review and Local Learning](remote-review-learning.md) for the full
 evidence and promotion state machine.
 
 Report vulnerabilities according to [SECURITY.md](../SECURITY.md).
+
+## Product sources and retained observations
+
+The [product-source boundary](product-knowledge-and-evaluated-sources.md) uses
+operator-configured endpoints, bounded queries, schema/field validation and
+immutable receipts. Incident Diagnosis has read authority only; it cannot
+reset offsets or redeploy a service. Retaining an observation preserves its
+source access restrictions: every hydration and evaluation checks current
+source/field permissions. Generated product proposals use explicit human
+QA and exact-version decisions, separate from schema-validated observations.
+Native adapters, total task budgets and execution isolation still need their
+explicit target controls.

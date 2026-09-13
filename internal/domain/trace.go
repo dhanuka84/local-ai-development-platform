@@ -22,23 +22,26 @@ type OperationRecord struct {
 	ID          string `json:"id"`
 	OperationID string `json:"operation_id"`
 	OperationScope
-	TraceID        string              `json:"trace_id"`
-	SpanID         string              `json:"span_id"`
-	ParentSpanID   string              `json:"parent_span_id,omitempty"`
-	Name           string              `json:"name"`
-	Phase          string              `json:"phase"`
-	Outcome        string              `json:"outcome"`
-	Actor          string              `json:"actor"`
-	Role           string              `json:"role,omitempty"`
-	InputSHA256    string              `json:"input_sha256"`
-	ResultSHA256   string              `json:"result_sha256,omitempty"`
-	References     []EvidenceReference `json:"references"`
-	PolicyVersion  string              `json:"policy_version,omitempty"`
-	PolicyDecision string              `json:"policy_decision,omitempty"`
-	Provider       string              `json:"provider,omitempty"`
-	Model          string              `json:"model,omitempty"`
-	Rationale      string              `json:"rationale"`
-	RecordedAt     time.Time           `json:"recorded_at"`
+	TraceID          string              `json:"trace_id"`
+	SpanID           string              `json:"span_id"`
+	ParentSpanID     string              `json:"parent_span_id,omitempty"`
+	Name             string              `json:"name"`
+	Phase            string              `json:"phase"`
+	Outcome          string              `json:"outcome"`
+	Actor            string              `json:"actor"`
+	AccountableOwner string              `json:"accountable_owner,omitempty"`
+	DelegatedBy      string              `json:"delegated_by,omitempty"`
+	ProductID        string              `json:"product_id,omitempty"`
+	Role             string              `json:"role,omitempty"`
+	InputSHA256      string              `json:"input_sha256"`
+	ResultSHA256     string              `json:"result_sha256,omitempty"`
+	References       []EvidenceReference `json:"references"`
+	PolicyVersion    string              `json:"policy_version,omitempty"`
+	PolicyDecision   string              `json:"policy_decision,omitempty"`
+	Provider         string              `json:"provider,omitempty"`
+	Model            string              `json:"model,omitempty"`
+	Rationale        string              `json:"rationale"`
+	RecordedAt       time.Time           `json:"recorded_at"`
 }
 type WorkflowTrace struct {
 	WorkflowID string            `json:"workflow_id"`
