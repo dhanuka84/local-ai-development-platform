@@ -2,7 +2,7 @@
 
 **Status:** Core foundation implemented; full automatic execution is still planned
 
-**Last updated:** 2026-08-09
+**Last updated:** 2026-09-12
 
 **Scope:** Automate the Operations, Development, QA, and Product Owner
 workflows without removing accountable human approval or PostgreSQL authority.
@@ -32,6 +32,33 @@ The automatic classifier, isolated worktree runner, cloud-disclosure packager,
 webhook relay, scheduled Operations jobs, and enterprise identity/high-
 availability controls are still planned. Do not describe those parts as fully
 automatic yet.
+
+## Current implementation and acceptance
+
+The [developer guide](developer-guide.md) explains how to change and test the
+implemented controller/service boundary. The September 12
+[functional receipt](agent-ready-validation-20260912.md#functional-acceptance-continuation)
+records 28/28 local requirements across 11 suites and 132 passing test/subtest
+results. Real application binaries, default operator authority, task credentials,
+validation/publication, definitions, freshness, traces and restart behavior are
+covered. Ollama responses in this suite are fixtures; it is not evidence that a
+general autonomous OpenClaw runner or target enterprise cluster is deployed.
+
+Assigned operator work does not require repeated permission prompts. Validated
+domain/capability/metric definitions can be published under standing task
+authority with exact validation and audit evidence. Generated KB entries require
+the user’s explicit exact-version decision; the controller retains its separate
+workload identity. Eligible validated reuse can finish while its new KB entry
+stays pending. [ADR-0011](adr/0011-scoped-autonomy-and-functional-acceptance.md)
+clarifies this scope.
+
+The sections below describe the integration design and proposed automation.
+Task classification, a general isolated agent runner, automatic disclosure
+packaging, webhook relay and scheduled operations remain planned. Deployment
+and adoption criteria are [deferred acceptance](agent-ready-operating-decisions.md),
+not hidden blockers to local feature development. External OpenClaw links are
+design references; executable compatibility is checked against the pinned
+plugin dependency and config fixtures.
 
 ## 1. Design summary
 
@@ -87,9 +114,11 @@ OpenClaw integration boundary.
 2. Milvus contains only approved semantic projections.
 3. OpenClaw may propose a transition but the Go service validates it.
 4. Models cannot approve their own output or impersonate a human actor.
-5. Product Owner promotion remains a human approval in the initial release.
-6. Maintenance remains local-only with no Kimi, OpenAI, Codex, or external
-   browsing route.
+5. Generated KB-entry publication requires an explicit user decision on the
+   exact validated version. Governed definitions use the separately authorized
+   registry decision path under the existing operator roles.
+6. Maintenance model inference remains local-only with no Kimi/OpenAI provider
+   or cloud fallback; running a client locally does not prove local inference.
 7. Restricted data never enters a cloud-review package.
 8. Confidential cloud disclosure always waits for an authorized human.
 9. Every model call, tool run, patch, context manifest, test result, review, and

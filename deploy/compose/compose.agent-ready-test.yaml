@@ -92,6 +92,11 @@ services:
       TEST_MILVUS_ADDRESS: milvus:19530
       TEST_CERBOS_ADDRESS: cerbos:3593
       TEST_OTEL_ENDPOINT: http://otel-collector:4318/v1/traces
+      TEST_AGENT_READY_DISPOSABLE: "true"
+      TEST_BINARY_DIR: /opt/agent-ready-bin
+      TEST_REPOSITORY_REVISION: ${TEST_REPOSITORY_REVISION:?set by agent_ready_acceptance.sh}
+    volumes:
+      - ${AGENT_READY_REPORT_DIR:?set by agent_ready_acceptance.sh}:/evidence
     depends_on:
       postgres: {condition: service_healthy}
       milvus: {condition: service_healthy}

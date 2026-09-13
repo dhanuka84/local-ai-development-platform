@@ -1,5 +1,9 @@
 # Code graph component
 
+Documentation reviewed September 12, 2026. See the
+[developer guide](../../docs/developer-guide.md) and
+[indexing runbook](../../docs/local-setup-and-indexing.md) for integration and checks.
+
 This component converts a checked-out source repository into a deterministic
 graph mapped to its repository name, branch, and exact revision. It is intentionally limited to extraction; PostgreSQL
 ownership, Milvus projection, MCP policy, review workflows, and model routing

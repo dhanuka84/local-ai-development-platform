@@ -1,5 +1,9 @@
 # Role Workflows and Make Commands
 
+Updated September 12, 2026. For the first development task, use the
+[developer guide](developer-guide.md); current acceptance is tracked in the
+[functional checklist](agent-ready-gap-checklist.md).
+
 ## Purpose
 
 This guide groups commands by responsibility. The role prefix shows which
@@ -12,6 +16,13 @@ make help-development
 make help-qa
 make help-product-owner
 ```
+
+For an assigned local task, these roles can be exercised under standing user
+authorization without repeated confirmation. Validated domain/capability/metric
+definitions may be published using the existing operator roles and exact
+validation evidence. Generated KB entries require the user's explicit decision
+on the exact candidate version. See
+[autonomous local operation](operations.md#autonomous-local-operation).
 
 The aliases do not grant permission by themselves. In the default `solo`
 profile, one authenticated person may perform Operations, Development, QA, and
@@ -163,9 +174,9 @@ make dev-session-local-repo REPO=/absolute/path/to/repository
 
 The local targets explicitly select `ollama/$LOCAL_CHAT_MODEL` and print the
 route before Codex starts. The startup banner (`provider: ollama`) and the
-inference smoke test prove local model inference. Codex CLI `0.147.0` defers MCP
-tool schemas, and local Qwen did not reliably invoke those deferred tools in
-validation. Use the standard Codex session or the OpenClaw local route when the
+inference smoke test prove local model inference. The retained experiment with Codex CLI `0.147.0` found deferred MCP
+tool schemas that local Qwen did not reliably invoke. The September 12 launcher
+checks cover configuration and arguments, not a new model tool-use experiment. Use the standard Codex session or the OpenClaw local route when the
 task requires `hybrid_knowledge` tools.
 
 Inside the governed OpenClaw flow, Development calls `workflow_task_begin` for
@@ -180,6 +191,8 @@ make dev-patch-verify \
   PACKET=/path/to/work-packet.json \
   PATCH=/path/to/candidate.patch
 make dev-check
+# Required for changed agent-ready functional behavior:
+make agent-ready-functional
 # Required when `policies/cerbos` changes:
 make dev-authz-policy-test
 ```
@@ -194,7 +207,9 @@ work packet, patch/diff, and evidence to QA. In `team` or
 later decisions. In `solo` mode, the same person may continue only by entering
 the separate QA and Product Owner transitions with the required evidence.
 
-After Product Owner approval and outbox indexing, Development records
+For validated reuse, record eligible context use and a trusted validation ID,
+then complete with `VALIDATED_REUSE_COMPLETED`; the new KB entry stays pending.
+For new KB publication, after the explicit user decision and outbox indexing, Development records
 `RAG_READBACK_VERIFIED`. The next queued task activates automatically. Product
 Owner or Operations may explicitly reject a queued task with `TASK_REJECTED`;
 normal waiting never uses rejection.
@@ -285,6 +300,8 @@ make dev-session-repo REPO=/absolute/path/to/repository
 make dev-policy-check PACKET=/path/to/work-packet.json
 make dev-patch-verify PACKET=/path/to/work-packet.json PATCH=/path/to/candidate.patch
 make dev-check
+# Required for changed agent-ready functional behavior:
+make agent-ready-functional
 
 # Acting as QA in a clean checkout/session
 make qa-patch-verify PACKET=/path/to/work-packet.json PATCH=/path/to/candidate.patch

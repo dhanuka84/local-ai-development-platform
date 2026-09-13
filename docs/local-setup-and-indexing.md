@@ -1,5 +1,9 @@
 # Local setup and multi-repository indexing
 
+Updated September 12, 2026. For application development without a persistent
+stack, start with the [developer guide](developer-guide.md) and run
+`make agent-ready-functional`; it requires no live vault or model service.
+
 This runbook takes a new workstation from Docker access through a fresh GPU
 deployment, local model installation, multi-repository source analysis, and
 verification. Examples deliberately use generic repository and project names.
@@ -10,7 +14,8 @@ Required tools:
 
 - Docker Engine with Compose v2
 - Git
-- Codex CLI
+- Python 3 with `requirements/vault.txt` installed for vault-backed commands
+- Codex CLI only when using the Codex client routes
 - GitHub CLI (`gh`) when cloning every repository owned by one account or
   organization
 - A supported NVIDIA driver and NVIDIA Container Toolkit for GPU mode

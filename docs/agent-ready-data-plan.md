@@ -1,5 +1,13 @@
 # Agent-ready data: design and implementation plan
 
+Current guidance, September 12, 2026: local functional acceptance is complete
+for all 28 mapped requirements. Broader rollout/adoption remains deferred in the
+[checklist](agent-ready-gap-checklist.md). Validated definitions may be published
+under standing task authority once authenticated access and current evidence are
+available; generated KB entries still require the user’s explicit exact-version
+decision. The dated checkpoint below preserves its original observations. Start
+new development with the [developer guide](developer-guide.md).
+
 Track follow-up work and validation evidence in the
 [gap checklist](agent-ready-gap-checklist.md).
 
@@ -147,23 +155,12 @@ successfully repeated through the gateway using its existing credential;
 
 ## 2. Architecture and invariants
 
-```mermaid
-flowchart TD
-    A[Bounded local development task] --> B[Pending candidate and immutable source manifest]
-    B --> C[Local verification and recorded QA evidence]
-    C --> D[Authenticated human promotion decision]
-    D --> E[PostgreSQL approved version and transactional outbox]
-    E --> F[Local indexing and version read-back]
-    F --> G[PostgreSQL eligibility and scope checks]
-    G --> H[Retrieval or governed metric query]
-    H --> I[Next task with explicit evidence of reuse]
-    C --> J[Quality review queue]
-    G --> J
-    K[Correlated events, artifacts and OpenTelemetry spans] -.-> C
-    K -.-> D
-    K -.-> G
-    K -.-> I
-```
+![Current KB-entry and governed-definition publication paths](diagrams/hybrid-ai-review-learning-explainer.png)
+
+The [task lifecycle diagram](diagrams/hybrid-ai-review-learning-loop.png) also
+shows validated reuse completing while its new candidate remains pending.
+The [local architecture](diagrams/hybrid-ai-local-architecture.png) shows the
+actual service and storage boundaries.
 
 PostgreSQL remains the authority. AGE and Milvus remain rebuildable projections.
 The existing Go service, worker, Cerbos policies, and OpenClaw adapter are

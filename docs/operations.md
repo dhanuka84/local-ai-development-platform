@@ -1,5 +1,8 @@
 # Operations Runbook
 
+Updated September 12, 2026. [Documentation index](README.md) ·
+[Developer guide](developer-guide.md) · [Functional E2E guide](agent-ready-e2e.md).
+
 Use this document to set up, start, verify, and stop the local platform. The
 commands are safe defaults for a single developer. Team and regulated identity
 options are explained after the local setup. For unfamiliar terms, use the
@@ -22,16 +25,18 @@ security boundaries. Do not reuse one credential for another service.
 
 | Boundary | Credential | Required for this deployment | Billing/data boundary |
 |---|---|---:|---|
-| Codex CLI -> OpenAI models | ChatGPT sign-in | Yes for the recommended Codex workflow | Uses the signed-in ChatGPT account/workspace entitlements and limits. It does not require OpenAI Platform API-key billing. |
+| Codex CLI -> OpenAI models | ChatGPT sign-in | Only for the explicitly selected cloud Codex route | Uses the signed-in ChatGPT account/workspace entitlements and limits. It does not require OpenAI Platform API-key billing. |
 | Codex CLI -> local MCP gateway | `HYBRID_AI_MCP_TOKEN` in the Codex process | Yes in HTTP mode | Local bearer secret; it must equal the gateway's vault-backed `AUTH_TOKEN`. It is not an OpenAI token and has no model-usage charge. |
 | OpenClaw -> local MCP gateway | `CONTROLLER_AUTH_TOKEN` | Yes for orchestration | Separate non-human controller identity. It cannot perform QA/Product Owner human gates. |
 | OpenClaw -> Kimi cloud | Moonshot/Kimi API key | Only for an explicitly selected cloud-review workflow | Moonshot cloud billing and disclosure boundary. Store it through OpenClaw's provider onboarding, not in this repository's `.env`. |
 | OpenClaw -> Ollama | No real cloud credential | Yes for local inference | Local-machine inference. A provider may require a non-secret placeholder such as `OLLAMA_API_KEY=ollama-local`. |
 
 This runbook uses ChatGPT sign-in for Codex, so `OPENAI_API_KEY` is not needed.
-Codex still uses a cloud model even though its CLI runs locally and connects to
-the local MCP server. Local-only maintenance must use OpenClaw and Ollama, not
-Codex or Kimi.
+The standard Codex target uses a cloud model even though the CLI and MCP server
+run locally. The explicit `codex-local` targets select Ollama; their launcher
+configuration is tested, while deferred MCP tool use remains a version-specific
+limitation. Use the OpenClaw/Ollama route for governed local maintenance and
+never introduce a cloud fallback. See the [developer guide](developer-guide.md).
 
 See the official [Codex authentication](https://learn.chatgpt.com/docs/auth) and [Codex MCP](https://learn.chatgpt.com/docs/extend/mcp) documentation.
 
@@ -254,8 +259,9 @@ is wanted.
 process. If a systemd or foreground gateway is already reachable, it exits with
 a corrective message instead of competing for the listener. The controller can
 coordinate state and run bounded work, but it cannot perform human QA or
-Product Owner decisions. Use `make codex` or another local human approval
-surface with `AUTH_TOKEN` at those gates.
+Product Owner decisions. An authorized Codex operator session uses `AUTH_TOKEN`
+for operator actions. Standing task authorization covers validated definition
+decisions; generated KB entries stay pending for explicit approval as described below.
 
 An OpenClaw systemd user service installed outside this workflow does not
 inherit the project `.env`. `make platform-status` inspects that service's
@@ -265,6 +271,68 @@ controller credential is absent. Stop the service with
 dedicated terminal.
 
 Use the `developer` agent for local development with explicit cloud-review escalation. Use the `maintenance` agent for local-only operation; its one-model per-agent catalog and empty fallbacks prevent Kimi or Codex model selection, including stored session overrides. Configure the Moonshot credential only in the `cloud-review` provider/agent through interactive OpenClaw onboarding. Do not put the Moonshot key in `.env`, Codex configuration, shell history, or the MCP service.
+
+## Autonomous local operation
+
+The default vault-backed `AUTH_TOKEN` authenticates `human:local-developer` with
+`development`, `qa`, `product_owner`, and `operations` roles across local
+projects. The `development` role on its own is narrower. Custom principals and
+project bindings retain their configured limits. An assigned task authorizes
+the agent to use the operator's existing roles for necessary local work,
+including validated domain, capability, and metric definition publication,
+without asking again for each action. Generated KB entries stay pending for an
+explicit user decision even though this account has permission to publish them.
+
+The pilot calls generated KB entries "lessons": validated fixes, procedures or
+reusable guidance captured with `generation_capture`. They are entries in the
+existing KB. Domain/capability/metric definitions describe the platform's
+vocabulary, operations and governed metric formulas.
+
+The project Codex configuration, HTTP/STDIO examples, and all four
+`codex`/`codex-repo`/`codex-local`/`codex-local-repo` launchers use
+`approval_policy = "never"`. The local MCP server's default, definition
+decisions, repository relationships and indexing use `approve`.
+`knowledge_candidate_decide` retains `prompt`; autonomous sessions must leave
+generated KB entries pending and continue other work. These settings are documented in
+the [OpenAI configuration reference](https://learn.chatgpt.com/docs/config-file/config-reference)
+and [MCP guide](https://learn.chatgpt.com/docs/extend/mcp?surface=cli).
+They apply when configuration is loaded for a new session; project settings
+require a trusted checkout. The launchers also supply process overrides.
+
+Capture reusable outcomes as pending KB entries with their validation evidence.
+Do not publish those entries under general task authorization. When the user
+explicitly approves an exact candidate version, check its validation and source
+freshness before recording the decision through `knowledge_candidate_decide`.
+For autonomous registry definition publication, use
+`context_registry_validate` followed by `context_definition_decide` for each
+exact version/digest. Include the validation ID and a reason identifying the
+user-delegated task. This records delegated operator execution; it must not be
+described as the user manually reviewing each item. `AUTO_APPROVE_LOCAL` stays
+false because unconditional publication on capture lacks these checks.
+
+The pilot executable returns at its KB-entry decision step. Continue independent
+work while that entry stays pending. After an explicit user decision, an
+authorized operator session can record the exact decision and
+`LEARNING_PROMOTED`, and resume the pilot. OpenClaw
+continues to use its separate controller credential. Gateway authorization,
+database invariants, source checks, and audit records enforce the same gates.
+
+Missing credentials, real observation windows, named deployment owners, and
+target-environment requirements remain factual prerequisites. Record them and
+continue independent tasks; do not manufacture evidence or count synthetic
+approvals as publication of real records. Maintenance remains local-model-only.
+
+## Functional acceptance without live credentials
+
+Run `make agent-ready-functional` from the implementation checkout. It provisions
+its own disposable PostgreSQL/AGE, Milvus, Cerbos and collector, builds the actual
+application binaries and retains a per-requirement report. It needs no live vault
+or model credentials. `make check` remains required but does not replace E2E.
+
+The [current checklist](agent-ready-gap-checklist.md) separates tested local
+functionality from live cutover, adoption and enterprise prerequisites. Missing
+runtime access does not justify disabling authentication or overwriting a vault.
+Retention emits review/hold alerts; it does not delete evidence.
 
 ## Normal checks
 

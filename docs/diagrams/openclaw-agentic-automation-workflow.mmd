@@ -1,118 +1,42 @@
 ---
-title: OpenClaw Agentic Automation — Local-First Execution with Human Governance
+title: OpenClaw integration · implemented authority and planned execution
 ---
-%%{init: {"theme": "base", "themeVariables": {"fontFamily": "Inter, Arial, sans-serif", "fontSize": "20px", "primaryTextColor": "#172033", "lineColor": "#334155", "edgeLabelBackground": "#ffffff"}, "themeCSS": ".edge-thickness-normal { stroke-width: 4px !important; } .marker path { fill: context-stroke !important; stroke: context-stroke !important; } #my-svg-1-HUMAN-GATES, #my-svg-1-TRIGGER-CONTROLLER { stroke: #2563eb !important; } #my-svg-1-CONTROLLER-TASKFLOW, #my-svg-1-TASKFLOW-CHECKPOINT, #my-svg-1-GATES-CHECKPOINT { stroke: #7c3aed !important; } #my-svg-1-CONTROLLER-LOCAL, #my-svg-1-LOCAL-ROUTE, #my-svg-1-ROUTE-CALLS, #my-svg-1-CHECKPOINT-CALLS { stroke: #ea580c !important; } #my-svg-1-CALLS-MCP, #my-svg-1-POLICIES-CERBOS, #my-svg-1-CERBOS-MCP { stroke: #dc2626 !important; } #my-svg-1-MCP-POSTGRES, #my-svg-1-MCP-ARTIFACTS { stroke: #047857 !important; } #my-svg-1-POSTGRES-OUTBOX, #my-svg-1-OUTBOX-EMBEDDING, #my-svg-1-EMBEDDING-MILVUS { stroke: #65a30d !important; }"}}%%
-block
-  columns 1
+%%{init: {"theme":"base","themeVariables":{"fontFamily":"Arial, sans-serif","fontSize":"16px","primaryTextColor":"#14263d","lineColor":"#53677f","edgeLabelBackground":"#ffffff"},"flowchart":{"curve":"basis","htmlLabels":true,"nodeSpacing":28,"rankSpacing":40},"fontFamily":"Arial, sans-serif","themeCSS":".nodeLabel, .edgeLabel, .cluster-label, .flowchartTitleText { font-family: Arial, sans-serif !important; }"}}%%
+flowchart TB
+    USER["Assigned task<br/>operator authority already established"]:::client
+    OC["OpenClaw TypeScript controller<br/>managed Task Flow adapter<br/>separate controller token"]:::client
+    MCP["Go MCP service<br/>workflow + FIFO task checkpoints<br/>version checks and idempotency"]:::service
+    PDP["Cerbos<br/>trusted identity + project + resource"]:::gate
+    DB[("PostgreSQL authority<br/>workflow events · exact evidence<br/>decisions · outbox")]:::data
+    LOCAL["Bounded local execution contract<br/>Ollama + work-packet/v1<br/>independent patch verifier"]:::local
+    REVIEW["Conditional read-only review<br/>allowed development miss only<br/>local reproduction of findings"]:::target
+    VERIFY["Trusted validation evidence<br/>exact version, revision and context"]:::service
+    DEF["Validated domain/capability/metric definitions<br/>operator's delegated task authority<br/>registry validation + exact decision"]:::service
+    KB["Generated KB entry<br/>pending until explicit user decision<br/>approved entry → worker → Milvus read-back"]:::pending
+    REUSE["Eligible validated reuse<br/>task completes<br/>new candidate remains pending"]:::done
+    FUTURE["Still planned<br/>general classifier + isolated agent runner<br/>automatic disclosure packaging<br/>webhook relay + scheduled operations"]:::target
+    USER --> OC --> MCP
+    MCP --> PDP
+    MCP --> DB
+    OC -->|execution contract| LOCAL
+    LOCAL -.->|when allowed| REVIEW
+    LOCAL --> VERIFY
+    REVIEW -->|apply locally then validate| VERIFY
+    VERIFY --> MCP
+    USER -->|authenticated operator, not controller| DEF
+    DEF --> MCP
+    MCP --> KB
+    MCP --> REUSE
+    OC -.- FUTURE
+    NOTE["Controller cannot inherit the operator's QA/Product Owner roles.<br/>Client unattended settings do not override server policy.<br/>Maintenance inference remains local with no cloud fallback."]:::gate
+    PDP -.- NOTE
 
-  block:top
-    columns 5
-    block:request
-      columns 1
-      H1["1 · REQUEST AND ACCOUNTABILITY"]
-      TRIGGER["Task trigger<br/><b>manual · Git/CI · webhook · cron</b>"]
-      HUMAN["Authenticated human<br/><b>solo:</b> one developer holds all roles<br/><b>team/regulated:</b> separation by policy"]
-      GATES["Human-only decisions<br/><b>QA · Product Owner · disclosure · Operations</b>"]
-    end
-
-    space
-
-    block:orchestrate
-      columns 1
-      H2["2 · OPENCLAW ORCHESTRATION"]
-      CONTROLLER["Workflow-controller plugin<br/><b>prepare · track · stop safely</b>"]
-      TASKFLOW["Durable orchestration<br/><b>Managed Task Flow + Lobster</b><br/>save progress · limit retries · resume safely"]
-      CHECKPOINT["Workflow checkpoint<br/><b>wait for the required human role</b>"]
-    end
-
-    space
-
-    block:execute
-      columns 1
-      H3["3 · BOUNDED EXECUTION AND REVIEW"]
-      LOCAL["Local execution lanes<br/><b>Development · independent QA · Maintenance</b><br/>Ollama · isolated worktree · bounded packet"]
-      ROUTE["Policy-selected review path<br/><b>local-only OR sanitized Kimi/Codex review</b>"]
-      CALLS["Authenticated MCP actions<br/><b>controller scope · human role scope · evidence only</b>"]
-    end
-  end
-
-  block:trust
-    columns 5
-    POLICIES[("4A · GIT POLICY BUNDLE<br/><b>permissions · deny tests</b>")]
-    space
-    CERBOS["4B · CERBOS DECISION<br/><b>ALLOW / DENY</b><br/>contextual policy · call ID"]
-    space
-    MCP["4C · GO MCP GATEWAY<br/><b>check identity · load context · authorize · validate</b>"]
-    SPLIT["Clear responsibilities<br/><b>OpenClaw:</b> chooses the next step<br/><b>Cerbos:</b> decides who may act<br/><b>Go:</b> allows valid state changes<br/><b>PostgreSQL:</b> saves the official record"]
-    space
-    ARTIFACTS[("Immutable artifacts<br/>patches · manifests · checks · reviews")]
-    space
-    POSTGRES[("PostgreSQL authority<br/><b>roles · tasks · code graph · official record</b><br/>evidence · versions · approvals · outbox")]
-    MILVUS[("Milvus semantic discovery<br/><b>approved items only</b><br/>queried through MCP · stable PostgreSQL IDs")]
-    space
-    EMBEDDING["Local Ollama<br/>embedding"]
-    space
-    OUTBOX["5 · APPROVED LEARNING<br/>Idempotent outbox worker"]
-  end
-
-  HUMAN --> GATES
-  TRIGGER --> CONTROLLER
-  CONTROLLER --> LOCAL
-  CONTROLLER --> TASKFLOW
-  TASKFLOW --> CHECKPOINT
-  LOCAL --> ROUTE
-  ROUTE --> CALLS
-  GATES --> CHECKPOINT
-  CHECKPOINT --> CALLS
-  CALLS --> MCP
-
-  POLICIES --> CERBOS
-  CERBOS --> MCP
-  MCP --> POSTGRES
-  MCP --> ARTIFACTS
-  POSTGRES --> OUTBOX
-  OUTBOX --> EMBEDDING
-  EMBEDDING --> MILVUS
-
-  classDef header fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#172554,font-size:22px,font-weight:bold;
-  classDef trigger fill:#e0f2fe,stroke:#0284c7,stroke-width:2px,color:#0c4a6e;
-  classDef human fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#78350f;
-  classDef gate fill:#ffedd5,stroke:#ea580c,stroke-width:2px,color:#7c2d12;
-  classDef openclaw fill:#f5f3ff,stroke:#8b5cf6,stroke-width:2px,color:#3b0764;
-  classDef openclawStrong fill:#ede9fe,stroke:#6d28d9,stroke-width:3px,color:#3b0764;
-  classDef local fill:#ccfbf1,stroke:#0f766e,stroke-width:2px,color:#134e4a;
-  classDef cloud fill:#fce7f3,stroke:#db2777,stroke-width:2px,color:#831843;
-  classDef gatewayLight fill:#eff6ff,stroke:#3b82f6,stroke-width:2px,color:#1e3a8a;
-  classDef gateway fill:#dbeafe,stroke:#1d4ed8,stroke-width:3px,color:#172554;
-  classDef authz fill:#fee2e2,stroke:#dc2626,stroke-width:3px,color:#7f1d1d;
-  classDef database fill:#e0e7ff,stroke:#4338ca,stroke-width:3px,color:#312e81;
-  classDef storage fill:#f3e8ff,stroke:#9333ea,stroke-width:2px,color:#581c87;
-  classDef git fill:#f1f5f9,stroke:#475569,stroke-width:2px,color:#0f172a;
-  classDef worker fill:#ecfccb,stroke:#65a30d,stroke-width:2px,color:#365314;
-  classDef vector fill:#cffafe,stroke:#0891b2,stroke-width:3px,color:#164e63;
-  classDef note fill:#fff7ed,stroke:#c2410c,stroke-width:2px,stroke-dasharray:8 5,color:#7c2d12;
-
-  class H1,H2,H3 header
-  class TRIGGER trigger
-  class HUMAN human
-  class GATES gate
-  class CONTROLLER openclawStrong
-  class TASKFLOW openclaw
-  class CHECKPOINT gate
-  class LOCAL,EMBEDDING local
-  class ROUTE cloud
-  class CALLS gatewayLight
-  class MCP gateway
-  class CERBOS authz
-  class POSTGRES database
-  class ARTIFACTS storage
-  class POLICIES git
-  class OUTBOX worker
-  class MILVUS vector
-  class SPLIT note
-
-  style request fill:#ffffff,stroke:#ffffff,stroke-width:0px
-  style orchestrate fill:#ffffff,stroke:#ffffff,stroke-width:0px
-  style execute fill:#ffffff,stroke:#ffffff,stroke-width:0px
-  style top fill:#ffffff,stroke:#ffffff,stroke-width:0px
-  style trust fill:#ffffff,stroke:#ffffff,stroke-width:0px
+    classDef client fill:#e0e7ff,stroke:#6366f1,color:#25265e,stroke-width:2px;
+    classDef service fill:#e8f1ff,stroke:#3574bd,color:#142f54,stroke-width:2px;
+    classDef local fill:#e5f5eb,stroke:#33845e,color:#163e2a,stroke-width:2px;
+    classDef data fill:#e0f2fe,stroke:#237895,color:#113d50,stroke-width:2px;
+    classDef evidence fill:#f1e8ff,stroke:#8860b5,color:#422760,stroke-width:2px;
+    classDef gate fill:#fff1d6,stroke:#b58128,color:#60440e,stroke-width:2px;
+    classDef pending fill:#fff0e9,stroke:#bf7350,color:#743820,stroke-width:2px;
+    classDef target fill:#f4f5f7,stroke:#778395,color:#374357,stroke-width:2px,stroke-dasharray:5 4;
+    classDef done fill:#d6f5e3,stroke:#268458,color:#16472e,stroke-width:3px;

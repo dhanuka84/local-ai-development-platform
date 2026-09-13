@@ -1,5 +1,9 @@
 # Hybrid Workflow Controller for OpenClaw
 
+Updated September 12, 2026. See the [developer guide](../../docs/developer-guide.md)
+and [integration plan](../../docs/openclaw-agentic-automation-plan.md) for
+implemented boundaries and the remaining execution automation proposals.
+
 This plugin mirrors OpenClaw managed Task Flow state to the authoritative Go
 MCP/PostgreSQL workflow service. It never calls PostgreSQL, Cerbos, Milvus, or
 model providers directly.
@@ -9,7 +13,9 @@ The plugin exposes workflow tools plus `hybrid_task_queue`,
 `executionMode: "auto"`: an allowed RAG miss proceeds to read-only cloud review
 without a manual acceptance prompt. `manual` mode is explicit and pauses before
 review. PostgreSQL activates only the FIFO head and the MCP service enforces all
-provider, validation, promotion, and Milvus read-back gates.
+provider, validation, promotion, and Milvus read-back gates. Validated reuse
+has a separate completion event that leaves the new KB entry pending; the
+controller does not gain publication authority.
 
 Build and test:
 
@@ -24,5 +30,8 @@ Set the configured controller token environment variable before starting the
 OpenClaw Gateway. The default local setup uses the separate
 `CONTROLLER_AUTH_TOKEN` workload principal with the `controller` role. Never
 give OpenClaw the human `AUTH_TOKEN`: the all-roles solo developer uses that
-credential in Codex or another local human approval surface to exercise
-Development, QA, Product Owner, and Operations gates explicitly.
+credential in an authorized Codex operator session to exercise Development, QA,
+Product Owner, and Operations gates. Standing task authorization permits
+validated definition publication; generated KB entries stay pending for an explicit
+user decision. See
+[autonomous local operation](../../docs/operations.md#autonomous-local-operation).

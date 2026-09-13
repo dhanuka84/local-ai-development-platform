@@ -1,116 +1,40 @@
 ---
-title: Local-to-Enterprise Evolution — Stable Contracts and Scale-Out Boundaries
+title: Local functionality to enterprise deployment · evidence at each step
 ---
-%%{init: {
-  "theme": "base",
-  "themeVariables": {
-    "fontFamily": "Inter, ui-sans-serif, system-ui, sans-serif",
-    "fontSize": "16px",
-    "primaryTextColor": "#172033",
-    "lineColor": "#526178",
-    "edgeLabelBackground": "#ffffff"
-  },
-  "flowchart": {
-    "defaultRenderer": "elk",
-    "curve": "basis",
-    "htmlLabels": true,
-    "nodeSpacing": 45,
-    "rankSpacing": 60
-  }
-}}%%
+%%{init: {"theme":"base","themeVariables":{"fontFamily":"Arial, sans-serif","fontSize":"16px","primaryTextColor":"#14263d","lineColor":"#53677f","edgeLabelBackground":"#ffffff"},"flowchart":{"curve":"basis","htmlLabels":true,"nodeSpacing":28,"rankSpacing":40},"fontFamily":"Arial, sans-serif","themeCSS":".nodeLabel, .edgeLabel, .cluster-label, .flowchartTitleText { font-family: Arial, sans-serif !important; }"}}%%
 flowchart LR
-
-    subgraph LOCAL["1 · LOCAL PROFILE · ONE GBX100"]
+    subgraph LOCAL["1 · LOCAL FUNCTIONAL ACCEPTANCE"]
         direction TB
-        LCLIENT["Codex + IDE + OpenClaw"]:::local
-        LMCP["One MCP gateway"]:::local
-        LANALYZER["Organization catalog + code analyzer<br/>explicit branch override · compiler-aware"]:::local
-        LAGENT["Local agent and workers"]:::local
-        LMODEL["Ollama<br/>coding · embeddings · reranking"]:::local
-        LPG[("Single PostgreSQL<br/><b>graph truth</b><br/>full repository catalog · active branch/revision<br/>revisioned code graph · outbox")]:::localData
-        LMILVUS[("Milvus Standalone<br/><b>semantic discovery</b><br/>knowledge + selected code entity UUIDs")]:::localData
-        LSTORE[("Product/knowledge Git + local artifact store<br/>raw reviews · disclosure manifests")]:::localData
-
-        LCLIENT evolution1_client@--> LMCP
-        LMCP evolution1_analyzer@--> LANALYZER
-        LANALYZER evolution1_graph@--> LPG
-        LMCP evolution1_agent@--> LAGENT
-        LAGENT evolution1_model@--> LMODEL
-        LAGENT evolution1_postgres@--> LPG
-        LAGENT evolution1_milvus@--> LMILVUS
-        LAGENT evolution1_store@--> LSTORE
+        TEST["28 mapped requirements<br/>actual binaries + disposable services<br/>deterministic Ollama fixtures"]:::done
+        LP["One gateway + worker<br/>PostgreSQL / AGE / Milvus<br/>local artifact volume"]:::local
+        LS["Operator + controller identities<br/>task expiry / revocation<br/>source validation + restart recovery"]:::local
+        TEST ~~~ LP ~~~ LS
     end
-
-    subgraph CONTRACTS["2 · STABLE PLATFORM CONTRACTS"]
+    subgraph KEEP["2 · CONTRACTS THAT REMAIN STABLE"]
         direction TB
-        C1["MCP tool schemas<br/>versioned and backward compatible"]:::contract
-        C2["Knowledge IDs + revisions<br/>tenant · project · classification"]:::contract
-        C3["PostgreSQL transaction + outbox<br/>SKIP LOCKED · batched idempotent projection"]:::contract
-        C4["VectorIndex interface<br/>Milvus hidden behind retrieval service"]:::contract
-        C5["ModelProvider interface<br/>local · private · cloud adapters"]:::contract
-        C6["Canonical rebuild sources<br/>PostgreSQL graph + Git + object artifacts<br/>review evidence linked by SHA-256"]:::contract
-        C7["Policy context<br/>identity · purpose · residency · disclosure"]:::contract
-        C8["Stable code entity IDs<br/>Milvus primary key = PostgreSQL UUID<br/>SQL hydration before traversal"]:::contract
+        AUTH["Authenticated actor + project<br/>Cerbos + service validation<br/>exact version and evidence"]:::service
+        DATA["PostgreSQL authority<br/>stable UUIDs + outbox<br/>hydrate every index hit"]:::data
+        KB["Pending generated KB entries<br/>explicit user publication<br/>validated definitions use task authority"]:::gate
+        AUTH ~~~ DATA ~~~ KB
     end
-
-    subgraph ENTERPRISE["3 · ENTERPRISE PROFILE · DISTRIBUTED"]
+    subgraph FUTURE["3 · DEFERRED ACCEPTANCE"]
         direction TB
-        ECLIENT["Workstations + CI/CD + edge sites"]:::enterprise
-        EMCP["Stateless MCP/API gateway replicas"]:::enterprise
-        EAGENT["Durable workflows + event bus<br/>sandboxed agent + analyzer worker pools"]:::enterprise
-        EMODEL["Private GPU inference cluster<br/>policy-gated Kimi/OpenAI review"]:::enterprise
-        EPG[("PostgreSQL HA<br/>catalog + default/analysis branch policy<br/>repository/code graph truth · multi-zone + DR")]:::enterpriseData
-        EMILVUS[("Milvus Distributed<br/>knowledge + code entity discovery<br/>scaled query + ingestion")]:::enterpriseData
-        ESTORE[("Enterprise Git + versioned object storage<br/>review evidence · regional replication")]:::enterpriseData
-
-        ECLIENT evolution4_client@--> EMCP
-        EMCP evolution4_agent@--> EAGENT
-        EAGENT evolution4_model@--> EMODEL
-        EAGENT evolution4_postgres@--> EPG
-        EAGENT evolution4_milvus@--> EMILVUS
-        EAGENT evolution4_store@--> ESTORE
+        LIVE["Live rollout<br/>unlock existing vault<br/>retained definition decisions + cutover"]:::target
+        ADOPT["Adoption and ownership<br/>representative timed cohorts<br/>named owners + stage decisions"]:::target
+        PROD["Target deployment<br/>identity / storage / retention<br/>tenant tests + HA / restore evidence"]:::target
+        LIVE ~~~ ADOPT ~~~ PROD
     end
+    LOCAL --> KEEP
+    KEEP --> FUTURE
+    INDEX["Index migration is a separate operation:<br/>provision target → rebuild from PostgreSQL<br/>→ validate eligibility and retrieval → switch with rollback.<br/>This repository does not certify an online Milvus topology upgrade."]:::evidence
+    KEEP -.-> INDEX
 
-    LMCP evolution2_mcp@==>|"same MCP contracts"| C1
-    LPG evolution2_ids@==>|"schema + IDs"| C2
-    LPG evolution2_outbox@==>|"reliable change stream"| C3
-    LMILVUS evolution2_vector@==>|"adapter boundary"| C4
-    LMODEL evolution2_model@==>|"provider boundary"| C5
-    LSTORE evolution2_rebuild@==>|"rebuildability"| C6
-    LCLIENT evolution2_context@==>|"request context"| C7
-    LANALYZER evolution2_identity@==>|"stable graph identity"| C8
-
-    C1 evolution3_mcp@==>|"horizontal gateway scaling"| EMCP
-    C2 evolution3_records@==>|"tenant-aware enterprise records"| EPG
-    C3 evolution3_events@==>|"outbox relay → event bus"| EAGENT
-    C4 evolution3_vector@==>|"backfill + validate + cutover"| EMILVUS
-    C5 evolution3_model@==>|"central routing and quotas"| EMODEL
-    C6 evolution3_recovery@==>|"object-backed recovery"| ESTORE
-    C7 evolution3_identity@==>|"OIDC · RLS · tenant isolation"| ECLIENT
-    C8 evolution3_hydration@==>|"active-revision hydration"| EPG
-    C8 evolution3_projection@==>|"stable UUID projection"| EMILVUS
-
-    NOTE["3M · Milvus migration rule<br/><b>Standalone cannot be upgraded online to Distributed.</b><br/>Create cluster → bulk reindex → validate → dual-write → cut over."]:::warning
-    C4 evolution3m_note@-.-> NOTE
-    NOTE evolution3m_cutover@-.-> EMILVUS
-
-    classDef evolutionFlow1 fill:none,stroke:#15803d,color:#14532d,stroke-width:3px;
-    classDef evolutionFlow2 fill:none,stroke:#7c3aed,color:#581c87,stroke-width:4px;
-    classDef evolutionFlow3 fill:none,stroke:#2563eb,color:#1e3a8a,stroke-width:4px;
-    classDef evolutionMigration fill:none,stroke:#dc2626,color:#7f1d1d,stroke-width:3px,stroke-dasharray:7 5;
-
-    class evolution1_client,evolution1_analyzer,evolution1_graph,evolution1_agent,evolution1_model,evolution1_postgres,evolution1_milvus,evolution1_store evolutionFlow1;
-    class evolution2_mcp,evolution2_ids,evolution2_outbox,evolution2_vector,evolution2_model,evolution2_rebuild,evolution2_context,evolution2_identity evolutionFlow2;
-    class evolution3_mcp,evolution3_records,evolution3_events,evolution3_vector,evolution3_model,evolution3_recovery,evolution3_identity,evolution3_hydration,evolution3_projection,evolution4_client,evolution4_agent,evolution4_model,evolution4_postgres,evolution4_milvus,evolution4_store evolutionFlow3;
-    class evolution3m_note,evolution3m_cutover evolutionMigration;
-
-    classDef local fill:#dcfce7,stroke:#16a34a,color:#14532d,stroke-width:1.5px;
-    classDef localData fill:#d1fae5,stroke:#059669,color:#064e3b,stroke-width:2px;
-    classDef contract fill:#e0e7ff,stroke:#4f46e5,color:#312e81,stroke-width:2px;
-    classDef enterprise fill:#dbeafe,stroke:#2563eb,color:#172554,stroke-width:1.5px;
-    classDef enterpriseData fill:#cffafe,stroke:#0891b2,color:#164e63,stroke-width:2px;
-    classDef warning fill:#fee2e2,stroke:#dc2626,color:#7f1d1d,stroke-width:2px;
-
-    style LOCAL fill:#f0fdf4,stroke:#22c55e,stroke-width:2.5px
-    style CONTRACTS fill:#eef2ff,stroke:#6366f1,stroke-width:2.5px
-    style ENTERPRISE fill:#eff6ff,stroke:#3b82f6,stroke-width:2.5px
+    classDef client fill:#e0e7ff,stroke:#6366f1,color:#25265e,stroke-width:2px;
+    classDef service fill:#e8f1ff,stroke:#3574bd,color:#142f54,stroke-width:2px;
+    classDef local fill:#e5f5eb,stroke:#33845e,color:#163e2a,stroke-width:2px;
+    classDef data fill:#e0f2fe,stroke:#237895,color:#113d50,stroke-width:2px;
+    classDef evidence fill:#f1e8ff,stroke:#8860b5,color:#422760,stroke-width:2px;
+    classDef gate fill:#fff1d6,stroke:#b58128,color:#60440e,stroke-width:2px;
+    classDef pending fill:#fff0e9,stroke:#bf7350,color:#743820,stroke-width:2px;
+    classDef target fill:#f4f5f7,stroke:#778395,color:#374357,stroke-width:2px,stroke-dasharray:5 4;
+    classDef done fill:#d6f5e3,stroke:#268458,color:#16472e,stroke-width:3px;

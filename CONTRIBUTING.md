@@ -1,12 +1,18 @@
 # Contributing
 
+Start with the [developer guide](docs/developer-guide.md) for architecture,
+setup, feature development and requirement-level E2E coverage.
+
 ## Workflow
 
 1. Create a focused branch and keep unrelated user changes intact.
-2. Add or update tests for behavior changes.
+2. Add meaningful tests for behavior changes, including E2E coverage for each
+   affected functional requirement. Keep the checklist and coverage map aligned.
 3. Add a numbered SQL migration rather than editing a migration already used outside local development.
-4. Run `make check` and validate Compose configuration.
-5. Update MCP examples and documentation when tool schemas or safety behavior changes.
+4. Run `make check`; run `make agent-ready-functional` for agent-ready behavior
+   and the relevant policy/contract/integration checks. Validate affected Compose profiles.
+5. Update MCP examples, current guides and diagrams when behavior changes.
+   Run `make diagrams` after Mermaid edits and `make docs-check` before handoff.
 6. Explain data migration, Milvus reindex, and rollback requirements in the pull request.
 
 ## Design constraints
@@ -24,6 +30,8 @@
 make fmt
 make check
 make build
+make agent-ready-functional
+make docs-check
 make mcp-preflight
 make vault-test
 make gdrive-test

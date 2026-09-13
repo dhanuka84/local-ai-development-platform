@@ -1,6 +1,13 @@
 # ADR-0007: OpenClaw managed agentic workflows
 
-**Status:** Proposed
+**Status:** Local controller foundation implemented; broader orchestration remains proposed.
+
+September 12, 2026 clarification: the TypeScript Task Flow adapter, Go/SQL
+workflow authority, Cerbos integration and contracts are implemented. A general
+automatic classifier/runner, disclosure packager, webhook relay, scheduled
+Operations jobs and true two-person decision protocol remain planned.
+[ADR-0011](0011-scoped-autonomy-and-functional-acceptance.md) defines current
+task authority, KB publication and validated reuse.
 
 ## Context
 

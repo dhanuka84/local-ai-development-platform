@@ -1,100 +1,98 @@
-# Hybrid AI Platform Diagrams
+# Project diagrams
 
-This directory contains the editable Mermaid sources and rendered images for
-the local, review-learning, and enterprise deployment profiles.
+Updated September 12, 2026. These are repository-native Mermaid diagrams with
+SVG and PNG exports. Use the [developer guide](../developer-guide.md) for the
+full explanation and the [documentation index](../README.md) for current status.
 
-## Deliverables
+## Views and downloadable exports
 
-| View | Mermaid source | PNG | SVG |
+| View | Mermaid source | SVG | PNG |
 |---|---|---|---|
-| Quick review-learning explainer | [generation prompt](hybrid-ai-review-learning-explainer.prompt.md) | [PNG](hybrid-ai-review-learning-explainer.png) | Not applicable |
-| Local GBX100 architecture | `hybrid-ai-local-architecture.mmd` | [PNG](hybrid-ai-local-architecture.png) | `hybrid-ai-local-architecture.svg` |
-| Remote review and local learning loop | `hybrid-ai-review-learning-loop.mmd` | [PNG](hybrid-ai-review-learning-loop.png) | `hybrid-ai-review-learning-loop.svg` |
-| Enterprise distributed architecture | `hybrid-ai-enterprise-architecture.mmd` | [PNG](hybrid-ai-enterprise-architecture.png) | `hybrid-ai-enterprise-architecture.svg` |
-| Local-to-enterprise evolution | `hybrid-ai-local-to-enterprise-evolution.mmd` | [PNG](hybrid-ai-local-to-enterprise-evolution.png) | `hybrid-ai-local-to-enterprise-evolution.svg` |
-| OpenClaw agentic automation and Cerbos governance | `openclaw-agentic-automation-workflow.mmd` | [PNG](openclaw-agentic-automation-workflow.png) | `openclaw-agentic-automation-workflow.svg` |
+| Implemented local runtime | [Source](hybrid-ai-local-architecture.mmd) | [SVG](hybrid-ai-local-architecture.svg) | [PNG](hybrid-ai-local-architecture.png) |
+| Governed task lifecycle and validated reuse | [Source](hybrid-ai-review-learning-loop.mmd) | [SVG](hybrid-ai-review-learning-loop.svg) | [PNG](hybrid-ai-review-learning-loop.png) |
+| KB entries versus governed definitions | [Source](hybrid-ai-review-learning-explainer.mmd) | [SVG](hybrid-ai-review-learning-explainer.svg) | [PNG](hybrid-ai-review-learning-explainer.png) |
+| OpenClaw integration and authority | [Source](openclaw-agentic-automation-workflow.mmd) | [SVG](openclaw-agentic-automation-workflow.svg) | [PNG](openclaw-agentic-automation-workflow.png) |
+| Enterprise reference target | [Source](hybrid-ai-enterprise-architecture.mmd) | [SVG](hybrid-ai-enterprise-architecture.svg) | [PNG](hybrid-ai-enterprise-architecture.png) |
+| Local functionality to deployment acceptance | [Source](hybrid-ai-local-to-enterprise-evolution.mmd) | [SVG](hybrid-ai-local-to-enterprise-evolution.svg) | [PNG](hybrid-ai-local-to-enterprise-evolution.png) |
 
-PNG is the standard format for documentation links and embeds. Mermaid PNGs
-are rendered at high resolution for presentations and fixed-format tools. SVG
-exports remain available as unlinked build artifacts when lossless scaling is
-needed, and the editable `.mmd` file remains the source for each diagram.
+Use SVG for zooming, presentations and print. Markdown pages embed PNG for
+broad renderer compatibility. The publication explainer now has editable
+Mermaid source; its previous AI-generated raster is superseded. The
+[original generation prompt](hybrid-ai-review-learning-explainer.prompt.md)
+remains a historical record and does not describe the current export.
 
-## Flow numbering and colors
+## How to read them
 
-The arrows use color and short step numbers to make each path easier to follow.
+Purple identifies clients or immutable evidence, blue identifies application
+services and data, green identifies local execution or successful completion,
+amber identifies validation/authority conditions, and peach identifies pending
+KB entries. Dashed gray boxes identify optional, conditional or proposed
+components; the text states which. The enterprise diagram is a reference target,
+not a claim of a deployed cluster.
 
-- Runtime architecture: blue `1` request, purple `2` orchestration, orange `3`
-  local execution, magenta `3C` conditional cloud review, amber `4` evidence,
-  emerald `5` approval and commit, green `6` indexing, and cyan `7` retrieval
-  and reuse.
-- Review-learning loop: slate `1` durable FIFO queue, blue `2` activation-time
-  RAG routing, green/orange `3` local ownership with conditional read-only
-  cloud review, and amber `4` validation, promotion, and read-back.
-- Local-to-enterprise evolution: green `1` local profile, purple `2` stable
-  contracts, blue `3` enterprise scale-out, and dashed red `3M` Milvus
-  migration.
-- OpenClaw automation: blue `1` request, purple `2` orchestration, orange `3`
-  execution, red `4` authorization, emerald persistence, and green `5`
-  approved learning.
-- Gray arrows are supporting operational paths. Dashed red arrows are hard
-  controls, migration warnings, or disaster-recovery paths.
+Arrows show calls, data movement or lifecycle progression as labeled. A dotted
+connection to a note supplies context. The local diagram shows logical
+components: the application service and analyzer run inside the gateway; AGE
+runs inside PostgreSQL. They are not all separately deployed services.
 
-The enterprise and local overviews use curved group-to-group arrows for
-cross-plane flows. Components remain visible inside each parallel plane, while
-detailed endpoint behavior is defined in the implementation documents and
-contracts. The review-learning loop uses the same pattern for its numbered
-lifecycle stages. The evolution diagram keeps its detailed one-to-one contract
-mappings because those relationships are the purpose of that view.
+## Architecture rules represented
 
-## Architecture conventions
+- PostgreSQL is authoritative for runtime records, versions, decisions, graphs,
+  traces and outbox intent. AGE and Milvus are rebuildable projections.
+- A search result is an ID/score candidate until current PostgreSQL hydration
+  checks approval, source, version, project and projection eligibility.
+- Git holds source, policies, contracts and docs. Runtime KB content is in
+  PostgreSQL; there is no automatic Git-wiki publication.
+- Exact model output, disclosed-context manifests and validation receipts go
+  into the SHA-256 artifact store. Raw model review is evidence, not approval.
+- Generated KB entries require the user's explicit exact-version decision.
+  Validated domain/capability/metric definitions may use standing task authority
+  under the existing operator roles and recorded validation.
+- Eligible validated reuse completes a task while its new KB entry stays
+  pending. New-knowledge publication requires indexing and exact Milvus read-back.
+- Maintenance remains local with no cloud fallback. A conditional development
+  review is read-only; automated disclosure packaging remains planned.
+- Local functional acceptance is separate from live rollout, representative
+  adoption cohorts and target identity/storage/HA/recovery acceptance.
 
-- PostgreSQL is the authoritative runtime system of record for workflow, graph relationships, provenance, audit, and indexing state.
-- Git repository nodes and typed, evidence-backed relationships are authoritative in PostgreSQL and semantically projected into Milvus.
-- Revisioned code entities and every exact code edge are authoritative in PostgreSQL. Only selected first-party entity summaries are projected into Milvus, using the same stable PostgreSQL UUID.
-- The repository catalog includes metadata-only repositories. Forge default
-  branch, intended analysis branch, and exact revision remain distinct.
-- Apache AGE contains only rebuildable active repository/code/approved-knowledge topology; every result is re-hydrated from PostgreSQL.
-- OpenClaw orchestrates analysis; deterministic compiler-aware analyzers produce graph evidence. LLM interpretations follow the candidate review workflow.
-- Git is the human-reviewable source for approved patterns, ADRs, policies, and runbooks.
-- Object or content-addressed storage holds large immutable artifacts and evidence.
-- Milvus is a derived vector and hybrid-search index that can be rebuilt from authoritative sources.
-- Cloud review is policy-gated. Maintenance is local-only and fails closed without local inference.
-- The PostgreSQL outbox and idempotent workers prevent unsafe dual writes between PostgreSQL, Git, object storage, and Milvus. Workers claim with `SKIP LOCKED` and batch both embeddings and Milvus upserts.
+## Render and verify
 
-## Rendering
+Use Node/npm and local Chrome. The pinned renderer is
+`@mermaid-js/mermaid-cli@11.16.0`; the browser path is set in
+[puppeteer-config.json](puppeteer-config.json).
 
-The diagrams were validated with Mermaid CLI 11.16.0. A local Chrome executable is configured in `puppeteer-config.json`.
+```bash
+make diagrams
+make docs-check
+```
 
-Render the local architecture as SVG and high-resolution PNG:
+The renderer processes every `.mmd` file, writes SVG and PNG on white
+backgrounds, and updates [manifest.json](manifest.json). PNG uses a 2,400-pixel
+viewport and scale 2; actual dimensions depend on diagram layout and are saved
+in the manifest. No image-generation model is used.
+
+The manifest binds each source, SVG, PNG, renderer script and browser config
+by SHA-256. `docs-check` verifies those hashes, SVG/PNG structure and dimensions,
+local Markdown links/anchors, and reachability of every Markdown document from
+the repository README. CI runs this check without installing a browser.
+
+Render one diagram during editing:
 
 ```bash
 make diagram-local-architecture
-```
-
-The enterprise and evolution views have matching reproducible targets:
-
-```bash
 make diagram-enterprise-architecture
 make diagram-local-to-enterprise
-```
-
-For a diagram whose natural Mermaid layout is narrower, increase `-s` to `4` to produce a comparable 12K-class export.
-
-The review-learning diagram has a dedicated reproducible target:
-
-```bash
 make diagram-review-loop
-```
-
-The OpenClaw/Cerbos automation diagram has a dedicated target:
-
-```bash
 make diagram-agentic-workflow
+make diagram-knowledge-publication
 ```
 
-This diagram uses aligned rows, compact spacing, and thicker colored arrows so
-each flow is easy to follow without large empty areas. The SVG stays sharp at
-any zoom level. The optional PNG is 7,953 × 2,916 pixels; use the SVG when
-presenting on a large screen or printing.
+A single target updates only its diagram's manifest entry. After changing the
+shared renderer or browser configuration, regenerate all diagrams. Review
+the rendered images for label wrapping, clipping and misleading relationships;
+hash checks cannot judge architectural accuracy.
 
-If Chrome is installed elsewhere, update `executablePath` in `puppeteer-config.json` before rendering.
+The [renderer](../../scripts/render_diagrams.py) and
+[documentation checker](../../scripts/docs_check.py) contain the executable
+build/verification rules. External website availability and production behavior
+are outside this documentation check.

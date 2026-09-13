@@ -1,19 +1,24 @@
 # Remote Review and Local Learning
 
+Updated September 12, 2026. See the [developer guide](developer-guide.md) for
+the daily workflow and [ADR-0011](adr/0011-scoped-autonomy-and-functional-acceptance.md)
+for the distinction between KB-entry and definition publication.
+
 ## Outcome
 
 The governed path is a FIFO queue of atomic tasks. When a task reaches the
 head, it searches approved RAG first. A strong match guides local Ollama work
 without another cloud call. An allowed RAG miss requires a read-only Codex
 cloud review, followed by an Ollama revision. Maintenance, confidential, and
-restricted work uses the local-only miss route. Every route converges on local
-validation, accountable approval, and a Milvus read-back before the next task
-is activated.
+restricted work uses the local-only miss route. Every route converges on trusted local
+validation. Eligible recorded reuse may then complete while its new candidate
+stays pending. Publishing a new KB entry additionally requires the user's
+explicit exact-version decision and Milvus read-back before task completion.
 
 The platform does **not** put raw reviewer output into Milvus. It saves the exact
 response as evidence. A recommendation becomes searchable knowledge only after
-someone applies it locally, runs checks, rewrites it as a reusable lesson, and
-explicitly approves it.
+it is applied locally, validated, generalized into a reusable KB entry, and
+explicitly approved by the user at that exact version.
 
 ![RAG-first task queue, review, and learning loop](diagrams/hybrid-ai-review-learning-loop.png)
 
@@ -25,12 +30,12 @@ editable source is retained at
 
 | Component | Owns | Must not own |
 |---|---|---|
-| OpenClaw | FIFO task submission, model invocation, context minimization, and queue coordination. | Knowledge approval or vector truth. |
+| OpenClaw integration | FIFO task submission, controller state and execution contracts; model invocation is supplied by the configured worker. Automatic context packaging remains planned. | Knowledge approval or vector truth. |
 | Ollama worker | Local implementation, local regeneration, and maintenance inference. | Cloud escalation policy. |
 | Work-packet verifier | Deterministic scope, patch, and validation enforcement in a disposable clone. | Model invocation or human approval. |
 | Codex CLI | Read-only repository/diff review of a sanitized package after an allowed RAG miss. | Repository writes, candidate revision, direct knowledge promotion, or local-only maintenance. |
 | Kimi | Architecture, design, optimization, and long-context advisory review. | Direct knowledge promotion. |
-| MCP gateway | Typed retrieval, capture, evidence, review, approval, and graph operations. | Autonomous task routing. |
+| MCP gateway | Typed retrieval, capture, evidence, validation, decisions, graph operations and enforcement of activation-time routes. | Model invocation or automatic cloud-package construction. |
 | PostgreSQL | Canonical workflow, provenance, review decisions, graph edges, stable IDs, and outbox. | Approximate semantic ranking. |
 | Artifact CAS | Exact prompt, output, raw review, and context-manifest bytes by SHA-256. | Approval state. |
 | Milvus | Semantic discovery of approved knowledge and selected graph projections. | Canonical records or pending reviewer prose. |
@@ -63,8 +68,11 @@ editable source is retained at
 8. Ollama accepts or rejects each finding against current source, applies the
    accepted changes, reruns checks, and records `revise` with fresh local
    validation. Only `provider=ollama` may revise pending content.
-9. The improved, generalized result stays a pending knowledge candidate until
-   an accountable actor uses `knowledge_candidate_decide`.
+9. The improved, generalized result stays a pending KB entry until the user
+   explicitly approves that version and the authorized operator executes
+   `knowledge_candidate_decide` with its trusted validation report. For eligible
+   reuse, `VALIDATED_REUSE_COMPLETED` instead rechecks recorded context and
+   `payload.validation_id`, completes the task and leaves its candidate pending.
 10. Approval and a `knowledge.upsert` outbox event commit atomically in
     PostgreSQL. The worker embeds the authoritative approved item with Ollama
     and upserts it into Milvus under the PostgreSQL UUID.
@@ -91,8 +99,8 @@ maintenance request
   -> OpenClaw maintenance policy
   -> approved local knowledge + current system evidence
   -> local Ollama diagnosis/action proposal
-  -> local verification and operator approval
-  -> optional pending capture
+  -> local verification under assigned operator authority
+  -> pending capture; explicit user decision only for KB publication
 ```
 
 The maintenance work packet must set `local_only=true` and

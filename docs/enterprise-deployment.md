@@ -1,8 +1,14 @@
 # Enterprise Deployment
 
+Updated September 12, 2026. **Reference target; enterprise deployment acceptance
+is deferred.** The application manifests and source-verification overlay exist,
+but this repository does not provision a complete cluster or certify identity,
+HA, storage or recovery. See the [functional/deployment scope](agent-ready-gap-checklist.md)
+and [developer guide](developer-guide.md).
+
 ## Plain-English summary
 
-The enterprise version keeps the same behavior and data rules. It replaces
+The enterprise target retains the same behavior and data rules. It would replace
 single-machine services with highly available managed or distributed services,
 uses organization identity instead of static tokens, and adds stronger network,
 secret, audit, and recovery controls. PostgreSQL is still the official record,
@@ -20,13 +26,24 @@ The enterprise deployment changes scale and identity, not semantics:
 - Cloud review is policy-selected, minimized, read-only, and audited. Auto mode
   removes review acceptance only; protected-data policy and promotion approval
   remain enforced.
-- Atomic tasks remain FIFO queued, and Milvus read-back of the promoted UUID
-  gates the next task even when gateway and worker replicas scale out.
+- Atomic tasks remain FIFO queued. New-knowledge publication needs exact Milvus
+  UUID read-back before completion. Validated reuse can complete after current
+  context and trusted validation checks while its new KB entry stays pending.
 - Exact reviewer output and disclosed-context manifests are immutable evidence;
   only approved generalized improvements enter semantic retrieval.
 - MCP is the typed client boundary.
 
 ![Enterprise architecture](diagrams/hybrid-ai-enterprise-architecture.png)
+
+## Acceptance boundary
+
+`make agent-ready-functional` tests project isolation, denied enterprise
+configuration, source freshness, expiring task authority, durable evidence and
+gateway/worker restart using disposable local services. It does not deploy these
+manifests or prove multi-tenant ingress, storage durability, cluster failover
+or an RTO/RPO. Complete E06–E08 with named owners and target-specific evidence.
+Retention alerts currently request review/hold; production archival/deletion
+and an object-storage adapter require separate requirements and implementation.
 
 ## Target mapping
 
@@ -52,7 +69,7 @@ The gateway uses the MCP SDK's stateless Streamable HTTP mode, allowing ordinary
 
 ## Multi-tenancy
 
-`project_id` is the current logical namespace. Enterprise deployments should derive it from authenticated authorization, not trust a model-supplied value. The gateway verifies OIDC/workload identity, loads trusted project/resource context, and asks an internal Cerbos PDP whether the action is allowed. PostgreSQL transition rules and, where needed, row-level security remain a second enforcement layer. Include tenant/project in Milvus partitioning or scalar filters and in object-store prefixes.
+`project_id` is the current logical namespace. Enterprise deployments should derive it from authenticated authorization, not trust a model-supplied value. The deployment edge must verify OIDC/workload identity and propagate a trusted identity through a defined integration contract. The current Go application authenticates configured bearer principals, loads trusted project/resource context, and asks Cerbos whether an action is allowed; it does not implement a complete OIDC federation service. PostgreSQL transition rules and, where needed, row-level security remain a second enforcement layer. Include tenant/project in Milvus partitioning or scalar filters and in object-store prefixes.
 
 Run multiple stateless Cerbos PDP replicas behind an internal service. Build,
 test, sign, and promote policy bundles independently of application releases;

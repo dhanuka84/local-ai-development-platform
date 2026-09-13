@@ -45,7 +45,7 @@ func New(svc *service.Service, defaultPrincipals ...domain.Principal) *mcp.Serve
 		Name: "hybrid-ai-knowledge", Title: "Hybrid AI Knowledge Gateway", Version: Version,
 		Description: "Captures reviewed software-development knowledge and retrieves approved guidance for local or cloud agents.",
 	}, &mcp.ServerOptions{
-		Instructions: "Queue atomic work with workflow_task_begin. Only the FIFO head runs: it searches approved RAG at activation, routes local Ollama work through conditional read-only cloud review, validates locally, promotes an approved lesson, and proves Milvus read-back before the next task activates. Use code_graph_get for exact topology after semantic discovery. Never treat pending candidates, raw cloud review, or vector similarity as authoritative facts.",
+		Instructions: "Queue atomic work with workflow_task_begin. Only the FIFO head runs: it searches approved RAG at activation and routes local Ollama work through conditional read-only cloud review. After trusted local validation, eligible recorded reuse can complete while its new KB candidate stays pending. New KB publication requires an explicit user decision on the exact validated candidate version and Milvus read-back before task completion. Completion activates the next queued task. Use code_graph_get for exact topology after semantic discovery. Never treat pending candidates, raw cloud review, or vector similarity as authoritative facts.",
 	})
 	api.register(server)
 	return server

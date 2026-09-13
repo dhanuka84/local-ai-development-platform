@@ -1,6 +1,11 @@
 # ADR-0010: RAG-first atomic task checkpoints
 
-**Status:** Accepted
+**Status:** Accepted; clarified by [ADR-0011](0011-scoped-autonomy-and-functional-acceptance.md).
+
+Updated September 12, 2026: the sequence below is the new-knowledge path.
+Validated reuse can emit `VALIDATED_REUSE_COMPLETED` after trusted validation
+and context eligibility checks; its new KB entry remains pending. Definition
+publication follows the separate registry contract and delegated task authority.
 
 ## Decision
 

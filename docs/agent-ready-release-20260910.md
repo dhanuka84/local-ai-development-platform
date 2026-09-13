@@ -1,5 +1,10 @@
 # Agent-ready local release preparation — 2026-09-10
 
+Historical release-preparation receipt. The runtime observations below are from
+September 10, not a new live deployment check. Use the
+[current scope](agent-ready-gap-checklist.md) and [operations runbook](operations.md)
+for subsequent work; live cutover remains deferred.
+
 The implementation and real two-task pilot are validated. The live platform
 remains on migration 7. Its coordinated rollout is prepared; the required vault
 materialization step could not obtain a passphrase noninteractively. Existing
