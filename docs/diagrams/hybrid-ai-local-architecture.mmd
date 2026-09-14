@@ -12,7 +12,7 @@ flowchart LR
         ANALYZE["Deterministic code analyzer<br/>local gateway profile only"]:::service
         WORKER["Worker<br/>outbox · source checks<br/>retention alerts · trace export"]:::service
         PG[("PostgreSQL authority<br/>versions · decisions · workflow<br/>graphs · traces · outbox")]:::data
-        CAS[("Local SHA-256 artifact store<br/>exact output · manifests · receipts")]:::evidence
+        CAS[("Local SHA-256 artifact store<br/>captured bytes · manifests · receipts")]:::evidence
         AGE[("Apache AGE projection<br/>active topology in PostgreSQL")]:::data
         MV[("Milvus Standalone<br/>derived semantic indexes<br/>etcd + MinIO dependencies")]:::data
         GIT[("Read-only Git source<br/>exact branch and revision<br/>code · policies · docs")]:::evidence

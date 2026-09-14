@@ -85,7 +85,7 @@ func TestStatelessStreamableHTTPListsTools(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(tools.Tools) != 31 {
-		t.Fatalf("tool count = %d, want 31", len(tools.Tools))
+	if len(tools.Tools) != 59 {
+		t.Fatalf("tool count = %d, want 59", len(tools.Tools))
 	}
 }

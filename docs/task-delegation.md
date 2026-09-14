@@ -1,6 +1,6 @@
 # Scoped local task credentials
 
-Updated September 12, 2026. See the [developer guide](developer-guide.md) for
+Updated September 13, 2026. See the [developer guide](developer-guide.md) for
 the operator/controller/task identity distinction and [E2E guide](agent-ready-e2e.md)
 for the reproducible test boundary.
 
@@ -10,6 +10,13 @@ issuer's current development authority for that project. It is always a
 workload identity, with durable attribution to the human and exact parent
 credential. It receives no QA, Product Owner, validation-executor, controller,
 operations or cloud-review role.
+
+This implements one delegation type: bounded local Development. The broader
+[SDLC agent role matrix](ai-native-sdlc-expectations.md#accountable-roles-with-different-responsibilities)
+also includes product analysis, independent evaluation, deployment, diagnosis,
+remediation and curation. The separate [SDLC runtime](sdlc-runtime.md) implements
+five distinct workload roles and expiring owner-attributed run/source/action
+grants. This development-task credential command does not issue those roles.
 
 The operator CLI writes the random 256-bit bearer token directly to an exclusive
 mode-0600 file inside an existing mode-0700 directory. It prints only delegation

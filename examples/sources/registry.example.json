@@ -1,0 +1,26 @@
+[
+  {
+    "id": "order-events",
+    "project_id": "example-application",
+    "product_id": "checkout",
+    "kind": "event",
+    "endpoint": "https://source-adapter.example.invalid/read/orders",
+    "token_file": "/run/secrets/order_source_token",
+    "schema_version": "orders/v1",
+    "classification": "confidential",
+    "owner": "human:local-developer",
+    "roles": ["operations", "incident_diagnosis"],
+    "purposes": ["diagnosis"],
+    "fields": {"event_id": "string", "event_time": "timestamp", "status": "string", "internal_cost": "number"},
+    "fields_by_role": {
+      "operations": ["event_id", "event_time", "status", "internal_cost"],
+      "incident_diagnosis": ["event_id", "event_time", "status"]
+    },
+    "filters": ["status"],
+    "max_rows": 100,
+    "max_bytes": 131072,
+    "timeout_seconds": 10,
+    "max_window_seconds": 3600,
+    "retention_seconds": 86400
+  }
+]

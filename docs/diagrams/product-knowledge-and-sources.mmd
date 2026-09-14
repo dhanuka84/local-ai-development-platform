@@ -1,0 +1,36 @@
+---
+title: Implemented product knowledge and evaluated source boundary
+---
+%%{init: {"theme":"base","themeVariables":{"fontFamily":"Arial, sans-serif","fontSize":"16px","primaryTextColor":"#14263d","lineColor":"#53677f","edgeLabelBackground":"#ffffff"},"flowchart":{"curve":"basis","nodeSpacing":30,"rankSpacing":40},"themeCSS":".nodeLabel, .edgeLabel, .cluster-label, .flowchartTitleText { font-family: Arial, sans-serif !important; }"}}%%
+flowchart TB
+    USER["Human or delegated agent<br/>Authenticated project authority"]:::client
+    MCP["Go MCP gateway<br/>Role, purpose and field checks · audit"]:::service
+    PROPOSAL["Product / BRS / feature / intent proposal<br/>Immutable pending version"]:::pending
+    GATE["Exact-digest QA evidence<br/>Explicit human Product Owner decision"]:::gate
+    SOURCE["Operator-configured HTTP source views<br/>Log · metric · event · lake · audit<br/>Native system bridges are external"]:::external
+    VALIDATE["Validate schema, fields and bounds<br/>Window · watermark · offsets / snapshot"]:::gate
+    RECEIPT["Immutable collection receipt<br/>Complete / partial / failed<br/>Actor · role · owner · query digest"]:::data
+    PG["PostgreSQL authority<br/>Accepted product heads and relationships<br/>Eligible time-scoped observations"]:::data
+    INDEX["Local Ollama embedding worker<br/>Verified Milvus read-back · AGE projection"]:::service
+    CONTEXT["Product context<br/>Semantic candidates + PostgreSQL structure<br/>Hydrate current versions and recheck source access"]:::service
+    INTENT["Accepted intent context<br/>Exact BRS and criterion bindings<br/>Uncertainty or stale requirements block readiness"]:::gate
+    EVAL["Deterministic observation reconciliation<br/>Satisfied / violated / inconclusive<br/>Immutable evidence; no inferred root cause"]:::service
+    NEXT["Remaining execution boundary<br/>Agent supervisor · delivery · remediation<br/>Separate effect authority and verification"]:::external
+    USER --> MCP
+    MCP --> PROPOSAL --> GATE --> PG
+    MCP -->|Bounded reads| SOURCE --> VALIDATE
+    VALIDATE --> RECEIPT
+    VALIDATE -->|Eligible observations| PG
+    PG --> INDEX --> CONTEXT
+    PG --> CONTEXT --> MCP
+    PG --> INTENT --> EVAL
+    RECEIPT --> EVAL
+    EVAL -->|Retained result and audit| PG
+    INTENT -.-> NEXT
+    EVAL -.-> NEXT
+    classDef client fill:#e0e7ff,stroke:#6366f1,color:#25265e,stroke-width:2px;
+    classDef service fill:#e8f1ff,stroke:#3574bd,color:#142f54,stroke-width:2px;
+    classDef data fill:#e0f2fe,stroke:#237895,color:#113d50,stroke-width:2px;
+    classDef gate fill:#fff1d6,stroke:#b58128,color:#60440e,stroke-width:2px;
+    classDef pending fill:#fff0e9,stroke:#bf7350,color:#743820,stroke-width:2px;
+    classDef external fill:#f4f5f7,stroke:#778395,color:#374357,stroke-width:2px,stroke-dasharray:5 4;

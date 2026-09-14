@@ -1,0 +1,36 @@
+{
+  "project_id": "example-project",
+  "mcp_url": "http://127.0.0.1:8080/mcp",
+  "token_file": "/run/secrets/sdlc_remediation",
+  "role": "sdlc_remediation",
+  "ollama_url": "http://127.0.0.1:11434",
+  "workspaces": {
+    "orders-service": "/workspace/orders-service"
+  },
+  "spool_directory": "/var/lib/sdlc/evidence/sdlc_remediation",
+  "trial_kind": "local_model",
+  "docker": "",
+  "delivery": {
+    "forge_url": "",
+    "repository": "",
+    "base_branch": "",
+    "token_file": "",
+    "artifact_root": "",
+    "staging_root": ""
+  },
+  "remediation": {
+    "remedies": [
+      {
+        "id": "resume-orders",
+        "endpoint": "https://operations.example.invalid/orders/paused",
+        "token_file": "/run/secrets/orders-remediation",
+        "before": {
+          "paused": true
+        },
+        "desired": {
+          "paused": false
+        }
+      }
+    ]
+  }
+}

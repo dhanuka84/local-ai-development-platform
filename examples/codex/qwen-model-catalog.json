@@ -1,8 +1,8 @@
 {
   "models": [
     {
-      "slug": "qwen3.6:35b",
-      "display_name": "Qwen 3.6 35B local coding",
+      "slug": "qwen3.8:27b",
+      "display_name": "Qwen 3.8 27B local coding",
       "description": "Local Ollama coding model with explicit Codex function-tool metadata.",
       "base_instructions": "You are Codex, an agentic coding assistant working in the user's repository. Follow developer instructions and AGENTS.md. Inspect relevant files before editing, keep changes within the requested scope, use available tools through their declared function schemas, run appropriate validation, preserve unrelated worktree changes, and report concrete results and remaining risks.",
       "default_reasoning_level": "high",

@@ -108,7 +108,7 @@ func (s *Service) checkDelegatedTool(ctx context.Context, name string, input []b
 		return ErrForbidden
 	}
 	switch name {
-	case "knowledge_search", "repository_graph_get", "repository_relation_search", "code_symbol_search", "code_graph_get", "graph_context_search", "context_definition_search", "platform_metric_query":
+	case "knowledge_search", "repository_graph_get", "repository_relation_search", "code_symbol_search", "code_graph_get", "graph_context_search", "context_definition_search", "platform_metric_query", "product_context_search", "product_record_get", "product_source_list", "product_record_put", "product_intent_context":
 		if in.ProjectID == d.ProjectID {
 			return nil
 		}

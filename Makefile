@@ -2,13 +2,17 @@ SHELL := /bin/sh
 .DEFAULT_GOAL := help
 BUILD_CHECK_IMAGE ?= local-ai-platform-buildcheck:go1.27.1
 
-.PHONY: agent-ready-acceptance agent-ready-integration agent-ready-e2e agent-ready-functional agent-ready-pilot
+.PHONY: agent-ready-acceptance agent-ready-integration agent-ready-e2e agent-ready-functional agent-ready-pilot sdlc-functional
 agent-ready-functional: agent-ready-e2e ## Verify local functionality and report deferred rollout/adoption requirements separately
+	$(MAKE) sdlc-functional
 
 agent-ready-e2e: agent-ready-integration ## Run checklist-mapped E2E and integration tests and retain machine-readable evidence
 
 agent-ready-integration: ## Build and run all agent-ready integration checks in isolated disposable services
 	sh scripts/agent_ready_acceptance.sh
+
+sdlc-functional: ## Exercise scoped host workers and isolated product evaluation against disposable services
+	sh scripts/sdlc_functional_acceptance.sh
 
 agent-ready-acceptance: ## Run the deterministic two-task scenario against explicitly disposable services
 	@test -n "$$TEST_DATABASE_URL" && test -n "$$TEST_MILVUS_ADDRESS" && test -n "$$TEST_CERBOS_ADDRESS" || { echo 'Set disposable TEST_DATABASE_URL, TEST_MILVUS_ADDRESS and TEST_CERBOS_ADDRESS'; exit 1; }
@@ -64,7 +68,7 @@ CONFIRM_RESTORE ?=
 ALLOW_VERSION_MISMATCH ?= false
 CODEX_LOCAL_MODEL ?= $(shell sed -n 's/^[[:space:]]*LOCAL_CHAT_MODEL[[:space:]]*=[[:space:]]*//p' .env 2>/dev/null | tail -n 1)
 ifeq ($(strip $(CODEX_LOCAL_MODEL)),)
-CODEX_LOCAL_MODEL := qwen3.6:35b
+CODEX_LOCAL_MODEL := qwen3.8:27b
 endif
 CODEX_LOCAL_REASONING_EFFORT ?= high
 CODEX_LOCAL_MODEL_CATALOG ?= $(CURDIR)/examples/codex/qwen-model-catalog.json
@@ -88,6 +92,7 @@ CODEX_MCP_ARGS := \
 	-c 'mcp_servers.hybrid_knowledge.tool_timeout_sec=1200' \
 	-c 'mcp_servers.hybrid_knowledge.default_tools_approval_mode="approve"' \
 	-c 'mcp_servers.hybrid_knowledge.tools.knowledge_candidate_decide.approval_mode="prompt"' \
+	-c 'mcp_servers.hybrid_knowledge.tools.product_record_decide.approval_mode="prompt"' \
 	-c 'mcp_servers.hybrid_knowledge.tools.context_definition_decide.approval_mode="approve"' \
 	-c 'mcp_servers.hybrid_knowledge.tools.repository_relation_upsert.approval_mode="approve"' \
 	-c 'mcp_servers.hybrid_knowledge.tools.code_repository_index.approval_mode="approve"'
@@ -434,6 +439,7 @@ build: ## Build all binaries into ./bin
 	go build -o bin/worker ./cmd/worker
 	go build -o bin/admin ./cmd/admin
 	go build -o bin/workpacket ./cmd/workpacket
+	go build -o bin/ ./cmd/sdlc ./cmd/sdlc-worker ./cmd/source-adapter ./cmd/sdlc-verifier
 
 migrate: mcp-preflight ## Apply PostgreSQL migrations through the Compose admin image
 	$(COMPOSE) run --rm migrate migrate
@@ -873,7 +879,7 @@ diagram-knowledge-publication: ## Render hybrid-ai-review-learning-explainer as 
 	python3 scripts/render_diagrams.py --name hybrid-ai-review-learning-explainer
 
 pull-local-model: ## Pull the recommended GBX100 coding model
-	docker compose --env-file .env -f deploy/compose/compose.yaml exec ollama ollama pull "$${LOCAL_CHAT_MODEL:-qwen3.6:35b}"
+	$(COMPOSE) exec ollama ollama pull "$(CODEX_LOCAL_MODEL)"
 
 models-list: mcp-preflight ## List locally installed Ollama models
 	$(COMPOSE) exec ollama ollama list

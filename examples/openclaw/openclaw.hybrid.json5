@@ -25,8 +25,8 @@
         timeoutSeconds: 300,
         models: [
           {
-            id: "qwen3.6:35b",
-            name: "Qwen 3.6 35B local coding",
+            id: "qwen3.8:27b",
+            name: "Qwen 3.8 27B local coding",
             reasoning: true,
             input: ["text", "image"],
             contextWindow: 262144,
@@ -48,7 +48,7 @@
         default: true,
         name: "Hybrid Workflow Coordinator",
         workspace: "~/.openclaw/workspace-coordinator",
-        model: { primary: "ollama/qwen3.6:35b", fallbacks: [] },
+        model: { primary: "ollama/qwen3.8:27b", fallbacks: [] },
         subagents: {
           requireAgentId: true,
           allowAgents: ["developer", "qa", "cloud-review"]
@@ -71,7 +71,7 @@
         id: "developer",
         name: "Hybrid Developer",
         workspace: "~/.openclaw/workspace-developer",
-        model: { primary: "ollama/qwen3.6:35b", fallbacks: [] },
+        model: { primary: "ollama/qwen3.8:27b", fallbacks: [] },
         subagents: { allowAgents: ["cloud-review"] },
         tools: { profile: "coding" }
       },
@@ -79,7 +79,7 @@
         id: "qa",
         name: "Independent Local QA",
         workspace: "~/.openclaw/workspace-qa",
-        model: { primary: "ollama/qwen3.6:35b", fallbacks: [] },
+        model: { primary: "ollama/qwen3.8:27b", fallbacks: [] },
         sandbox: { mode: "all", scope: "agent", workspaceAccess: "ro" },
         tools: { profile: "coding", deny: ["write", "edit", "apply_patch"] }
       },
@@ -87,10 +87,10 @@
         id: "maintenance",
         name: "Local Maintenance",
         workspace: "~/.openclaw/workspace-maintenance",
-        model: { primary: "ollama/qwen3.6:35b", fallbacks: [] },
+        model: { primary: "ollama/qwen3.8:27b", fallbacks: [] },
         // A non-empty per-agent model catalog is an allowlist. This prevents
         // stored session overrides from switching maintenance to cloud.
-        models: { "ollama/qwen3.6:35b": {} },
+        models: { "ollama/qwen3.8:27b": {} },
         tools: { profile: "coding" }
       },
       {

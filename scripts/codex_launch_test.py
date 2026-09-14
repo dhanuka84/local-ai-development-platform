@@ -95,6 +95,7 @@ pathlib.Path(os.environ["LAUNCH_RECORD"]).write_text(json.dumps({
                 self.assertIs(overrides[prefix + "required"], True)
                 self.assertEqual(overrides[prefix + "default_tools_approval_mode"], "approve")
                 self.assertEqual(overrides[prefix + "tools.knowledge_candidate_decide.approval_mode"], "prompt")
+                self.assertEqual(overrides[prefix + "tools.product_record_decide.approval_mode"], "prompt")
                 for tool in ("context_definition_decide", "repository_relation_upsert", "code_repository_index"):
                     self.assertEqual(overrides[prefix + "tools." + tool + ".approval_mode"], "approve")
                 if "local" in target:
@@ -125,9 +126,10 @@ pathlib.Path(os.environ["LAUNCH_RECORD"]).write_text(json.dumps({
                 for server in config["mcp_servers"].values():
                     self.assertEqual(server["default_tools_approval_mode"], "approve")
                     self.assertEqual(server["tools"]["knowledge_candidate_decide"]["approval_mode"], "prompt")
+                    self.assertEqual(server["tools"]["product_record_decide"]["approval_mode"], "prompt")
                     self.assertEqual(server["tools"]["context_definition_decide"]["approval_mode"], "approve")
                     for name, tool in server["tools"].items():
-                        if name != "knowledge_candidate_decide":
+                        if name not in ("knowledge_candidate_decide", "product_record_decide"):
                             self.assertEqual(tool["approval_mode"], "approve")
 
 

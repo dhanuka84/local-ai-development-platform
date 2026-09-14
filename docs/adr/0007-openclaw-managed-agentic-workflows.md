@@ -2,12 +2,24 @@
 
 **Status:** Local controller foundation implemented; broader orchestration remains proposed.
 
+September 14 update: [ADR-0012](0012-bounded-sdlc-runtime.md) implements separate
+local feature/incident execution and five distinct workload roles. This ADR's
+OpenClaw managed-flow proposal and dated observations remain specific to that
+integration; they no longer describe all execution available in the platform.
+
 September 12, 2026 clarification: the TypeScript Task Flow adapter, Go/SQL
 workflow authority, Cerbos integration and contracts are implemented. A general
 automatic classifier/runner, disclosure packager, webhook relay, scheduled
 Operations jobs and true two-person decision protocol remain planned.
 [ADR-0011](0011-scoped-autonomy-and-functional-acceptance.md) defines current
 task authority, KB publication and validated reuse.
+
+September 13 scope clarification: the [AI-native target](../ai-native-sdlc-expectations.md)
+extends the roles and data-source contracts described here. Approval-only
+retrieval below refers to generated knowledge; code/repository projections
+retain their separate source eligibility. Proposed confidential-disclosure gates
+do not override the current atomic task route, which keeps confidential and
+restricted tasks local.
 
 ## Context
 

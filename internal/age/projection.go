@@ -9,12 +9,13 @@ import (
 )
 
 type RebuildStats struct {
-	Repositories        int `json:"repositories"`
-	RepositoryRelations int `json:"repository_relations"`
-	CodeEntities        int `json:"code_entities"`
-	CodeRelations       int `json:"code_relations"`
-	KnowledgeItems      int `json:"knowledge_items"`
-	KnowledgeEdges      int `json:"knowledge_edges"`
+	ProductRecordsQueued int `json:"product_records_queued"`
+	Repositories         int `json:"repositories"`
+	RepositoryRelations  int `json:"repository_relations"`
+	CodeEntities         int `json:"code_entities"`
+	CodeRelations        int `json:"code_relations"`
+	KnowledgeItems       int `json:"knowledge_items"`
+	KnowledgeEdges       int `json:"knowledge_edges"`
 }
 
 var repositoryEdgeLabels = map[string]string{
@@ -358,6 +359,13 @@ func (s *Store) Rebuild(ctx context.Context) (RebuildStats, error) {
 				return err
 			}
 		}
+		// Product records use the same durable indexing worker for semantic and
+		// AGE projections. Rebuild must not lose those vertices indefinitely.
+		queued, err := tx.Exec(ctx, `INSERT INTO outbox_events(aggregate_id,topic) SELECT id,'product.upsert' FROM product_records WHERE product_record_eligible(id)`)
+		if err != nil {
+			return err
+		}
+		stats.ProductRecordsQueued = int(queued.RowsAffected())
 		return nil
 	})
 	if err != nil {

@@ -1,6 +1,6 @@
 # Enterprise Deployment
 
-Updated September 12, 2026. **Reference target; enterprise deployment acceptance
+Updated September 13, 2026. **Reference target; enterprise deployment acceptance
 is deferred.** The application manifests and source-verification overlay exist,
 but this repository does not provision a complete cluster or certify identity,
 HA, storage or recovery. See the [functional/deployment scope](agent-ready-gap-checklist.md)
@@ -13,6 +13,17 @@ single-machine services with highly available managed or distributed services,
 uses organization identity instead of static tokens, and adds stronger network,
 secret, audit, and recovery controls. PostgreSQL is still the official record,
 and Milvus is still a rebuildable search index.
+
+The [AI-native product scope](ai-native-sdlc-expectations.md) applies at both
+local and enterprise scale: a shared structural/semantic KB, evaluated source
+ingestion, accountable agent roles and audited access throughout the SDLC.
+The [product KB and source protocol](product-knowledge-and-evaluated-sources.md)
+and [role execution runtime](sdlc-runtime.md) are implemented locally. A cluster
+deployment must provision target credentials, native view contracts, worker
+isolation and enterprise access controls, then execute the local conformance
+profiles and its own availability/retention/recovery acceptance. The
+[completion register](sdlc-completion-checklist.md) separates these target inputs
+from completed local capability work.
 
 ## Invariants
 

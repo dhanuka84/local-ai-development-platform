@@ -43,11 +43,31 @@ func New(svc *service.Service, defaultPrincipals ...domain.Principal) *mcp.Serve
 	}
 	server := mcp.NewServer(&mcp.Implementation{
 		Name: "hybrid-ai-knowledge", Title: "Hybrid AI Knowledge Gateway", Version: Version,
-		Description: "Captures reviewed software-development knowledge and retrieves approved guidance for local or cloud agents.",
+		Description: "Governed structural and semantic product knowledge, scoped local SDLC execution, independent evaluation and auditable delivery and recovery.",
 	}, &mcp.ServerOptions{
-		Instructions: "Queue atomic work with workflow_task_begin. Only the FIFO head runs: it searches approved RAG at activation and routes local Ollama work through conditional read-only cloud review. After trusted local validation, eligible recorded reuse can complete while its new KB candidate stays pending. New KB publication requires an explicit user decision on the exact validated candidate version and Milvus read-back before task completion. Completion activates the next queued task. Use code_graph_get for exact topology after semantic discovery. Never treat pending candidates, raw cloud review, or vector similarity as authoritative facts.",
+		Instructions: "Use accepted product intent with sdlc_run_create for bounded feature or incident execution. Separately authenticated local workers claim assigned stages, hydrate current KB context, propose work and verify outcomes. Inspect sdlc_run_get and sdlc_trace_get for progress, budgets, denials and evidence; reconcile interrupted effects before retry. Existing atomic workflows remain available through workflow_task_begin. Retrieve approved knowledge and hydrate semantic candidates from PostgreSQL. Never treat pending content, model output or similarity as authority. Maintenance and the SDLC workers use local inference with no cloud fallback. Generated KB entries remain pending until an explicit user decision approves the exact locally validated version.",
 	})
 	api.register(server)
+	server.AddReceivingMiddleware(func(next mcp.MethodHandler) mcp.MethodHandler {
+		return func(ctx context.Context, method string, request mcp.Request) (result mcp.Result, err error) {
+			input, ok := request.GetParams().(*mcp.CallToolParamsRaw)
+			if method != "tools/call" || !ok {
+				return next(ctx, method, request)
+			}
+			ctx, finish, err := api.service.BeginToolEnvelope(api.context(ctx), input.Name, input.Arguments)
+			if err != nil {
+				return nil, err
+			}
+			defer func() {
+				outcome := err
+				if out, ok := result.(*mcp.CallToolResult); ok && out.IsError && outcome == nil {
+					outcome = service.ErrInvalidInput
+				}
+				err = errors.Join(err, finish(outcome))
+			}()
+			return next(ctx, method, request)
+		}
+	})
 	return server
 }
 
@@ -78,6 +98,8 @@ func (a *API) register(server *mcp.Server) {
 	addTool(a, server, writeTool("workflow_task_begin", "Queue workflow task", "Queue an atomic task. The FIFO head is activated automatically and performs its governed RAG lookup at activation time."), a.workflowTaskBegin)
 	addTool(a, server, readTool("workflow_task_get", "Get workflow task", "Read an atomic task checkpoint, its RAG route, provider provenance, and current gate."), a.workflowTaskGet)
 	a.registerSemantic(server)
+	a.registerProduct(server)
+	a.registerExecution(server)
 	addTool(a, server, writeTool("workflow_task_transition", "Transition workflow task", "Record an evidence-backed local, cloud-review, validation, promotion, read-back, or manual rejection event."), a.workflowTaskTransition)
 }
 

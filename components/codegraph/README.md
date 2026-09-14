@@ -25,6 +25,15 @@ The local analyzer container pins the external indexers. External tools run
 against a disposable writable copy; the allowlisted source mount remains
 read-only. None of the providers requires VS Code, Neo4j, or a network listener.
 
+This graph is one structural input to the
+[shared product KB](../../docs/ai-native-sdlc-expectations.md#what-the-two-kb-dimensions-contain).
+BRS, feature, deployment and incident links need separate authoritative source
+contracts and validation. Their semantic interpretation must not be presented
+as compiler-extracted code facts. The platform's
+[typed product-code bridge](../../docs/sdlc-runtime.md) now joins accepted
+product records to active repository revisions and exact symbols, rejecting
+stale heads before execution and evidence acceptance.
+
 ## Deliberately excluded
 
 - VS Code extension and HTTP bridge

@@ -11,7 +11,9 @@ import (
 
 	"github.com/dhanuka84/hybrid-ai-platform/components/codegraph"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/domain"
+	"github.com/dhanuka84/hybrid-ai-platform/internal/execution"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/graphrag"
+	"github.com/dhanuka84/hybrid-ai-platform/internal/sources"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/telemetry"
 )
 
@@ -34,7 +36,13 @@ type Service struct {
 	graphHealth                domain.HealthChecker
 	graphRAG                   *graphrag.Service
 	traceRetentionDays         int
+	sources                    *sources.Registry
+	executions                 *execution.Registry
 }
+
+func (s *Service) ConfigureExecutions(registry *execution.Registry) { s.executions = registry }
+
+func (s *Service) ConfigureSources(registry *sources.Registry) { s.sources = registry }
 
 func (s *Service) ConfigureAuthorization(authorizer domain.Authorizer, reportDependency bool) error {
 	if authorizer == nil {
@@ -276,9 +284,9 @@ type CaptureInput struct {
 
 func (s *Service) Capture(ctx context.Context, input CaptureInput) (domain.KnowledgeItem, error) {
 	input.ProjectID = strings.TrimSpace(input.ProjectID)
-	input.Prompt = strings.TrimSpace(input.Prompt)
-	input.Response = strings.TrimSpace(input.Response)
-	if input.ProjectID == "" || input.Prompt == "" || input.Response == "" {
+	// Validate meaningful content without normalizing the original evidence.
+	// Whitespace and line endings are part of the captured generation bytes.
+	if input.ProjectID == "" || strings.TrimSpace(input.Prompt) == "" || strings.TrimSpace(input.Response) == "" {
 		return domain.KnowledgeItem{}, fmt.Errorf("%w: project_id, prompt, and response are required", ErrInvalidInput)
 	}
 	generationID, err := domain.NewID()

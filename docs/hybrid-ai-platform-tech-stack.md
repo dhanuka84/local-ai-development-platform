@@ -1,10 +1,16 @@
 # Implemented technology stack
 
-Updated September 12, 2026. This page describes the checked-in stack and the
+Updated September 13, 2026. This page describes the checked-in stack and the
 reason for each choice. Versions below are repository pins, not claims about
 the latest upstream release. The [developer guide](developer-guide.md) explains
 how to build and change it; the [original architecture](hybrid-openclaw-ollama-kimi-architecture.md)
 retains the earlier design proposals.
+
+The [AI-native scope](ai-native-sdlc-expectations.md) extends this foundation into
+a shared structural/semantic product KB and accountable agents across the SDLC.
+An entry in this stack table identifies an implemented component; it does not
+establish the broader product ontology, source connectors or durable execution
+capabilities in the [gap assessment](sdlc-gap-assessment.md).
 
 ## Runtime and development choices
 
@@ -16,11 +22,11 @@ retains the earlier design proposals.
 | Property graph | Apache AGE 1.6.0 / PostgreSQL 17 in Compose | Rebuildable active topology; recursive SQL fallback; [ADR-0009](adr/0009-apache-age-graphrag.md) |
 | Semantic index | Milvus 2.6.21 Standalone; Go client 2.6.5 | Derived knowledge/definition/repository/code indexes with SQL UUIDs |
 | Milvus dependencies | etcd and MinIO | Included in the Compose profile and consistent backup set |
-| Local inference | Ollama 0.32.6 container | Explicit local coding and embedding endpoints; no hidden cloud fallback |
-| Coding model default | `qwen3.6:35b` | Configured local development choice; pull separately and evaluate on actual work |
+| Local inference | Ollama 0.34.0 container | Explicit local coding and embedding endpoints; no hidden cloud fallback |
+| Coding model default | `qwen3.8:27b` | Configured local development choice; pull separately and evaluate on actual work |
 | Embedding default | `embeddinggemma`, 768 dimensions | One local embedding contract; model/dimension changes require a compatible collection and reindex |
 | Authorization | Cerbos 0.54.0 | Trusted actor/resource checks with policy fixtures and durable decision correlation |
-| Evidence | Local SHA-256 content-addressed files plus PostgreSQL references | Exact immutable prompt/output/review/validation bytes; not automatically published knowledge |
+| Evidence | Local SHA-256 content-addressed files plus PostgreSQL references | Immutable stored capture/review/validation bytes; generation prompts/responses retain original whitespace and line endings |
 | Asynchronous work | PostgreSQL outbox and Go worker | Retryable indexing, source checks and evidence export without a separate event bus |
 | Source analysis | Compiler-aware Go plus SCIP adapters | Deterministic revisioned facts for Go, JVM, TypeScript/JavaScript and Python |
 | Bounded validation | Go work-packet verifier, Git and declared executable checks | Applies a scoped patch to an exact revision in a disposable clone |
@@ -40,7 +46,9 @@ files when upgrading rather than copying versions from a dated experiment.
 Git holds product source, policies, contracts, documentation and migrations.
 PostgreSQL holds runtime KB content, definition versions, approvals, source
 bindings, graphs, workflow events, traces and projection intent. The artifact
-store holds exact evidence bytes referenced by hash.
+store holds supplied evidence bytes referenced by hash. Generation capture
+now preserves original prompt/response bytes, including boundary whitespace. Raw review and context
+manifest inputs follow a separate path that preserves their supplied bytes.
 
 AGE and Milvus are rebuildable projections. Semantic matches are candidates:
 the service hydrates current PostgreSQL records and checks project, version,
@@ -86,6 +94,15 @@ test/subtest results. Synthetic Ollama protocol responses make that suite
 deterministic; it does not benchmark inference or certify a real cloud session.
 
 ## Proposed components and deployment work
+
+Versioned product/BRS/feature/operations/incident records and bounded source
+ingestion are described in the [product KB guide](product-knowledge-and-evaluated-sources.md).
+The [SDLC runtime](sdlc-runtime.md) adds durable execution, versioned packages,
+role-scoped access, native readers and delivery/remediation workers across those
+same Go/PostgreSQL/AGE/Milvus boundaries. Trusted host workers launch isolated
+product evaluation. Kafka, S3, Loki, Prometheus and Gitea are native disposable
+acceptance dependencies and optional target integrations, not newly installed
+services in the live stack. See the [closure evidence](sdlc-completion-checklist.md).
 
 The earlier stack proposal included a TypeScript MCP service, pgvector/QMD as
 the main retrieval store, Git as the runtime KB authority, a protected hook

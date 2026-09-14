@@ -1,25 +1,30 @@
 # Hybrid AI Software Engineering Platform
 
-A local-first platform for software development. OpenClaw coordinates the work,
-Ollama runs local models, and the MCP server gives Codex and other agents one
-safe way to use shared knowledge. Codex and Kimi are optional cloud services.
-The platform never sends work to them as a hidden fallback.
+An AI-native SDLC platform centered on shared structural and semantic product
+knowledge. Local model workers progress accepted intent through implementation,
+independent evaluation, delivery and operational recovery. The MCP gateway
+controls authority, durable state, evidence and reuse; PostgreSQL is authoritative,
+with AGE and Milvus as governed projections.
 
-Start with the [developer guide](docs/developer-guide.md) for what, why and how,
-or the [documentation index](docs/README.md) for every guide and evidence record.
-The September 12 run passed **28/28 local functional requirements**; live rollout
-and enterprise acceptance remain [explicitly deferred](docs/agent-ready-gap-checklist.md).
+Start with the [runtime guide](docs/sdlc-runtime.md) for setup and end-to-end use,
+the [expectations and diagram](docs/ai-native-sdlc-expectations.md) for scope, and
+the [15-stage lifecycle guide](docs/sdlc-guide.md) for agent responsibilities.
+The [assessment](docs/sdlc-gap-assessment.md) and
+[completion checklist](docs/sdlc-completion-checklist.md) map the implementation
+to A01–A12 and distinguish executed local proofs from deferred target acceptance.
+The [documentation index](docs/README.md) links current guides and historical receipts.
 
 ## How it works
 
-1. An agent searches approved KB entries and the current code graph.
-2. A local Ollama model or Codex works on the task and runs checks.
-3. Codex or Kimi may review a small, sanitized package when policy allows it.
-4. Generated KB entries stay pending until the user explicitly approves the
-   exact validated version. Governed definitions use a separate validated,
-   task-authorized publication path.
-5. PostgreSQL saves the official record. Apache AGE expands exact topology and
-   Milvus makes approved records easy to find by meaning.
+1. An accountable operator submits accepted intent, criteria, scoped workers and budgets.
+2. Each stage hydrates current structural/semantic KB context and relevant source evidence.
+3. A pinned local model proposes work; a separate evaluator verifies protected product tests or business criteria.
+4. Assigned delivery/remediation workers perform fixed authorized actions and reconcile their read-back.
+5. Exact model output, sources, role handoffs, denials, usage and effects remain auditable. Improvement proposals stay pending until their own approval requirements are satisfied.
+
+The [local execution guide](docs/sdlc-runtime.md) describes native Kafka/S3/audit/log/metric readers, forge/CI/artifact/staging effects and the operator CLI.
+Optional cloud review belongs to the existing separate policy-controlled integration;
+the SDLC workers have no cloud fallback.
 
 Maintenance always uses local Ollama models. A single developer can perform
 the Development, QA, Product Owner, and Operations roles. Larger teams can
@@ -33,7 +38,13 @@ The repository implements:
 - A headless, compiler-aware Go analyzer for revisioned symbols, calls, references, implementations, imports, and tests.
 - Milvus for derived semantic indexes of approved knowledge, repository relationships, selected code symbols, and graph edges.
 - Ollama for local embeddings and local coding inference.
-- Immutable SHA-256 prompt/output artifacts.
+- Immutable SHA-256 prompt/output artifacts, preserving original whitespace and line endings.
+- Versioned product/BRS/feature/intent knowledge, scoped source observations,
+  local semantic discovery, structural context and exact-criterion reconciliation.
+- Durable bounded SDLC execution with five distinct workload roles, expiring leases,
+  package qualification/activation/rollback, cumulative budgets and an operator CLI.
+- Native Kafka, S3, PostgreSQL audit, Loki and Prometheus readers; independently
+  verified feature delivery and technical/business incident recovery.
 - An asynchronous indexing worker and administrative CLI.
 - A versioned workflow state machine with authenticated principals, Cerbos
   policy enforcement, immutable transition evidence, and optimistic/idempotent
@@ -84,7 +95,7 @@ before following calls, references, implementations, imports, or tests.
 | Property-graph traversal | Apache AGE 1.6 / PostgreSQL 17 | Cypher traversal without a separate graph authority or service. |
 | Semantic/hybrid index | Milvus | Vector search that can grow from one machine to a distributed cluster. |
 | Local inference | Ollama | Simple local model serving and local embeddings. |
-| Local coding on GBX100/GB10 | `qwen3.6:35b` | Configured local coding default; evaluate quality and memory use on the actual task. |
+| Local coding on GBX100/GB10 | `qwen3.8:27b` | Configured local coding default; evaluate quality and memory use on the actual task. |
 | Local embeddings | `embeddinggemma` | Small local embedding model; 768 dimensions by default. |
 | Code analysis | Go compiler APIs plus SCIP for JVM, TypeScript/JavaScript, and Python | Deterministic, build-aware evidence without an LLM or editor bridge. |
 | Cloud architecture review | `moonshot/kimi-k3` | Explicit, sanitized review subagent. |
@@ -176,12 +187,13 @@ make gdrive-check
 make backup-gdrive BACKUP_DATA_CLASSIFICATION=approved-for-encrypted-cloud
 ```
 
-Use `make download-gdrive STAMP=<stamp>` to download, authenticate, decrypt,
+Replace `BACKUP_STAMP` with the chosen bundle's actual timestamp.
+Use `make download-gdrive STAMP=BACKUP_STAMP` to download, authenticate, decrypt,
 and checksum a bundle without changing local volumes. Restore requires the
 additional destructive confirmation:
 
 ```bash
-make restore-gdrive STAMP=<stamp> CONFIRM_RESTORE=<stamp>
+make restore-gdrive STAMP=BACKUP_STAMP CONFIRM_RESTORE=BACKUP_STAMP
 ```
 
 New vaults created by `make env-init` already contain
@@ -389,7 +401,7 @@ The local launcher prints the selected model route before Codex starts. The
 Codex startup banner must also show values equivalent to:
 
 ```text
-model: qwen3.6:35b
+model: qwen3.8:27b
 provider: ollama
 reasoning effort: high
 ```
@@ -400,7 +412,7 @@ After sending a prompt, independently confirm the model loaded in Ollama:
 curl --silent http://127.0.0.1:11434/api/ps | jq -r '.models[].name'
 ```
 
-`qwen3.6:35b` should appear while it remains loaded. This runtime evidence,
+`qwen3.8:27b` should appear while it remains loaded. This runtime evidence,
 together with the Codex startup banner, proves the conversation used Qwen.
 
 Inside Codex, verify a real MCP connection:
@@ -566,6 +578,9 @@ observed results, applicability, exclusions, rollback guidance, and outcome
 `generation_capture` stores immutable prompt/output artifacts and creates a
 pending candidate. Model generation or self-review never makes that candidate
 approved knowledge.
+Capture preserves the supplied prompt/response bytes, including boundary
+whitespace and line endings, as described in
+[capture behavior](docs/implementation-guide.md#capture-and-knowledge-promotion).
 
 ### 10. Perform independent QA
 
@@ -573,18 +588,19 @@ First rerun the disposable-clone verifier from the platform repository:
 
 ```bash
 make qa-candidates PROJECT=local-development LIMIT=25
-make qa-candidate-get ID=<candidate-uuid>
+make qa-candidate-get ID=CANDIDATE_UUID
 make qa-patch-verify \
   PACKET=/path/to/task.work-packet.json \
   PATCH=/tmp/task.patch
 ```
 
 Then create a fresh QA worktree at the packet's exact base revision, apply the
-candidate patch, and start a new Codex session there:
+candidate patch, and start a new Codex session there. Replace `BASE_REVISION`
+with the packet's full commit and use the actual repository/worktree paths:
 
 ```bash
 git -C /absolute/path/to/software-repository worktree add --detach \
-  /absolute/path/to/qa-worktree <base-revision>
+  /absolute/path/to/qa-worktree BASE_REVISION
 git -C /absolute/path/to/qa-worktree apply /tmp/task.patch
 
 cd /absolute/path/to/local-ai-development-platform
@@ -598,21 +614,35 @@ Independently review candidate <candidate-uuid> and its patch. Verify scope,
 acceptance criteria, tests, error handling, security implications,
 cross-repository impact, reusable-knowledge quality, and rollback guidance.
 Reproduce the important checks. Call review_record with verdict approve,
-reject, revise, or comment and include the exact validation evidence. Do not
-perform the final knowledge decision.
+reject, or comment and include the exact validation evidence. Request any
+candidate revision through the local Ollama path. Do not perform the final
+knowledge decision.
 ```
 
-A `revise` verdict requires improved content and fresh local validation.
+A `revise` verdict requires `provider=ollama`, improved content and fresh local
+validation. Preserve the actual provider identity; a Codex review cannot
+impersonate that local revision path.
 `review_record` preserves review evidence but cannot publish the candidate.
+
+Publication also requires a current exact-version validation report. Follow
+the [QA validation procedure](docs/agent-ready-data-operations.md#validate-and-decide)
+to execute work-packet checks through the authenticated validation CLI, or
+record an appropriate human attestation through `knowledge_validation_record`.
+Preserve the returned `validation_id`; review feedback alone is insufficient.
 
 ### 11. Make the explicit knowledge decision
 
-After checking QA evidence, applicability, exclusions, and business acceptance:
+After the user's explicit decision on the exact candidate version, check its
+matching QA report, source applicability and exclusions. Replace the uppercase
+placeholders with inspected values; version `1` is illustrative:
 
 ```bash
-make po-candidate-get ID=<candidate-uuid>
-make po-approve ID=<candidate-uuid>
-# Or: make po-reject ID=<candidate-uuid>
+make po-candidate-get ID=CANDIDATE_UUID
+make po-approve ID=CANDIDATE_UUID VERSION=1 VALIDATION_ID=VALIDATION_UUID \
+  DECISION_KEY=UNIQUE_DECISION_KEY REASON='User approved this exact validated version'
+# Or reject that version:
+make po-reject ID=CANDIDATE_UUID VERSION=1 \
+  DECISION_KEY=UNIQUE_REJECTION_KEY REASON='Rejected this candidate after review'
 ```
 
 Approval commits the authoritative PostgreSQL decision and queues local Ollama
@@ -666,7 +696,7 @@ This repository pins and tests its controller plugin against OpenClaw
    openclaw onboard --non-interactive \
      --auth-choice ollama \
      --custom-base-url http://127.0.0.1:11434 \
-     --custom-model-id qwen3.6:35b \
+     --custom-model-id qwen3.8:27b \
      --accept-risk
    ```
 
@@ -778,7 +808,9 @@ workflow_task_begin -> FIFO activation -> approved RAG lookup
   -> RAG read-back -> complete -> activate next queued task
 ```
 
-Available tools:
+Selected core tools are listed below. The complete current surface also includes
+the [product tools](docs/product-knowledge-and-evaluated-sources.md#available-tools)
+and [SDLC execution/package tools](docs/sdlc-runtime.md).
 
 | Tool | Effect |
 |---|---|
@@ -807,7 +839,7 @@ Supported repository edge types are `depends_on`, `provides_api_to`, `deploys_wi
 ## Repository layout
 
 ```text
-cmd/                 gateway, indexing worker, and admin CLI
+cmd/                 gateway, index/SDLC workers, source adapter, verifier and CLIs
 components/          code graph analyzer plus bounded-work policy/verifier
 automation/          OpenClaw controller plugin and Lobster workflows
 contracts/           versioned workflow JSON Schemas

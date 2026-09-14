@@ -104,7 +104,7 @@ def source_digest(root):
                                      "AGENTS.md", ".env.example", ".codex/config.toml",
                                      "examples/codex/config.toml", "examples/codex/config-stdio.toml",
                                      "docs/agent-ready-gap-checklist.md")]
-    for directory in ("cmd", "components", "contracts", "internal", "migrations", "scripts", "tests", "deploy", "policies"):
+    for directory in ("cmd", "components", "contracts", "internal", "migrations", "scripts", "tests", "deploy", "policies", "examples/sources", "examples/agents"):
         files.extend(p for p in (root / directory).rglob("*") if p.is_file() and p.suffix in (".go", ".py", ".sh", ".sql", ".json", ".yaml"))
     entries = {str(path.relative_to(root)): hashlib.sha256(path.read_bytes()).hexdigest()
                for path in sorted(files)}

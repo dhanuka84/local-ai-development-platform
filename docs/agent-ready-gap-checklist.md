@@ -3,6 +3,11 @@
 Navigation: [Documentation index](README.md) · [Developer guide](developer-guide.md) ·
 [End-to-end test guide](agent-ready-e2e.md).
 
+For the broader AI-native product target, see the
+[expectations and scope](ai-native-sdlc-expectations.md),
+[lifecycle guide](sdlc-guide.md) and [AI-native gap assessment](sdlc-gap-assessment.md).
+That assessment has its own scope and does not change this register's counts.
+
 Updated: 2026-09-12. Baseline: `ce8b7d3`; continuation baseline: `a999db0`.
 Implementation branch: `fix/agent-ready-gaps-20260910`.
 

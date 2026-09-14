@@ -1,12 +1,20 @@
 # Hybrid Workflow Controller for OpenClaw
 
-Updated September 12, 2026. See the [developer guide](../../docs/developer-guide.md)
+Updated September 13, 2026. See the [developer guide](../../docs/developer-guide.md)
 and [integration plan](../../docs/openclaw-agentic-automation-plan.md) for
 implemented boundaries and the remaining execution automation proposals.
 
 This plugin mirrors OpenClaw managed Task Flow state to the authoritative Go
 MCP/PostgreSQL workflow service. It never calls PostgreSQL, Cerbos, Milvus, or
 model providers directly.
+
+Its place in the [AI-native scope](../../docs/ai-native-sdlc-expectations.md) is
+the execution/control integration boundary. The separate
+[SDLC runtime](../../docs/sdlc-runtime.md) now supplies bounded feature and
+incident execution, native sources, five distinct workloads and correlated
+audit. This plugin persists/mirrors its existing workflow state; a configured
+client or execution worker supplies model work. A queued task alone does not
+generate a patch. See [ADR-0012](../../docs/adr/0012-bounded-sdlc-runtime.md).
 
 The plugin exposes workflow tools plus `hybrid_task_queue`,
 `hybrid_task_status`, and `hybrid_task_transition`. Task queueing defaults to

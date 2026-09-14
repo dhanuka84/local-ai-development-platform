@@ -43,8 +43,8 @@ func TestServerPublishesValidatedToolSchemasAndSafetyHints(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(result.Tools) != 32 {
-		t.Fatalf("tool count = %d, want 32", len(result.Tools))
+	if len(result.Tools) != 60 {
+		t.Fatalf("tool count = %d, want 60", len(result.Tools))
 	}
 	tools := make(map[string]*mcp.Tool, len(result.Tools))
 	for _, tool := range result.Tools {
@@ -73,5 +73,15 @@ func TestServerPublishesValidatedToolSchemasAndSafetyHints(t *testing.T) {
 	}
 	if tools["workflow_task_transition"].Annotations.ReadOnlyHint {
 		t.Fatal("workflow_task_transition is incorrectly marked read-only")
+	}
+	for _, name := range []string{"product_record_get", "product_context_search", "product_source_list", "product_intent_context", "product_evaluation_get"} {
+		if tools[name] == nil || !tools[name].Annotations.ReadOnlyHint {
+			t.Fatalf("missing read-only product tool %s", name)
+		}
+	}
+	for _, name := range []string{"product_record_put", "product_record_validate", "product_record_decide", "product_relation_put", "product_source_query", "product_observations_compare"} {
+		if tools[name] == nil || tools[name].Annotations.ReadOnlyHint {
+			t.Fatalf("missing additive product tool %s", name)
+		}
 	}
 }

@@ -13,12 +13,14 @@ import (
 	"github.com/dhanuka84/hybrid-ai-platform/internal/authorization"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/config"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/domain"
+	"github.com/dhanuka84/hybrid-ai-platform/internal/execution"
 	graphfallback "github.com/dhanuka84/hybrid-ai-platform/internal/graph"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/graphrag"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/milvus"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/ollama"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/postgres"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/service"
+	"github.com/dhanuka84/hybrid-ai-platform/internal/sources"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/telemetry"
 )
 
@@ -46,6 +48,20 @@ func Open(ctx context.Context, cfg config.Config) (*Platform, error) {
 	embedder := telemetry.WrapEmbedder(repository, ollama.New(cfg.OllamaURL, cfg.EmbeddingModel))
 	artifactStore := artifacts.NewLocalStore(cfg.ArtifactsPath)
 	svc := service.New(repository, artifactStore, embedder, vectors, cfg.SearchFallback, cfg.AutoApproveLocal)
+	sourceRegistry, err := sources.Load(cfg.ProductSourceRegistry)
+	if err != nil {
+		repository.Close()
+		_ = vectors.Close(ctx)
+		return nil, fmt.Errorf("configure product source registry: %w", err)
+	}
+	svc.ConfigureSources(sourceRegistry)
+	executionRegistry, err := execution.Load(cfg.SDLCRegistry)
+	if err != nil {
+		repository.Close()
+		_ = vectors.Close(ctx)
+		return nil, fmt.Errorf("configure SDLC execution registry: %w", err)
+	}
+	svc.ConfigureExecutions(executionRegistry)
 	if err := svc.ConfigureTraceRetention(cfg.TraceRetentionDays); err != nil {
 		repository.Close()
 		_ = vectors.Close(ctx)

@@ -1,0 +1,32 @@
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  resource: product_knowledge
+  version: default
+  variables:
+    local:
+      project: request.principal.attr.project_ids.exists(p, p == "*" || p == request.resource.attr.project_id)
+  rules:
+    - actions: ["read"]
+      effect: EFFECT_ALLOW
+      roles: ["development", "qa", "product_owner", "operations", "incident_diagnosis", "maintenance_executor", "validation_executor"]
+      condition:
+        match:
+          expr: V.project
+    - actions: ["propose", "relate"]
+      effect: EFFECT_ALLOW
+      roles: ["development", "qa", "product_owner", "operations", "incident_diagnosis"]
+      condition:
+        match:
+          expr: V.project
+    - actions: ["validate"]
+      effect: EFFECT_ALLOW
+      roles: ["qa"]
+      condition:
+        match:
+          expr: V.project && request.principal.attr.human
+    - actions: ["decide"]
+      effect: EFFECT_ALLOW
+      roles: ["product_owner"]
+      condition:
+        match:
+          expr: V.project && request.principal.attr.human

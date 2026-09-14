@@ -1,6 +1,6 @@
 # Plain-English Glossary
 
-Updated September 12, 2026. [Developer guide](developer-guide.md) ·
+Updated September 13, 2026. [Developer guide](developer-guide.md) ·
 [Documentation index](README.md).
 
 Use this page when a design or operations document uses an unfamiliar term.
@@ -8,6 +8,11 @@ Use this page when a design or operations document uses an unfamiliar term.
 | Term | Meaning in this platform |
 |---|---|
 | Agent | A model-driven worker that receives a task and can use allowed tools. |
+| AI-native SDLC | The target operating model in which agents progress authorized intent through the lifecycle, use the shared KB, verify outcomes and escalate missing information or authority. |
+| Accountable owner | The identified person or organizational role responsible for an outcome or consequential authorization; agent actions retain their own authenticated attribution. |
+| Agent role | A bounded responsibility such as BRS analysis, implementation, QA or diagnosis. A prompt label grants no permissions; the target role matrix needs workload identity and enforced capabilities. |
+| Agent supervisor | The target runtime that checkpoints plan/action/evaluation cycles, enforces limits and reconciles effects after interruption. The current controller mirror is one foundation. |
+| BRS | Business requirements specification: versioned business meaning, constraints and expected behavior used for development, acceptance and operational diagnosis. |
 | Approval gate | A decision requiring the permitted actor and exact evidence. Generated KB entries need an explicit user decision; validated definitions can use standing task authorization. |
 | Analysis branch | The checked-out branch actually scanned. Its canonical API/SQL field is `branch`; it may differ from `default_branch` through an explicit override. |
 | Artifact | An exact saved file, such as a prompt, response, patch, test result, or review package. Its SHA-256 hash shows whether its contents changed. |
@@ -20,7 +25,7 @@ Use this page when a design or operations document uses an unfamiliar term.
 | Code graph | Exact links between code items, such as packages, files, functions, calls, imports, and tests. |
 | Codex | The coding client used by the configured cloud route or an explicit local Ollama route. A locally running CLI does not establish where inference occurs; inspect the selected provider. |
 | Controller | The non-human OpenClaw component that tracks a workflow and chooses the next permitted step. |
-| Evidence | Saved facts used to support a result or decision, such as a patch, test output, source location, or review. |
+| Evidence | Retained inputs, outputs, observations, checks or decisions used to support a claim. Saving a model response proves its content, not its correctness. |
 | Fail closed | Deny an action when a required security check cannot be completed. |
 | Governance profile | Rules for who may perform each role. `solo` allows one person to hold every role; `team` and `regulated` can require different people. |
 | Git revision | The exact commit analyzed. Its canonical API/SQL field is `revision`; this is the concept sometimes called `git_commit`. |
@@ -28,8 +33,16 @@ Use this page when a design or operations document uses an unfamiliar term.
 | Idempotent | Safe to retry without creating the same change twice. |
 | Immutable | Saved so that later changes create a new version instead of silently replacing the old contents. |
 | Kimi | Moonshot AI's cloud model, used here only for an explicit, policy-approved review. |
-| Knowledge base (KB) | Governed reusable software knowledge with versions, provenance and evidence. Approved, currently eligible entries can be retrieved for later tasks. |
+| Knowledge base (KB) | One governed logical store with structural and semantic views. The target covers products, BRS, features, code, operations, observations and incidents; current code/repository graphs, definitions and approved lessons are its foundation. |
 | KB entry / lesson | The same reusable item: a fix, procedure or recommendation. “Lesson” is the older pilot label, not a separate product or store. |
+| Structural knowledge | Identities and evidence-backed relationships, with versions and applicability. PostgreSQL owns the records; AGE provides a rebuildable graph view. |
+| Semantic knowledge | Meaning, behavior, context and eligible reusable experience linked to authoritative records. Milvus discovers candidates that must be hydrated and authorized. |
+| Source adapter | A typed, scoped MCP capability for collecting a bounded evidence window or invoking an allowed action. A bounded HTTP source-view protocol is implemented; native log/Kafka/lake/audit bridges and delivery adapters remain extensions. |
+| Evaluated ingestion | Validation and retention of collected data with provenance, uncertainty and eligibility. The current source protocol validates bounded schema/time/field contracts; richer enrichment and native integrations remain open. |
+| Validated observation | A source/window-bound record whose integrity, schema and coverage were checked. General observation retention is proposed; source validity alone does not prove an agent's causal explanation. |
+| Hypothesis | A possible explanation supported or contradicted by evidence; it remains unproven until relevant validation supports a finding. |
+| Event time / collection time | When a source event happened versus when it was retrieved. Re-ingestion does not make historical data current. |
+| Audit trail | Attributed records that reconstruct reads, actions, decisions and failures. Complete source-to-agent-to-KB coverage is a target beyond existing platform task traces. |
 | Domain definition | A versioned description of the subject area and its data contract in the governed registry. |
 | Capability definition | A versioned description of a supported operation and its contract in the governed registry. |
 | Metric definition | A versioned formula, dimensions and fixed reviewed SQL; metric queries never execute model-generated SQL. |

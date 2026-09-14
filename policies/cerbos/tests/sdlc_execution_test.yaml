@@ -1,0 +1,85 @@
+name: SDLCExecution
+description: Operators grant runs; assigned workload roles execute stages without publication or arbitrary source authority.
+principals:
+  operator:
+    id: human:operator
+    roles: [operations]
+    attr: {human: true, project_ids: [product-a]}
+  builder:
+    id: workload:builder
+    roles: [sdlc_builder]
+    attr: {human: false, project_ids: [product-a]}
+  evaluator:
+    id: workload:evaluator
+    roles: [sdlc_evaluator]
+    attr: {human: false, project_ids: [product-a]}
+  foreign:
+    id: workload:builder
+    roles: [sdlc_builder]
+    attr: {human: false, project_ids: [product-b]}
+resources:
+  build:
+    kind: sdlc_execution
+    id: run-1
+    attr: {project_id: product-a, owner: "human:operator", assigned_actor: "workload:builder", environment: staging}
+  source:
+    kind: product_source
+    id: source-1
+    attr: {project_id: product-a, execution_authorized: false, environment: staging}
+  scoped_source:
+    kind: product_source
+    id: source-1
+    attr: {project_id: product-a, execution_authorized: true, environment: staging}
+  knowledge:
+    kind: product_knowledge
+    id: record-1
+    attr: {project_id: product-a}
+tests:
+  - name: Exact stage assignment and operator responsibility
+    input:
+      principals: [operator, builder, evaluator, foreign]
+      resources: [build]
+      actions: [create, read, execute, control]
+    expected:
+      - principal: operator
+        resource: build
+        actions: {create: EFFECT_ALLOW, read: EFFECT_ALLOW, execute: EFFECT_DENY, control: EFFECT_ALLOW}
+      - principal: builder
+        resource: build
+        actions: {create: EFFECT_DENY, read: EFFECT_ALLOW, execute: EFFECT_ALLOW, control: EFFECT_DENY}
+      - principal: evaluator
+        resource: build
+        actions: {create: EFFECT_DENY, read: EFFECT_ALLOW, execute: EFFECT_DENY, control: EFFECT_DENY}
+      - principal: foreign
+        resource: build
+        actions: {create: EFFECT_DENY, read: EFFECT_DENY, execute: EFFECT_DENY, control: EFFECT_DENY}
+  - name: Source authority requires a server-checked run lease
+    input:
+      principals: [builder, evaluator]
+      resources: [source, scoped_source]
+      actions: [query, read_observation]
+    expected:
+      - principal: builder
+        resource: source
+        actions: {query: EFFECT_DENY, read_observation: EFFECT_DENY}
+      - principal: builder
+        resource: scoped_source
+        actions: {query: EFFECT_DENY, read_observation: EFFECT_DENY}
+      - principal: evaluator
+        resource: source
+        actions: {query: EFFECT_DENY, read_observation: EFFECT_DENY}
+      - principal: evaluator
+        resource: scoped_source
+        actions: {query: EFFECT_ALLOW, read_observation: EFFECT_ALLOW}
+  - name: Workload results confer no publication authority
+    input:
+      principals: [builder, evaluator]
+      resources: [knowledge]
+      actions: [read, propose, validate, decide]
+    expected:
+      - principal: builder
+        resource: knowledge
+        actions: {read: EFFECT_DENY, propose: EFFECT_DENY, validate: EFFECT_DENY, decide: EFFECT_DENY}
+      - principal: evaluator
+        resource: knowledge
+        actions: {read: EFFECT_DENY, propose: EFFECT_DENY, validate: EFFECT_DENY, decide: EFFECT_DENY}

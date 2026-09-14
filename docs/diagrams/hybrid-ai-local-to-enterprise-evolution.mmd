@@ -19,7 +19,7 @@ flowchart LR
     end
     subgraph FUTURE["3 · DEFERRED ACCEPTANCE"]
         direction TB
-        LIVE["Live rollout<br/>unlock existing vault<br/>retained definition decisions + cutover"]:::target
+        LIVE["Live rollout<br/>verify credentials and runtime compatibility<br/>retained definition decisions + cutover"]:::target
         ADOPT["Adoption and ownership<br/>representative timed cohorts<br/>named owners + stage decisions"]:::target
         PROD["Target deployment<br/>identity / storage / retention<br/>tenant tests + HA / restore evidence"]:::target
         LIVE ~~~ ADOPT ~~~ PROD

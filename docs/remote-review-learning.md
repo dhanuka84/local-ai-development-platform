@@ -1,8 +1,15 @@
 # Remote Review and Local Learning
 
-Updated September 12, 2026. See the [developer guide](developer-guide.md) for
+Updated September 13, 2026. See the [developer guide](developer-guide.md) for
 the daily workflow and [ADR-0011](adr/0011-scoped-autonomy-and-functional-acceptance.md)
 for the distinction between KB-entry and definition publication.
+
+This guide describes the existing review and generated-learning contract within
+the [AI-native lifecycle](sdlc-guide.md). The shared structural/semantic product
+KB and evaluated operational ingestion extend that foundation. The separate
+[SDLC runtime](sdlc-runtime.md) implements native source readers, retained and
+reauthorized observations, accountable workers and independent incident recovery.
+Generated diagnoses and lessons retain the exact-version approval path here.
 
 ## Outcome
 
@@ -37,8 +44,13 @@ editable source is retained at
 | Kimi | Architecture, design, optimization, and long-context advisory review. | Direct knowledge promotion. |
 | MCP gateway | Typed retrieval, capture, evidence, validation, decisions, graph operations and enforcement of activation-time routes. | Model invocation or automatic cloud-package construction. |
 | PostgreSQL | Canonical workflow, provenance, review decisions, graph edges, stable IDs, and outbox. | Approximate semantic ranking. |
-| Artifact CAS | Exact prompt, output, raw review, and context-manifest bytes by SHA-256. | Approval state. |
+| Artifact CAS | Supplied evidence bytes by SHA-256; raw review and context-manifest bytes are preserved. | Approval state. |
 | Milvus | Semantic discovery of approved knowledge and selected graph projections. | Canonical records or pending reviewer prose. |
+
+Generation capture now preserves prompt/response boundary whitespace and line
+endings in both artifacts and stored records. The SDLC runtime also records
+source, action, handoff and denial evidence through `sdlc_trace_get` and CLI
+export. Work outside platform-owned boundaries requires external instrumentation.
 
 ## Development workflow
 
@@ -90,6 +102,14 @@ local; every supplied prompt, diff, snippet, or MCP result is a disclosure to
 OpenAI.
 
 ## Maintenance workflow
+
+The [production diagnosis walkthrough](ai-native-sdlc-expectations.md#production-troubleshooting-walkthrough)
+adds bounded source collection and comparison with BRS, deployed code and past
+incidents. The [incident runtime](sdlc-runtime.md#connect-operational-evidence)
+collects native log, metric, Kafka, lake and audit evidence, compares competing
+explanations and verifies a fixed remedy against technical probes and a new
+business-data window. Diagnostic read scope stays separate from remediation
+authority. Its local model route has no cloud fallback.
 
 Maintenance uses the same approved knowledge and exact graphs but stops before
 the cloud-review branch:

@@ -70,7 +70,11 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: agent-ready-e2e
-          path: .local/agent-ready-e2e/
+          path: |
+            .local/agent-ready-e2e/
+            .local/sdlc-e2e/
+            !.local/sdlc-e2e/**/bin/**
+            !.local/sdlc-e2e/**/source/**
           include-hidden-files: true
           if-no-files-found: error
 

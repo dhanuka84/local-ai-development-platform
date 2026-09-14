@@ -120,7 +120,11 @@ func run(ctx context.Context, args []string) error {
 		if err != nil {
 			return err
 		}
-		fmt.Printf("queued %d approved knowledge items, %d repository relations, %d code entities, %d semantic graph edges, and %d approved context definitions for indexing\n", knowledgeCount, relationCount, codeEntityCount, edgeCount, definitionCount)
+		productCount, err := repository.RequeueProductRecords(ctx)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("queued %d approved knowledge items, %d repository relations, %d code entities, %d semantic graph edges, %d approved context definitions, and %d eligible product records for indexing\n", knowledgeCount, relationCount, codeEntityCount, edgeCount, definitionCount, productCount)
 		return nil
 	case "repository-upsert":
 		if len(args) != 6 {

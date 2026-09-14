@@ -297,6 +297,35 @@ func TestCapturePreservesReusableProcedure(t *testing.T) {
 	}
 }
 
+func TestCapturePreservesOriginalEvidenceBytes(t *testing.T) {
+	repository := &fakeRepository{}
+	artifacts := &fakeArtifacts{}
+	svc := New(repository, artifacts, &fakeEmbedder{}, &fakeVectors{}, true, false)
+	prompt, response := "\t  reproduce\r\n", "\r\n  café\t\n\n"
+	_, err := svc.Capture(context.Background(), CaptureInput{ProjectID: " product ", Prompt: prompt, Response: response})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if repository.recorded.Prompt != prompt || repository.recorded.Response != response ||
+		repository.recorded.PromptArtifact.SHA256 != prompt || repository.recorded.OutputArtifact.SHA256 != response {
+		t.Fatal("generation evidence was normalized")
+	}
+	if repository.recorded.ProjectID != "product" {
+		t.Fatal("project identifiers must still be normalized")
+	}
+	for _, in := range []CaptureInput{
+		{ProjectID: "product", Prompt: " \r\n\t", Response: response},
+		{ProjectID: "product", Prompt: prompt, Response: " \r\n\t"},
+	} {
+		if _, err := svc.Capture(context.Background(), in); err == nil {
+			t.Fatal("blank generation must be rejected")
+		}
+	}
+	if artifacts.count != 2 {
+		t.Fatal("invalid captures wrote artifacts")
+	}
+}
+
 func TestRecordReviewStoresImmutableEvidence(t *testing.T) {
 	repository := &fakeRepository{}
 	artifacts := &fakeArtifacts{}

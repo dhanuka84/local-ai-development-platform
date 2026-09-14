@@ -1,0 +1,24 @@
+{
+  "project_id": "example-project",
+  "mcp_url": "http://127.0.0.1:8080/mcp",
+  "token_file": "/run/secrets/sdlc_delivery",
+  "role": "sdlc_delivery",
+  "ollama_url": "http://127.0.0.1:11434",
+  "workspaces": {
+    "orders-service": "/workspace/orders-service"
+  },
+  "spool_directory": "/var/lib/sdlc/evidence/sdlc_delivery",
+  "trial_kind": "local_model",
+  "docker": "",
+  "delivery": {
+    "forge_url": "https://forge.example.invalid",
+    "repository": "example/orders-service",
+    "base_branch": "main",
+    "token_file": "/run/secrets/forge-delivery",
+    "artifact_root": "/var/lib/sdlc/releases",
+    "staging_root": "/var/lib/sdlc/staging/orders"
+  },
+  "remediation": {
+    "remedies": null
+  }
+}

@@ -2,11 +2,22 @@
 
 **Status:** Accepted
 
+September 14 update: [ADR-0012](0012-bounded-sdlc-runtime.md) extends the execution
+boundary with explicit local SDLC workers and a durable gateway supervisor. It
+supersedes the OpenClaw-only execution assumption for these profiles while
+retaining separate model execution, canonical state and publication authority.
+Earlier dated observations below retain their original boundary.
+
 September 12, 2026 clarification: OpenClaw owns model invocation; the MCP
 service enforces activation-time routes and durable transitions. General
 automatic classification and disclosure packaging remain planned.
 [ADR-0011](0011-scoped-autonomy-and-functional-acceptance.md) adds the current
 publication distinction and validated-reuse completion path.
+
+September 13 scope clarification: the execution boundary is retained for the
+[AI-native target](../ai-native-sdlc-expectations.md). The current controller
+mirrors state and configured clients/workers supply model work; a general
+durable execution supervisor is still [A02 work](../sdlc-gap-assessment.md#a02).
 
 ## Decision
 

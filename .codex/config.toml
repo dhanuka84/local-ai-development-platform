@@ -16,6 +16,9 @@ default_tools_approval_mode = "approve"
 # Reusable lessons stay pending; their publication needs an explicit decision.
 approval_mode = "prompt"
 
+[mcp_servers.hybrid_knowledge.tools.product_record_decide]
+approval_mode = "prompt"
+
 [mcp_servers.hybrid_knowledge.tools.context_definition_decide]
 approval_mode = "approve"
 

@@ -1,6 +1,6 @@
 # Role Workflows and Make Commands
 
-Updated September 12, 2026. For the first development task, use the
+Updated September 13, 2026. For the first development task, use the
 [developer guide](developer-guide.md); current acceptance is tracked in the
 [functional checklist](agent-ready-gap-checklist.md).
 
@@ -38,10 +38,26 @@ two-person approval is still planned.
 
 | Role | Plain-English responsibility |
 |---|---|
-| Operations | Keep the platform healthy and protect its data and credentials. |
-| Development | Understand the task, make the change, run checks, and save evidence. |
+| Operations | Own service outcomes, authorized deployment/recovery, platform health, data and credentials. |
+| Development | Ground intent in product/code knowledge, design and implement the change, run checks and save evidence. |
 | QA | Verify the change independently and record findings. |
-| Product Owner | Decide whether the validated lesson should become reusable knowledge. |
+| Product Owner | Own product intent and acceptance; separately decide whether an exact validated generated KB entry may be published. |
+
+These are current operator roles. The
+[agent responsibility matrix](ai-native-sdlc-expectations.md#accountable-roles-with-different-responsibilities)
+defines the target product/BRS, architecture, implementation, evaluation,
+security, release, diagnosis, maintenance, curation and coordination agents.
+Each needs workload identity, delegated task/scope and an accountable owner;
+selecting a prompt or Make alias does not provision those capabilities.
+The existing task delegation remains scoped to local Development. The separate
+[SDLC runtime](sdlc-runtime.md#execution-and-responsibility) provisions five
+distinct workload roles with per-run, product, source, field, purpose and
+environment scope, total budgets and correlated audit.
+
+Use the [15-stage KB map](sdlc-guide.md#the-shared-kb-throughout-the-sdlc) for each
+role's inputs and evaluated outputs. The commands below operate the existing
+platform contracts, not the complete target lifecycle. Replace uppercase
+placeholder values with the inspected IDs and exact versions before use.
 
 ## Operations
 
@@ -228,7 +244,7 @@ and reusable-knowledge quality.
 
 ```bash
 make qa-candidates PROJECT=my-product LIMIT=25
-make qa-candidate-get ID=<candidate-uuid>
+make qa-candidate-get ID=CANDIDATE_UUID
 make qa-session-repo REPO=/absolute/path/to/repository
 # Local alternative only when this session does not need MCP tool calls:
 make qa-session-local-repo REPO=/absolute/path/to/repository
@@ -246,12 +262,19 @@ make qa-authz-policy-test
 ```
 
 QA records its independent verdict and findings with `review_record` through
-MCP. A `revise` verdict requires locally reproduced improved content and fresh
-validation evidence. The review record does not perform final approval.
+MCP. Only the local Ollama path may submit `revise`, with its actual
+`provider=ollama`, improved content and fresh local validation evidence. A
+Codex QA review records `approve`, `reject` or `comment` and requests local
+revision when needed. A review does not create a publication validation report
+or approve knowledge. Record exact-version validation through the
+[QA validation procedure](agent-ready-data-operations.md#validate-and-decide):
+use the authenticated CLI for executed work-packet checks, or
+`knowledge_validation_record` for an appropriate human attestation. Preserve
+the returned `validation_id`; an attestation cannot claim command execution.
 
-When validation passes, QA hands the candidate UUID and review evidence to the
-Product Owner. When it fails, QA records `reject`, `revise`, or `comment` review
-feedback and returns the work to Development.
+When validation passes, QA hands the candidate UUID/version, validation ID and
+review evidence to the Product Owner. When it fails, QA records `reject` or
+`comment` feedback and returns the work to Development for local revision.
 
 ## Product Owner
 
@@ -262,7 +285,7 @@ validated candidate as reusable organizational knowledge.
 
 ```bash
 make po-candidates PROJECT=my-product LIMIT=25
-make po-candidate-get ID=<candidate-uuid>
+make po-candidate-get ID=CANDIDATE_UUID
 ```
 
 Before deciding, confirm:
@@ -275,10 +298,16 @@ Before deciding, confirm:
 
 ### Make the explicit decision
 
+After the user's explicit decision on that exact version, use the inspected
+values, a stable decision key and an accurate reason. Version `1` below is an
+example; a later candidate version needs its own matching report.
+
 ```bash
-make po-approve ID=<candidate-uuid>
+make po-approve ID=CANDIDATE_UUID VERSION=1 VALIDATION_ID=VALIDATION_UUID \
+  DECISION_KEY=UNIQUE_DECISION_KEY REASON='User approved this exact validated version'
 # or
-make po-reject ID=<candidate-uuid>
+make po-reject ID=CANDIDATE_UUID VERSION=1 \
+  DECISION_KEY=UNIQUE_REJECTION_KEY REASON='Rejected this candidate after review'
 ```
 
 Approval commits the knowledge decision and outbox intent in PostgreSQL.
@@ -306,11 +335,13 @@ make agent-ready-functional
 # Acting as QA in a clean checkout/session
 make qa-patch-verify PACKET=/path/to/work-packet.json PATCH=/path/to/candidate.patch
 make qa-check
-make qa-candidate-get ID=<candidate-uuid>
+make qa-candidate-get ID=CANDIDATE_UUID
 
 # Acting as Product Owner after QA evidence exists
-make po-candidate-get ID=<candidate-uuid>
-make po-approve ID=<candidate-uuid>
+make po-candidate-get ID=CANDIDATE_UUID
+# Only after the explicit decision and matching version-bound validation report:
+make po-approve ID=CANDIDATE_UUID VERSION=1 VALIDATION_ID=VALIDATION_UUID \
+  DECISION_KEY=UNIQUE_DECISION_KEY REASON='User approved this exact validated version'
 
 # Acting as Operations again
 make ops-doctor
@@ -333,14 +364,18 @@ Development
   work packet → implementation → local checks → generation_capture
       ↓ candidate UUID + patch + evidence
 QA
-  independent verification → review_record
-      ↓ technically validated candidate UUID
+  independent verification → exact-version validation report + review_record
+      ↓ candidate UUID/version + validation ID + evidence
 Product Owner
-  business acceptance → po-approve / po-reject
+  explicit generated-KB decision → versioned po-approve / po-reject
       ↓ committed outbox event
 Operations
   monitor worker and semantic projection freshness
 ```
+
+This is the knowledge-publication handoff. Product acceptance, artifact release,
+deployment authorization and verified business recovery require their own
+records in the [lifecycle guide](sdlc-guide.md); KB approval does not perform them.
 
 ## Command ownership summary
 

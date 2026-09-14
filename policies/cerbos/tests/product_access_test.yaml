@@ -1,0 +1,76 @@
+name: ProductKnowledgeAndSources
+description: Product publication remains human and validated; diagnostic source reads do not imply operational writes.
+principals:
+  builder:
+    id: agent:builder
+    roles: [development]
+    attr: {human: false, project_ids: [product-a]}
+  diagnostic:
+    id: agent:diagnostic
+    roles: [incident_diagnosis]
+    attr: {human: false, project_ids: [product-a]}
+  qa:
+    id: human:qa
+    roles: [qa]
+    attr: {human: true, project_ids: [product-a]}
+  owner:
+    id: human:owner
+    roles: [product_owner]
+    attr: {human: true, project_ids: [product-a]}
+  impersonated_owner:
+    id: agent:owner
+    roles: [product_owner]
+    attr: {human: false, project_ids: [product-a]}
+  foreign:
+    id: human:foreign
+    roles: [operations, product_owner, qa]
+    attr: {human: true, project_ids: [product-b]}
+resources:
+  context:
+    kind: product_knowledge
+    id: brs-1
+    attr: {project_id: product-a, classification: internal}
+  logs:
+    kind: product_source
+    id: source-1
+    attr: {project_id: product-a, classification: internal, purpose: diagnosis}
+tests:
+  - name: Distinct product responsibilities
+    input:
+      principals: [builder, diagnostic, qa, owner, impersonated_owner, foreign]
+      resources: [context]
+      actions: [read, propose, validate, decide]
+    expected:
+      - principal: builder
+        resource: context
+        actions: {read: EFFECT_ALLOW, propose: EFFECT_ALLOW, validate: EFFECT_DENY, decide: EFFECT_DENY}
+      - principal: diagnostic
+        resource: context
+        actions: {read: EFFECT_ALLOW, propose: EFFECT_ALLOW, validate: EFFECT_DENY, decide: EFFECT_DENY}
+      - principal: qa
+        resource: context
+        actions: {read: EFFECT_ALLOW, propose: EFFECT_ALLOW, validate: EFFECT_ALLOW, decide: EFFECT_DENY}
+      - principal: owner
+        resource: context
+        actions: {read: EFFECT_ALLOW, propose: EFFECT_ALLOW, validate: EFFECT_DENY, decide: EFFECT_ALLOW}
+      - principal: impersonated_owner
+        resource: context
+        actions: {read: EFFECT_ALLOW, propose: EFFECT_ALLOW, validate: EFFECT_DENY, decide: EFFECT_DENY}
+      - principal: foreign
+        resource: context
+        actions: {read: EFFECT_DENY, propose: EFFECT_DENY, validate: EFFECT_DENY, decide: EFFECT_DENY}
+  - name: Source queries never authorize remedy actions
+    input:
+      principals: [diagnostic, builder, foreign]
+      resources: [logs]
+      actions: [query, deploy, reset_offsets, update]
+    expected:
+      - principal: diagnostic
+        resource: logs
+        actions: {query: EFFECT_ALLOW, deploy: EFFECT_DENY, reset_offsets: EFFECT_DENY, update: EFFECT_DENY}
+      - principal: builder
+        resource: logs
+        actions: {query: EFFECT_DENY, deploy: EFFECT_DENY, reset_offsets: EFFECT_DENY, update: EFFECT_DENY}
+      - principal: foreign
+        resource: logs
+        actions: {query: EFFECT_DENY, deploy: EFFECT_DENY, reset_offsets: EFFECT_DENY, update: EFFECT_DENY}

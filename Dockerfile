@@ -27,7 +27,16 @@ ARG TARGETOS=linux
 ARG TARGETARCH
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath -ldflags="-s -w" -o /out/gateway ./cmd/gateway && \
     CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath -ldflags="-s -w" -o /out/worker ./cmd/worker && \
-    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath -ldflags="-s -w" -o /out/admin ./cmd/admin
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath -ldflags="-s -w" -o /out/admin ./cmd/admin && \
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath -ldflags="-s -w" -o /out/sdlc-verifier ./cmd/sdlc-verifier
+
+# The evaluator worker starts this image with no network, no capabilities, a
+# read-only root and only a credential-free snapshot mounted read-only.
+FROM buildcheck AS sdlc-evaluator
+COPY --from=build /out/sdlc-verifier /sdlc-verifier
+USER 65532:65532
+WORKDIR /tmp
+ENTRYPOINT ["/sdlc-verifier"]
 
 FROM gcr.io/distroless/static-debian12:nonroot AS gateway
 COPY --from=build /out/gateway /gateway

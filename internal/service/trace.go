@@ -31,6 +31,8 @@ func (s *Service) BeginToolOperation(ctx context.Context, name string, input []b
 		ProjectID       string `json:"project_id"`
 		WorkflowID      string `json:"workflow_id"`
 		TaskID          string `json:"task_id"`
+		RunID           string `json:"run_id"`
+		StepID          string `json:"step_id"`
 		KnowledgeID     string `json:"knowledge_id"`
 		ID              string `json:"id"`
 		ExpectedVersion int    `json:"expected_version"`
@@ -38,11 +40,11 @@ func (s *Service) BeginToolOperation(ctx context.Context, name string, input []b
 	if err := json.Unmarshal(input, &fields); err != nil {
 		return ctx, nil, err
 	}
-	scope := domain.OperationScope{ProjectID: fields.ProjectID, WorkflowID: fields.WorkflowID, TaskID: fields.TaskID}
+	scope := domain.OperationScope{ProjectID: fields.ProjectID, WorkflowID: fields.WorkflowID, TaskID: fields.TaskID, ExecutionID: fields.RunID, ExecutionStepID: fields.StepID}
 	if fields.ID != "" && name == "knowledge_get" {
 		fields.KnowledgeID = fields.ID
 	}
-	refs := []domain.EvidenceReference{}
+	refs := []domain.EvidenceReference{{Kind: "tool_input", ID: name, SHA256: domain.Digest(input)}}
 	if fields.KnowledgeID != "" {
 		item, err := s.repository.GetKnowledge(ctx, fields.KnowledgeID, true)
 		if err != nil {

@@ -1,0 +1,32 @@
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  resource: sdlc_execution
+  version: default
+  variables:
+    local:
+      project: request.principal.attr.project_ids.exists(p, p == "*" || p == request.resource.attr.project_id)
+  rules:
+    - actions: ["read"]
+      effect: EFFECT_ALLOW
+      roles: ["operations", "sdlc_builder", "sdlc_evaluator", "sdlc_delivery", "sdlc_diagnosis", "sdlc_remediation"]
+      condition:
+        match:
+          expr: V.project
+    - actions: ["create"]
+      effect: EFFECT_ALLOW
+      roles: ["operations"]
+      condition:
+        match:
+          expr: V.project && request.principal.attr.human
+    - actions: ["control"]
+      effect: EFFECT_ALLOW
+      roles: ["operations"]
+      condition:
+        match:
+          expr: V.project && request.principal.attr.human && request.principal.id == request.resource.attr.owner
+    - actions: ["execute"]
+      effect: EFFECT_ALLOW
+      roles: ["sdlc_builder", "sdlc_evaluator", "sdlc_delivery", "sdlc_diagnosis", "sdlc_remediation"]
+      condition:
+        match:
+          expr: V.project && !request.principal.attr.human && request.principal.id == request.resource.attr.assigned_actor && request.resource.attr.environment in ["disposable", "staging"]

@@ -50,7 +50,7 @@ func (r *Repository) ReadWorkflowTrace(ctx context.Context, project, workflow st
 		limit = 1000
 	}
 	result := domain.WorkflowTrace{ProjectID: project, WorkflowID: workflow, Records: []domain.OperationRecord{}, Missing: []string{}, Coverage: "platform_owned_boundaries; external client actions require explicit evidence"}
-	rows, err := r.pool.Query(ctx, `SELECT record FROM operation_records WHERE project_id=$1 AND workflow_id=$2 AND record->>'name'<>'mcp.workflow_trace_get' ORDER BY recorded_at,id LIMIT $3`, project, workflow, limit+1)
+	rows, err := r.pool.Query(ctx, `SELECT record FROM operation_records WHERE project_id=$1 AND workflow_id=$2 AND record->>'name' NOT IN ('mcp.workflow_trace_get','mcp.envelope.workflow_trace_get') ORDER BY recorded_at,id LIMIT $3`, project, workflow, limit+1)
 	if err != nil {
 		return result, err
 	}

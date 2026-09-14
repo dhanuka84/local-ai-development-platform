@@ -9,6 +9,14 @@ This runbook covers operator-triggered cold backups of the platform's durable
 Docker volumes. The implementation uses the Google Drive API directly; rclone
 is not required.
 
+This supports recovery of the platform KB and evidence. It does not back up
+every external product source, Kafka topic, lake or audit database in the
+[AI-native scope](ai-native-sdlc-expectations.md#source-adapter-requirements).
+Each connector needs source recovery/retention and replay boundaries, while
+the restored KB must preserve lineage, access rules and current eligibility.
+Automated incident remediation and measured product recovery remain
+[A08/A12 acceptance](sdlc-gap-assessment.md#a08).
+
 The entry points are:
 
 - `scripts/manual-backup-to-gdrive.sh`

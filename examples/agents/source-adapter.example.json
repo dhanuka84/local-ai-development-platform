@@ -1,0 +1,232 @@
+{
+  "schema": "hybrid-ai/source-adapter/v1",
+  "address": "127.0.0.1:8095",
+  "token_file": "/run/secrets/source-adapter",
+  "views": [
+    {
+      "contract": {
+        "id": "event",
+        "project_id": "example-project",
+        "product_id": "orders",
+        "kind": "event",
+        "endpoint": "http://127.0.0.1:8095/query",
+        "token_file": "/run/secrets/source-adapter",
+        "schema_version": "orders/v1",
+        "adapter_sha256": "5f2c56a46d36ed866417e1a4e4ac9dd56bf39b6f264989826874dc1b3e4ddffd",
+        "classification": "internal",
+        "owner": "human:local-developer",
+        "roles": [
+          "operations",
+          "sdlc_diagnosis",
+          "sdlc_evaluator"
+        ],
+        "purposes": [
+          "diagnosis",
+          "recovery"
+        ],
+        "fields": {
+          "event_id": "string",
+          "event_time": "timestamp",
+          "status": "string"
+        },
+        "filters": [],
+        "max_rows": 100,
+        "max_bytes": 131072,
+        "timeout_seconds": 20,
+        "max_window_seconds": 60,
+        "retention_seconds": 3600,
+        "allow_loopback_http": true
+      },
+      "backend": {
+        "kind": "kafka",
+        "credential_file": "/run/secrets/kafka-reader.json",
+        "brokers": [
+          "kafka.example.invalid:9093"
+        ],
+        "topic": "orders",
+        "partitions": [
+          0
+        ],
+        "max_scan_records": 1000,
+        "allow_plaintext_local": false
+      }
+    },
+    {
+      "contract": {
+        "id": "lake",
+        "project_id": "example-project",
+        "product_id": "orders",
+        "kind": "lake",
+        "endpoint": "http://127.0.0.1:8095/query",
+        "token_file": "/run/secrets/source-adapter",
+        "schema_version": "orders/v1",
+        "adapter_sha256": "7e6597a35ed6d59c6b082a47547cc88b86f4de0c0a3dd1e876557cfe4bc88ef0",
+        "classification": "internal",
+        "owner": "human:local-developer",
+        "roles": [
+          "operations",
+          "sdlc_diagnosis",
+          "sdlc_evaluator"
+        ],
+        "purposes": [
+          "diagnosis",
+          "recovery"
+        ],
+        "fields": {
+          "event_id": "string",
+          "event_time": "timestamp",
+          "status": "string"
+        },
+        "filters": [],
+        "max_rows": 100,
+        "max_bytes": 131072,
+        "timeout_seconds": 20,
+        "max_window_seconds": 60,
+        "retention_seconds": 3600,
+        "allow_loopback_http": true
+      },
+      "backend": {
+        "kind": "s3",
+        "endpoint": "https://lake.example.invalid",
+        "credential_file": "/run/secrets/lake-reader.json",
+        "max_scan_records": 1000,
+        "bucket": "orders",
+        "object": "evaluated/current.json",
+        "allow_plaintext_local": false
+      }
+    },
+    {
+      "contract": {
+        "id": "audit",
+        "project_id": "example-project",
+        "product_id": "orders",
+        "kind": "audit",
+        "endpoint": "http://127.0.0.1:8095/query",
+        "token_file": "/run/secrets/source-adapter",
+        "schema_version": "orders/v1",
+        "adapter_sha256": "119d18598b7788bc0f82cd9b31202198fde570327d27b090b10f6f2d67f15a24",
+        "classification": "internal",
+        "owner": "human:local-developer",
+        "roles": [
+          "operations",
+          "sdlc_diagnosis",
+          "sdlc_evaluator"
+        ],
+        "purposes": [
+          "diagnosis",
+          "recovery"
+        ],
+        "fields": {
+          "event_id": "string",
+          "event_time": "timestamp",
+          "status": "string"
+        },
+        "filters": [],
+        "max_rows": 100,
+        "max_bytes": 131072,
+        "timeout_seconds": 20,
+        "max_window_seconds": 60,
+        "retention_seconds": 3600,
+        "allow_loopback_http": true
+      },
+      "backend": {
+        "kind": "postgres",
+        "database_url_file": "/run/secrets/audit-database-url",
+        "view": "sdlc.orders",
+        "watermark_view": "sdlc.watermark",
+        "max_scan_records": 1000,
+        "allow_plaintext_local": false
+      }
+    },
+    {
+      "contract": {
+        "id": "log",
+        "project_id": "example-project",
+        "product_id": "orders",
+        "kind": "log",
+        "endpoint": "http://127.0.0.1:8095/query",
+        "token_file": "/run/secrets/source-adapter",
+        "schema_version": "orders/v1",
+        "adapter_sha256": "3440b153ab0b467821fa7d308a4183e57febffb8ad5b5641ab0ad939232f9db5",
+        "classification": "internal",
+        "owner": "human:local-developer",
+        "roles": [
+          "operations",
+          "sdlc_diagnosis",
+          "sdlc_evaluator"
+        ],
+        "purposes": [
+          "diagnosis",
+          "recovery"
+        ],
+        "fields": {
+          "event_id": "string",
+          "event_time": "timestamp",
+          "status": "string"
+        },
+        "filters": [],
+        "max_rows": 100,
+        "max_bytes": 131072,
+        "timeout_seconds": 20,
+        "max_window_seconds": 60,
+        "retention_seconds": 3600,
+        "allow_loopback_http": true
+      },
+      "backend": {
+        "kind": "loki",
+        "endpoint": "https://logs.example.invalid",
+        "credential_file": "/run/secrets/log-reader",
+        "query": "{stream=\"orders\"}",
+        "max_scan_records": 1000,
+        "allow_plaintext_local": false,
+        "expected_streams": [
+          "orders"
+        ]
+      }
+    },
+    {
+      "contract": {
+        "id": "metric",
+        "project_id": "example-project",
+        "product_id": "orders",
+        "kind": "metric",
+        "endpoint": "http://127.0.0.1:8095/query",
+        "token_file": "/run/secrets/source-adapter",
+        "schema_version": "orders/v1",
+        "adapter_sha256": "f6f562be8bfb9bd6d632659a36f67a864def07b2dc62a52e532ea96671934cbc",
+        "classification": "internal",
+        "owner": "human:local-developer",
+        "roles": [
+          "operations",
+          "sdlc_diagnosis",
+          "sdlc_evaluator"
+        ],
+        "purposes": [
+          "diagnosis",
+          "recovery"
+        ],
+        "fields": {
+          "event_id": "string",
+          "event_time": "timestamp",
+          "value": "number"
+        },
+        "filters": [],
+        "max_rows": 100,
+        "max_bytes": 131072,
+        "timeout_seconds": 20,
+        "max_window_seconds": 60,
+        "retention_seconds": 3600,
+        "allow_loopback_http": true
+      },
+      "backend": {
+        "kind": "prometheus",
+        "endpoint": "https://metrics.example.invalid",
+        "credential_file": "/run/secrets/metric-reader",
+        "query": "orders_processed",
+        "watermark_query": "orders_producer_watermark",
+        "max_scan_records": 1000,
+        "allow_plaintext_local": false
+      }
+    }
+  ]
+}
