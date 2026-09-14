@@ -89,8 +89,8 @@ structs. Check the actual tool registration before copying an older example.
 ## Set up a development checkout
 
 Use Git, Make, Docker Engine with Compose v2, Python 3 and the Go toolchain
-selected by [go.mod](../go.mod). The module declares Go 1.25.8 compatibility and
-selects toolchain Go 1.26.8. Node/npm is needed for the controller, contract
+selected by [go.mod](../go.mod). The module declares Go 1.26.7 compatibility and
+selects toolchain Go 1.27.1. Node/npm is needed for the controller, contract
 checks and diagram rendering. A GPU is needed only for your chosen local-model
 workload; the deterministic functional suite does not invoke a model.
 

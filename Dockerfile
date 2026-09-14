@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-FROM golang:1.26.8-bookworm AS go-toolchain
+FROM golang:1.27.1-bookworm AS go-toolchain
 
 # Reproducible local checks, including the Python setup tests. No source or
 # runtime credentials are baked into this target; make mounts the workspace.
@@ -45,17 +45,17 @@ ENTRYPOINT ["/gateway"]
 # Compiler-backed SCIP indexers for TypeScript, JavaScript, and Python. The
 # package versions and multi-architecture Node image are pinned for repeatable
 # local builds.
-FROM node:20.19.5-bookworm-slim@sha256:9e70124bd00f47dd023e349cd587132ae61892acc0e47ed641416c3e18f401c3 AS scip-node
+FROM node:26.8-bookworm-slim@sha256:cd9f682fa2885cd1056e830424764158570061c59736a1da836bc3d73df095ae AS scip-node
 RUN npm install --global --ignore-scripts \
     @sourcegraph/scip-typescript@0.4.0 \
     @sourcegraph/scip-python@0.6.6
 
-FROM gradle:9.1.0-jdk25@sha256:d2f954187670397de6dd42c5c3a9d4535409b590059c6d248ff2a59ba67cecc3 AS gradle-tools
+FROM gradle:9.7.1-jdk25@sha256:eec96c1a66c66235f8d58d4fdb3ee3b9c52852d895001cc3183388fbf421ff42 AS gradle-tools
 
 # Local-only analyzer profile. Repositories are mounted read-only and copied to
 # a disposable directory before an indexer or build tool runs.
-FROM maven:3.9.11-eclipse-temurin-25@sha256:407c4423cec0cf2981055bc2c6c0dc211d9605b6669279b95997f2d1c7e91e2c AS gateway-analyzer
-RUN apt-get update && apt-get install --yes --no-install-recommends git python3 python3-pip && \
+FROM maven:3.9.15-eclipse-temurin-26@sha256:029a8e2838ae68238ffb8be407cddbb3f07d4d839c60c6f26c619a69fd184531 AS gateway-analyzer
+RUN apt-get update && apt-get install --yes --no-install-recommends git python3 python3-pip libatomic1 && \
     rm -rf /var/lib/apt/lists/*
 COPY deploy/analyzer/scip-java-runtime.pom.xml /tmp/scip-java-runtime.pom.xml
 RUN mvn --batch-mode --file /tmp/scip-java-runtime.pom.xml dependency:copy-dependencies -DoutputDirectory=/opt/scip-java && \
@@ -63,6 +63,9 @@ RUN mvn --batch-mode --file /tmp/scip-java-runtime.pom.xml dependency:copy-depen
 COPY --from=build /usr/local/go /usr/local/go
 COPY --from=scip-node /usr/local/ /usr/local/
 COPY --from=gradle-tools /opt/gradle /opt/gradle
+# The copied Node runtime needs libatomic on arm64. Exercise the actual indexer
+# launchers during the image build so dependency updates cannot hide ABI gaps.
+RUN node --version && scip-typescript --version && scip-python --version && java --version
 RUN git config --system --add safe.directory '*'
 ENV PATH=/usr/local/go/bin:/usr/local/bin:/opt/gradle/bin:/usr/share/maven/bin:/opt/java/openjdk/bin:/usr/bin:/bin \
     HOME=/tmp/analyzer-home \

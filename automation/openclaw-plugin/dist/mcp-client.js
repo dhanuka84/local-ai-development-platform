@@ -6,7 +6,19 @@ export class HybridMCPClient {
         this.config = config;
     }
     async callWorkflowTool(name, args, signal) {
-        const client = new Client({ name: "hybrid-openclaw-controller", version: "0.1.0" });
+        const value = await this.callTool(name, args, signal);
+        if (!isWorkflowResponse(value))
+            throw new Error(`${name} returned an invalid workflow response`);
+        return value;
+    }
+    async callTaskTool(name, args, signal) {
+        const value = await this.callTool(name, args, signal);
+        if (!isWorkflowTaskResponse(value))
+            throw new Error(`${name} returned an invalid workflow task response`);
+        return value;
+    }
+    async callTool(name, args, signal) {
+        const client = new Client({ name: "hybrid-openclaw-controller", version: "0.2.0" });
         const transport = new StreamableHTTPClientTransport(new URL(this.config.url), {
             requestInit: { headers: { Authorization: `Bearer ${this.config.token}` } },
         });
@@ -20,14 +32,23 @@ export class HybridMCPClient {
             if (result.isError)
                 throw new Error(toolError(result));
             const value = result.structuredContent ?? parseTextContent(result);
-            if (!isWorkflowResponse(value))
-                throw new Error(`${name} returned an invalid workflow response`);
             return value;
         }
         finally {
             await client.close().catch(() => undefined);
         }
     }
+}
+function isWorkflowTaskResponse(value) {
+    if (!value || typeof value !== "object")
+        return false;
+    const task = value.task;
+    if (!task || typeof task !== "object")
+        return false;
+    const candidate = task;
+    return typeof candidate.id === "string" && typeof candidate.workflow_id === "string" &&
+        typeof candidate.project_id === "string" && typeof candidate.state === "string" &&
+        typeof candidate.route === "string" && typeof candidate.version === "number";
 }
 function parseTextContent(result) {
     const text = result.content?.find((item) => item.type === "text")?.text;

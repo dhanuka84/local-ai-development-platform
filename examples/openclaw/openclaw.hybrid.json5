@@ -110,8 +110,8 @@
         url: "http://127.0.0.1:8080/mcp",
         transport: "streamable-http",
         headers: { Authorization: "Bearer ${CONTROLLER_AUTH_TOKEN}" },
-        timeout: 120,
-        connectTimeout: 10,
+        requestTimeoutMs: 120000,
+        connectionTimeoutMs: 10000,
         supportsParallelToolCalls: true,
         toolFilter: {
           include: [

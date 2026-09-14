@@ -25,6 +25,29 @@ export declare class WorkflowController {
         workflow: WorkflowRun;
     }>;
     status(workflowId: string, flowId?: string, signal?: AbortSignal): Promise<Record<string, unknown>>;
+    queueTask(input: {
+        workflowId: string;
+        taskKey: string;
+        title: string;
+        taskType?: string;
+        executionMode?: "auto" | "manual";
+        ragQuery: string;
+        matchThreshold?: number;
+        idempotencyKey: string;
+    }, signal?: AbortSignal): Promise<Record<string, unknown>>;
+    taskStatus(taskId: string, signal?: AbortSignal): Promise<Record<string, unknown>>;
+    transitionTask(input: {
+        taskId: string;
+        expectedVersion: number;
+        eventType: string;
+        idempotencyKey: string;
+        provider?: string;
+        model?: string;
+        candidateId?: string;
+        evidence?: string;
+        reviewInfluenceWeight?: number;
+        payload?: Record<string, unknown>;
+    }, signal?: AbortSignal): Promise<Record<string, unknown>>;
     transition(input: {
         workflowId: string;
         flowId: string;

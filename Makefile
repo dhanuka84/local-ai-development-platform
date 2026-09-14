@@ -1,6 +1,6 @@
 SHELL := /bin/sh
 .DEFAULT_GOAL := help
-BUILD_CHECK_IMAGE ?= local-ai-platform-buildcheck:go1.26.8
+BUILD_CHECK_IMAGE ?= local-ai-platform-buildcheck:go1.27.1
 
 .PHONY: agent-ready-acceptance agent-ready-integration agent-ready-e2e agent-ready-functional agent-ready-pilot sdlc-functional
 agent-ready-functional: agent-ready-e2e ## Verify local functionality and report deferred rollout/adoption requirements separately
@@ -357,7 +357,7 @@ openclaw-plugin-check: ## Type-check/test the controller and validate its OpenCl
 		npx openclaw plugins build --root . --check
 	cd $(OPENCLAW_PLUGIN_DIR) && CONTROLLER_AUTH_TOKEN=validation-only \
 		npx openclaw plugins validate --root .
-	cd $(OPENCLAW_PLUGIN_DIR) && npm audit --omit=dev
+	cd $(OPENCLAW_PLUGIN_DIR) && npm audit
 
 openclaw-config-check: ## Validate the example against the pinned OpenClaw config schema
 	cd $(OPENCLAW_PLUGIN_DIR) && CONTROLLER_AUTH_TOKEN=validation-only \
