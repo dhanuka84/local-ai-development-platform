@@ -10,7 +10,7 @@ retains the earlier design proposals.
 
 | Concern | Implemented choice | Why / authoritative configuration |
 |---|---|---|
-| MCP and data plane | Go; module Go 1.25.8, toolchain Go 1.26.8 | Typed contracts, concurrency and small binaries; [go.mod](../go.mod), [ADR-0001](adr/0001-go-for-the-mcp-data-plane.md) |
+| MCP and data plane | Go; module Go 1.26.7, toolchain Go 1.27.1 | Typed contracts, concurrency and small binaries; [go.mod](../go.mod), [ADR-0001](adr/0001-go-for-the-mcp-data-plane.md) |
 | MCP protocol | Official Go SDK 1.7.0; Streamable HTTP or STDIO | Shared typed tool boundary for clients; `internal/mcpserver` |
 | Durable records | PostgreSQL | Transactions bind versions, decisions, audit and outbox; `internal/postgres`, `migrations` |
 | Property graph | Apache AGE 1.6.0 / PostgreSQL 17 in Compose | Rebuildable active topology; recursive SQL fallback; [ADR-0009](adr/0009-apache-age-graphrag.md) |
@@ -24,7 +24,7 @@ retains the earlier design proposals.
 | Asynchronous work | PostgreSQL outbox and Go worker | Retryable indexing, source checks and evidence export without a separate event bus |
 | Source analysis | Compiler-aware Go plus SCIP adapters | Deterministic revisioned facts for Go, JVM, TypeScript/JavaScript and Python |
 | Bounded validation | Go work-packet verifier, Git and declared executable checks | Applies a scoped patch to an exact revision in a disposable clone |
-| OpenClaw adapter | TypeScript plugin; tested against OpenClaw `2026.7.1-2` | Integration boundary only; Go/PostgreSQL remain authoritative |
+| OpenClaw adapter | TypeScript plugin; tested against OpenClaw `2026.9.4` | Integration boundary only; Go/PostgreSQL remain authoritative |
 | Local credentials | Python vault, scrypt and AES-256-GCM; private tmpfs files | Independent operator/controller/database credentials without plaintext secrets in Git |
 | Trace export | Durable SQL queue and optional OpenTelemetry collector | Actual collector export is covered by the disposable E2E profile |
 | Backup | Cold volume snapshot, authenticated encryption and direct Google Drive client | Consistent PostgreSQL/Milvus dependencies/artifact bundle; [runbook](manual-backup-restore-postgres-milvus-google-drive.md) |

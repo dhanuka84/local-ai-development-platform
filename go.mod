@@ -2,7 +2,7 @@ module github.com/dhanuka84/hybrid-ai-platform
 
 go 1.26.7
 
-toolchain go1.26.8
+toolchain go1.27.1
 
 require (
 	github.com/cerbos/cerbos-sdk-go v0.4.4

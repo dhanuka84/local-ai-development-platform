@@ -54,6 +54,35 @@ export class WorkflowController {
         const flow = flowId ? this.flows().get(flowId) : undefined;
         return { workflow: response.workflow, flow };
     }
+    async queueTask(input, signal) {
+        return await this.mcp.callTaskTool("workflow_task_begin", {
+            workflow_id: input.workflowId,
+            task_key: input.taskKey,
+            title: input.title,
+            task_type: input.taskType,
+            execution_mode: input.executionMode ?? "auto",
+            rag_query: input.ragQuery,
+            match_threshold: input.matchThreshold,
+            idempotency_key: input.idempotencyKey,
+        }, signal);
+    }
+    async taskStatus(taskId, signal) {
+        return await this.mcp.callTaskTool("workflow_task_get", { task_id: taskId }, signal);
+    }
+    async transitionTask(input, signal) {
+        return await this.mcp.callTaskTool("workflow_task_transition", {
+            task_id: input.taskId,
+            expected_version: input.expectedVersion,
+            event_type: input.eventType,
+            idempotency_key: input.idempotencyKey,
+            provider: input.provider,
+            model: input.model,
+            candidate_id: input.candidateId,
+            evidence: input.evidence,
+            review_influence_weight: input.reviewInfluenceWeight,
+            payload: input.payload,
+        }, signal);
+    }
     async transition(input, signal) {
         const flow = this.requireFlow(input.flowId, input.flowExpectedRevision);
         const response = await this.mcp.callWorkflowTool("workflow_run_transition", {

@@ -1,4 +1,4 @@
-import type { WorkflowResponse } from "./types.js";
+import type { WorkflowResponse, WorkflowTaskResponse } from "./types.js";
 export type MCPClientConfig = {
     url: string;
     token: string;
@@ -8,4 +8,6 @@ export declare class HybridMCPClient {
     private readonly config;
     constructor(config: MCPClientConfig);
     callWorkflowTool(name: string, args: Record<string, unknown>, signal?: AbortSignal): Promise<WorkflowResponse>;
+    callTaskTool(name: string, args: Record<string, unknown>, signal?: AbortSignal): Promise<WorkflowTaskResponse>;
+    private callTool;
 }
