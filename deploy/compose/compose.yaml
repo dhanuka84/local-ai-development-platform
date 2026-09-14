@@ -145,7 +145,7 @@ services:
     restart: unless-stopped
 
   ollama:
-    image: ollama/ollama:0.32.6
+    image: ollama/ollama:0.34.0@sha256:684d8674b4315fa18f4f0e973a118ec2652ed96f67563277839985175858e0ba
     ports:
       - "127.0.0.1:11434:11434"
     volumes:
@@ -158,7 +158,7 @@ services:
     restart: unless-stopped
 
   ollama-pull:
-    image: ollama/ollama:0.32.6
+    image: ollama/ollama:0.34.0@sha256:684d8674b4315fa18f4f0e973a118ec2652ed96f67563277839985175858e0ba
     entrypoint: ["/bin/sh", "-c"]
     command: ["ollama pull $${OLLAMA_EMBEDDING_MODEL}"]
     environment:

@@ -42,6 +42,26 @@ images can expose fewer tools; discover the installed surface before use.
 
 ## Configure an owned target
 
+The current local default is [Qwen3.8 27B](https://ollama.com/library/qwen3.8:27b)
+(`Q4_K_M`) on the pinned Ollama 0.34.0 Compose image. The reviewed model digest is
+`22130167c4c20e20c7b71454612966ca8e8171e9b3cc8ab6ce8aa6cbfec79643`.
+The installed 0.32.6 runtime rejected this model's manifest; use the configured
+0.34.0 runtime for this baseline. Ollama and SDLC workers run inference locally.
+
+Qwen3.8-Flash-Next is a newer architecture preview. Its smallest listed Linux
+quantization requires [120 GB of weights](https://ollama.com/library/qwen3.8-flash-next/tags),
+before context/runtime memory, which exceeds this workstation's available
+memory. The 27B model is the selected compatible local upgrade. Model catalog
+context limits describe capability; each accepted execution still has its own
+smaller input/output, time and total-token budgets.
+
+For a later model change, pull and inspect the exact model first, run structured
+output/tool checks and the explicit local-model acceptance profile below, then
+change the configured defaults. Preserve the previous model for an explicit
+rollback. SDLC package activation additionally requires the exact regression
+campaign and operator decision described below; changing a client default does
+not activate an SDLC package or approve generated KB entries.
+
 Run `make build` for the operator CLI, workers and source adapter. Build the
 isolated evaluator with the `sdlc-evaluator` Docker target and record its image
 ID. Supply Python/Go or other required offline test dependencies in your
@@ -249,7 +269,7 @@ the live installation is unchanged.
 To add an actual installed local model trial:
 
 ```sh
-SDLC_LOCAL_MODEL=qwen3.6:35b SDLC_LOCAL_OLLAMA_URL=http://127.0.0.1:11434 make agent-ready-functional
+SDLC_LOCAL_MODEL=qwen3.8:27b SDLC_LOCAL_OLLAMA_URL=http://127.0.0.1:11434 make agent-ready-functional
 ```
 
 Use your installed model name and explicit local origin. There is no cloud

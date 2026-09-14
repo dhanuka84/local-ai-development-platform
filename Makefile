@@ -68,7 +68,7 @@ CONFIRM_RESTORE ?=
 ALLOW_VERSION_MISMATCH ?= false
 CODEX_LOCAL_MODEL ?= $(shell sed -n 's/^[[:space:]]*LOCAL_CHAT_MODEL[[:space:]]*=[[:space:]]*//p' .env 2>/dev/null | tail -n 1)
 ifeq ($(strip $(CODEX_LOCAL_MODEL)),)
-CODEX_LOCAL_MODEL := qwen3.6:35b
+CODEX_LOCAL_MODEL := qwen3.8:27b
 endif
 CODEX_LOCAL_REASONING_EFFORT ?= high
 CODEX_LOCAL_MODEL_CATALOG ?= $(CURDIR)/examples/codex/qwen-model-catalog.json
@@ -879,7 +879,7 @@ diagram-knowledge-publication: ## Render hybrid-ai-review-learning-explainer as 
 	python3 scripts/render_diagrams.py --name hybrid-ai-review-learning-explainer
 
 pull-local-model: ## Pull the recommended GBX100 coding model
-	docker compose --env-file .env -f deploy/compose/compose.yaml exec ollama ollama pull "$${LOCAL_CHAT_MODEL:-qwen3.6:35b}"
+	$(COMPOSE) exec ollama ollama pull "$(CODEX_LOCAL_MODEL)"
 
 models-list: mcp-preflight ## List locally installed Ollama models
 	$(COMPOSE) exec ollama ollama list

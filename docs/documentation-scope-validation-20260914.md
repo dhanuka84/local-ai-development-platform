@@ -68,6 +68,14 @@ passing receipt never overwrites a failed trial. This is local functional
 alignment and documentation consistency, not a representative model benchmark
 or certification of a production deployment.
 
+The subsequent [dependency and model follow-up](sdlc-completion-checklist.md#dependency-and-model-follow-up)
+records the merged Dependabot update, Qwen3.8/Ollama baseline and repeated
+functional validation. Current model instructions, catalogs and examples were
+updated together; dated Qwen3.6 receipts keep their original identities. The
+follow-up documentation inventory and check logs are retained separately in
+`.local/qwen-upgrade-20260914/`, preserving the earlier counts and source boundary
+above.
+
 ## Complete document inventory
 
 Each entry is covered by link/navigation and example validation. Current guides

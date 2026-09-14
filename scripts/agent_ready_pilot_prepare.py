@@ -117,6 +117,6 @@ if __name__ == "__main__":
     parser.add_argument("runtime")
     parser.add_argument("--project", default="pilot-agent-ready-20260906")
     parser.add_argument("--database", default="pilot_agent_ready_20260906")
-    parser.add_argument("--model", default="qwen3.6:35b")
+    parser.add_argument("--model", default="qwen3.8:27b")
     options = parser.parse_args()
     prepare(options.runtime, options.project, options.database, options.model)

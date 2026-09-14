@@ -95,7 +95,7 @@ before following calls, references, implementations, imports, or tests.
 | Property-graph traversal | Apache AGE 1.6 / PostgreSQL 17 | Cypher traversal without a separate graph authority or service. |
 | Semantic/hybrid index | Milvus | Vector search that can grow from one machine to a distributed cluster. |
 | Local inference | Ollama | Simple local model serving and local embeddings. |
-| Local coding on GBX100/GB10 | `qwen3.6:35b` | Configured local coding default; evaluate quality and memory use on the actual task. |
+| Local coding on GBX100/GB10 | `qwen3.8:27b` | Configured local coding default; evaluate quality and memory use on the actual task. |
 | Local embeddings | `embeddinggemma` | Small local embedding model; 768 dimensions by default. |
 | Code analysis | Go compiler APIs plus SCIP for JVM, TypeScript/JavaScript, and Python | Deterministic, build-aware evidence without an LLM or editor bridge. |
 | Cloud architecture review | `moonshot/kimi-k3` | Explicit, sanitized review subagent. |
@@ -401,7 +401,7 @@ The local launcher prints the selected model route before Codex starts. The
 Codex startup banner must also show values equivalent to:
 
 ```text
-model: qwen3.6:35b
+model: qwen3.8:27b
 provider: ollama
 reasoning effort: high
 ```
@@ -412,7 +412,7 @@ After sending a prompt, independently confirm the model loaded in Ollama:
 curl --silent http://127.0.0.1:11434/api/ps | jq -r '.models[].name'
 ```
 
-`qwen3.6:35b` should appear while it remains loaded. This runtime evidence,
+`qwen3.8:27b` should appear while it remains loaded. This runtime evidence,
 together with the Codex startup banner, proves the conversation used Qwen.
 
 Inside Codex, verify a real MCP connection:
@@ -696,7 +696,7 @@ This repository pins and tests its controller plugin against OpenClaw
    openclaw onboard --non-interactive \
      --auth-choice ollama \
      --custom-base-url http://127.0.0.1:11434 \
-     --custom-model-id qwen3.6:35b \
+     --custom-model-id qwen3.8:27b \
      --accept-risk
    ```
 

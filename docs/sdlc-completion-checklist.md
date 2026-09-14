@@ -65,6 +65,56 @@ processes and verification were executed against actual disposable services.
 The summary and immutable artifacts preserve that distinction and all failed
 attempts; no model assertion substitutes for independent completion checks.
 
+## Dependency and model follow-up
+
+[Dependabot PR #24](https://github.com/dhanuka84/local-ai-development-platform/pull/24)
+merged as `0aba0d9b810230e62033872b8badcefc55d809ae` after all ten GitHub
+checks passed. The changes include compatible Go dependencies and tooling,
+the official Quay MinIO image, analyzer runtime checks and OpenClaw dependencies
+with zero reported npm audit vulnerabilities. The feature branch incorporates
+that merge. Historical receipts above retain their original dependency and
+model identities.
+
+The final model change selects `qwen3.8:27b` at digest
+`22130167c4c20e20c7b71454612966ca8e8171e9b3cc8ab6ce8aa6cbfec79643`
+with Ollama 0.34.0. [Model selection and qualification](sdlc-runtime.md#configure-an-owned-target)
+explain the hardware fit, exact version and rollback boundary. Structured JSON,
+native tool request/result round trips, the Responses function-call API with
+high reasoning, and the existing 768-dimensional embedding model passed local
+compatibility checks. The previous model and private configuration backups are
+retained. Repository launch defaults and existing explicit OpenClaw local-model
+references now select Qwen3.8; configuration validation and gateway reload passed.
+Changing these defaults does not activate an SDLC package or publish knowledge.
+
+The first Qwen3.8 feature trial, `a0304207-2a84-445b-8ab6-4c3ad03f5b4d`,
+completed with one model call, 4,764 actual tokens and 13,015 ms reported model
+inference. Both functional maps passed (28/28 and 12/12), including independent
+evaluation and native delivery. Its exact source was
+`71454348fb88a7a1b78cb81c4107efad2cce5bfe8fde22727db95b6e256b146e`,
+recorded in `.local/sdlc-e2e/run-20260914T011515Z-RNCDFe/summary.json`.
+These synthetic trials establish compatibility with the configured execution
+profile; they do not establish a comparative model-quality benchmark.
+
+After the model-pull helper was corrected to honor the configured Compose/vault
+environment and selected `.env` model, the final configured source was tested
+again. `make pull-local-model`, `make check` and both acceptance maps passed.
+Both final suites bind source SHA-256
+`406aff3b34efd1cbf9287200a6cba3a15493268789be711d563fa07a3005ab1a`:
+
+| Final check | Receipt |
+|---|---|
+| 28/28 foundation requirements | `.local/agent-ready-e2e/run-20260914T012211Z-wuFMhO/summary.json` |
+| 12/12 SDLC requirements, 13 passing test/subtest results, real local model passed | `.local/sdlc-e2e/run-20260914T012423Z-u6r7P6/summary.json` |
+
+Final Qwen3.8 run `e44cac27-89e4-4ca5-97b6-a994659145ab` completed with
+one model call, 4,860 actual tokens and 23,853 ms reported inference. Its
+independent evaluator used image
+`sha256:013825aab92cf0bc7028f6695a6706f7362507f8bd2fca7fb8483fb8f8c283d5`.
+
+Follow-up logs, exact model exchanges, sanitized runtime/configuration read-back
+and the final source-bound acceptance evidence are retained under
+`.local/qwen-upgrade-20260914/`. Private backups are excluded from evidence exports.
+
 ## Remaining target acceptance
 
 Live cutover, representative adoption cohorts and organization-specific

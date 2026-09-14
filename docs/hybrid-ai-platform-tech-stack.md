@@ -22,8 +22,8 @@ capabilities in the [gap assessment](sdlc-gap-assessment.md).
 | Property graph | Apache AGE 1.6.0 / PostgreSQL 17 in Compose | Rebuildable active topology; recursive SQL fallback; [ADR-0009](adr/0009-apache-age-graphrag.md) |
 | Semantic index | Milvus 2.6.21 Standalone; Go client 2.6.5 | Derived knowledge/definition/repository/code indexes with SQL UUIDs |
 | Milvus dependencies | etcd and MinIO | Included in the Compose profile and consistent backup set |
-| Local inference | Ollama 0.32.6 container | Explicit local coding and embedding endpoints; no hidden cloud fallback |
-| Coding model default | `qwen3.6:35b` | Configured local development choice; pull separately and evaluate on actual work |
+| Local inference | Ollama 0.34.0 container | Explicit local coding and embedding endpoints; no hidden cloud fallback |
+| Coding model default | `qwen3.8:27b` | Configured local development choice; pull separately and evaluate on actual work |
 | Embedding default | `embeddinggemma`, 768 dimensions | One local embedding contract; model/dimension changes require a compatible collection and reindex |
 | Authorization | Cerbos 0.54.0 | Trusted actor/resource checks with policy fixtures and durable decision correlation |
 | Evidence | Local SHA-256 content-addressed files plus PostgreSQL references | Immutable stored capture/review/validation bytes; generation prompts/responses retain original whitespace and line endings |

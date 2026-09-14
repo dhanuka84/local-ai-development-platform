@@ -241,7 +241,7 @@ Configuration requirements:
 
 ### 5.2 Local Development agent
 
-**Model:** `ollama/qwen3.6:35b` or the configured local coding model.  
+**Model:** `ollama/qwen3.8:27b` or the configured local coding model.
 **Workspace:** managed worktree or disposable clone.  
 **Authority:** inspect, implement, run allowlisted checks, produce a patch, and
 capture a pending generation.  
