@@ -16,6 +16,7 @@ type SourceDescriptor struct {
 	Endpoint          string              `json:"endpoint"`
 	TokenFile         string              `json:"token_file,omitempty"`
 	SchemaVersion     string              `json:"schema_version"`
+	AdapterSHA256     string              `json:"adapter_sha256,omitempty"`
 	Classification    string              `json:"classification"`
 	Owner             string              `json:"owner"`
 	Roles             []string            `json:"roles"`
@@ -48,6 +49,7 @@ type SourceQuery struct {
 // translating a reviewed view to native log/metric/event/lake/audit queries.
 type SourceEnvelope struct {
 	SchemaVersion string                       `json:"schema_version"`
+	AdapterSHA256 string                       `json:"adapter_sha256,omitempty"`
 	Revision      string                       `json:"revision"`
 	Start         time.Time                    `json:"start"`
 	End           time.Time                    `json:"end"`

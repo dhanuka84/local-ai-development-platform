@@ -66,7 +66,7 @@ func (s *Service) CompareProductObservations(ctx context.Context, in CompareObse
 	}
 	// Source-level authorization and field permissions have already been checked
 	// by GetProductRecord, including reads through retained KB context.
-	role, ok := selectRole(p, in.ProjectID, []string{"operations", "incident_diagnosis"})
+	role, ok := selectRole(p, in.ProjectID, []string{"operations", "incident_diagnosis", "sdlc_diagnosis", "sdlc_evaluator"})
 	if !ok {
 		return out, ErrForbidden
 	}

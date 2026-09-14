@@ -1,5 +1,10 @@
 # AI-native SDLC implementation and validation — September 13, 2026
 
+Historical receipt. Current runtime completion and evidence are recorded in the
+[September 14 scope review](documentation-scope-validation-20260914.md) and
+[completion checklist](sdlc-completion-checklist.md). Statements below retain
+their original revision boundary.
+
 Navigation: [Gap assessment](sdlc-gap-assessment.md#implementation-progress) ·
 [Usage and source setup](product-knowledge-and-evaluated-sources.md) ·
 [Documentation index](README.md).

@@ -9,10 +9,19 @@ import (
 	"time"
 
 	"github.com/dhanuka84/hybrid-ai-platform/internal/domain"
+	"github.com/dhanuka84/hybrid-ai-platform/internal/identity"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/telemetry"
+	"slices"
 )
 
 func (s *Service) productAccess(ctx context.Context, project, id, action, classification string) (context.Context, domain.Principal, error) {
+	if run, ok := executionGrant(ctx); ok {
+		p, err := identity.RequirePrincipal(ctx)
+		if err != nil || project != run.ProjectID || action != "read" || p.ID != run.Actor() || !slices.Contains(run.Target.Classifications, classification) {
+			return ctx, p, ErrForbidden
+		}
+		return ctx, p, nil
+	}
 	p, err := s.AuthorizeProjectAction(ctx, project, "product_knowledge", id, action, map[string]any{"classification": classification})
 	if err != nil {
 		return ctx, p, err
@@ -28,7 +37,9 @@ func (s *Service) productAccess(ctx context.Context, project, id, action, classi
 	if !ok {
 		return ctx, p, ErrForbidden
 	}
-	return telemetry.WithRole(domain.WithOperationScope(ctx, domain.OperationScope{ProjectID: project, WorkflowID: domain.ScopeFromContext(ctx).WorkflowID, TaskID: domain.ScopeFromContext(ctx).TaskID}), role), p, nil
+	scope := domain.ScopeFromContext(ctx)
+	scope.ProjectID = project
+	return telemetry.WithRole(domain.WithOperationScope(ctx, scope), role), p, nil
 }
 
 func (s *Service) productRepository() (domain.ProductRepository, error) {
@@ -91,6 +102,9 @@ func (s *Service) GetProductRecord(ctx context.Context, project, id string, curr
 	out, err := r.GetProductRecord(ctx, project, id, current)
 	if err != nil {
 		return out, err
+	}
+	if run, ok := executionGrant(ctx); ok && out.ProductID != run.ProductID {
+		return domain.ProductRecord{}, ErrForbidden
 	}
 	_, _, err = s.productAccess(ctx, project, id, "read", out.Classification)
 	if err != nil {

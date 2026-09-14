@@ -233,7 +233,7 @@ func (r *Repository) SearchProductRecords(ctx context.Context, project, product,
 	if limit < 1 || limit > 100 {
 		return nil, fmt.Errorf("invalid product search limit")
 	}
-	rows, err := r.pool.Query(ctx, `SELECT `+productColumns+` FROM product_records r WHERE project_id=$1 AND product_id=$2 AND product_record_eligible(r.id) AND ($3='' OR to_tsvector('simple',r.record->>'title'||' '||r.record->>'content') @@ plainto_tsquery('simple',$3)) ORDER BY r.created_at DESC,r.id LIMIT $4`, project, product, query, limit)
+	rows, err := r.pool.Query(ctx, `SELECT `+productColumns+` FROM product_records r WHERE project_id=$1 AND product_id=$2 AND product_record_eligible(r.id) AND ($3='' OR to_tsvector('simple',concat_ws(' ',r.record->>'title',r.record->>'content')) @@ plainto_tsquery('simple',$3)) ORDER BY r.created_at DESC,r.id LIMIT $4`, project, product, query, limit)
 	if err != nil {
 		return nil, err
 	}

@@ -179,6 +179,15 @@ func (r *Registry) Query(ctx context.Context, d domain.SourceDescriptor, q domai
 	if decoder.Decode(&out) != nil || decoder.Decode(new(any)) != io.EOF {
 		return domain.SourceEnvelope{}, errors.New("source schema invalid")
 	}
+	return ValidateEnvelope(d, q, out)
+}
+
+// ValidateEnvelope is shared by native adapters and the receiving gateway.
+// Native protocol success alone does not establish typed or complete evidence.
+func ValidateEnvelope(d domain.SourceDescriptor, q domain.SourceQuery, out domain.SourceEnvelope) (domain.SourceEnvelope, error) {
+	if d.AdapterSHA256 != "" && out.AdapterSHA256 != d.AdapterSHA256 {
+		return domain.SourceEnvelope{}, errors.New("native adapter contract changed")
+	}
 	if out.SchemaVersion != d.SchemaVersion || out.Revision == "" || len(out.Revision) > 256 || !out.Start.Equal(q.Start) || !out.End.Equal(q.End) || out.Watermark.IsZero() || out.Watermark.After(time.Now().Add(time.Minute)) || len(out.Rows) > q.Limit {
 		return domain.SourceEnvelope{}, errors.New("source coverage contract invalid")
 	}

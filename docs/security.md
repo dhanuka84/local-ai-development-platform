@@ -138,9 +138,11 @@ and source/time lineage. Generated diagnoses, summaries and lessons remain
 pending until relevant validation and explicit exact-version approval; calling
 an inference an observation cannot bypass that gate. Product troubleshooting
 and maintenance inference stay local with no cloud fallback. These requirements
-remain implementation work in [A04](sdlc-gap-assessment.md#a04),
-[A06](sdlc-gap-assessment.md#a06), [A07](sdlc-gap-assessment.md#a07) and
-[A11](sdlc-gap-assessment.md#a11).
+are enforced by the [scoped runtime](sdlc-runtime.md) and its native adapters.
+Its acceptance tests cover early schema/authentication denials, role handoffs,
+expired/revoked grants, source budgets and separate protected execution. New
+target adapters must meet the same boundaries; arbitrary external client
+actions remain outside platform-owned audit coverage.
 
 ## Production requirements
 

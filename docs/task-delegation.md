@@ -13,11 +13,10 @@ operations or cloud-review role.
 
 This implements one delegation type: bounded local Development. The broader
 [SDLC agent role matrix](ai-native-sdlc-expectations.md#accountable-roles-with-different-responsibilities)
-also calls for product analysis, independent evaluation, deployment, diagnosis,
-remediation and curation capabilities. Those role names are target
-responsibilities, not credentials this CLI can issue. Extending delegation
-requires explicit source/action scopes, owner attribution, revocation and
-negative tests under [A06](sdlc-gap-assessment.md#a06).
+also includes product analysis, independent evaluation, deployment, diagnosis,
+remediation and curation. The separate [SDLC runtime](sdlc-runtime.md) implements
+five distinct workload roles and expiring owner-attributed run/source/action
+grants. This development-task credential command does not issue those roles.
 
 The operator CLI writes the random 256-bit bearer token directly to an exclusive
 mode-0600 file inside an existing mode-0700 directory. It prints only delegation

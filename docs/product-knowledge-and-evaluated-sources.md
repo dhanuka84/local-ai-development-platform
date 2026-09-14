@@ -20,8 +20,9 @@ and evidence boundary needed by the SDLC agents.
 
 ## Available tools
 
-The source registers **43 MCP tools with local code indexing enabled, 42
-without it**. Eleven are added by this implementation:
+The source registers **60 MCP tools with local code indexing enabled, 59
+without it**. The eleven product tools below are complemented by the
+[17 execution/package tools](sdlc-runtime.md):
 
 | Tool | Purpose and authority |
 |---|---|
@@ -129,18 +130,20 @@ The registry describes:
 - Maximum rows, response bytes, elapsed query time and time-window duration,
   plus observation retention eligibility.
 
-There are per-request bounds, not yet a persistent total task/source cost
-budget or a distributed rate limiter. Complete workload-role delegation and
-execution isolation remain [A06](sdlc-gap-assessment.md#a06).
+Execution-scoped reads additionally reserve persistent cumulative query and row
+budgets under an expiring role lease. Exact retries reuse their reservation.
+The native adapter enforces local concurrency/rate bounds; distributed source
+quotas require the target's gateway/service controls. See the
+[execution access boundary](sdlc-runtime.md#execution-and-responsibility).
 
 ## Adapter protocol and evaluated ingestion
 
-The gateway POSTs a typed `SourceQuery` to the fixed endpoint. This is a
-**read-only view protocol**: the adapter operator implements the translation
-to the native log, metric, event, lake or audit system. This repository does
-not yet contain native Kafka consumers, lake clients or arbitrary database
-connectors. Configuring an adapter is not evidence of a tested production
-integration.
+The gateway POSTs a typed `SourceQuery` to a fixed reviewed endpoint. The
+[native adapter](../internal/sourceadapter/adapter.go) translates this protocol
+to Kafka, S3, PostgreSQL audit views, Loki, Prometheus or a fixed read-only MCP
+tool. Its [setup and completeness contracts](sdlc-runtime.md#connect-operational-evidence)
+bind native versions, watermarks and private read authority. The disposable
+native-service proof does not establish access to an organization's production data.
 
 Example query arguments, using a closed window appropriate to the actual
 data being investigated:
@@ -253,9 +256,7 @@ verifies product edges and rebuild queuing. Domain/source tests cover malformed
 criteria, invalid transport/data, duplicate joins, empty samples and incomplete
 coverage. Functional evidence remains distinct from real-model performance.
 
-The [gap assessment](sdlc-gap-assessment.md#implementation-progress) tracks the
-implemented primitives and remaining composite requirements. Durable agent
-execution, protected independent product-test execution, evaluated agent
-packages, native production connectors, delivery/remediation effects and an
-outcome/exception interface are still required. Changing a fixture's source
-data to test reconciliation is not a remediation-agent proof.
+The [runtime guide](sdlc-runtime.md) connects these contracts to durable role
+execution, independent tests, native delivery/remediation and the operator CLI.
+The [completion checklist](sdlc-completion-checklist.md) maps end-to-end evidence;
+fixture protocol tests remain distinct from native-service and real-model trials.

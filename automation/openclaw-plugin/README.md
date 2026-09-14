@@ -9,11 +9,12 @@ MCP/PostgreSQL workflow service. It never calls PostgreSQL, Cerbos, Milvus, or
 model providers directly.
 
 Its place in the [AI-native scope](../../docs/ai-native-sdlc-expectations.md) is
-the execution/control integration boundary. A general plan/action/evaluate
-supervisor, product/incident source adapters and the expanded agent role/audit
-contracts remain [A02–A11 work](../../docs/sdlc-gap-assessment.md#primary-ai-native-gaps).
-The plugin currently persists/mirrors state; a configured client or execution
-worker must supply model work. A queued task does not itself generate a patch.
+the execution/control integration boundary. The separate
+[SDLC runtime](../../docs/sdlc-runtime.md) now supplies bounded feature and
+incident execution, native sources, five distinct workloads and correlated
+audit. This plugin persists/mirrors its existing workflow state; a configured
+client or execution worker supplies model work. A queued task alone does not
+generate a patch. See [ADR-0012](../../docs/adr/0012-bounded-sdlc-runtime.md).
 
 The plugin exposes workflow tools plus `hybrid_task_queue`,
 `hybrid_task_status`, and `hybrid_task_transition`. Task queueing defaults to

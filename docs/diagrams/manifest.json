@@ -2,11 +2,11 @@
   "schema": "hybrid-ai/diagram-manifest/v1",
   "diagrams": {
     "ai-native-sdlc-scope": {
-      "source_sha256": "05d149aa494ee74800f594acf8db8a6522061080ed1e9ec1e8db4edfb78ca654",
-      "svg_sha256": "0c7dafff4f5f3000085b7a8bed5435e1948179945f2fbf451ceac2347f20d274",
-      "png_sha256": "3e72946ff8458911d10c2ac092ea3ebe698fcdd9bd96d7292c7e9e3c2d5002ae",
-      "png_width": 3190,
-      "png_height": 4526,
+      "source_sha256": "a13105c81683a721177cd595e9c90bc09e915451fcabf6768cc61fe7a78259ea",
+      "svg_sha256": "3f78a7aba0832cb7e76341834ec6f4a71fb3eaf7599381135f7fd576bc92414f",
+      "png_sha256": "400d8783c48c3c51d79ceef5343e0e5ec61a5780f0f790984750558514452794",
+      "png_width": 3486,
+      "png_height": 4678,
       "renderer": "@mermaid-js/mermaid-cli@11.16.0",
       "renderer_sha256": "545576961a67865ef41de8c462d1ccd65a8e136b47cce6596a66c96c7b860fb9",
       "config_sha256": "0478f58fb0233dc0fd5ad6a9e78af7cab3002135762b2bc8b10b7cc729495c3c"

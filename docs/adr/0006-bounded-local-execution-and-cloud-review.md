@@ -2,6 +2,12 @@
 
 **Status:** Accepted
 
+September 14 update: [ADR-0012](0012-bounded-sdlc-runtime.md) extends the execution
+boundary with explicit local SDLC workers and a durable gateway supervisor. It
+supersedes the OpenClaw-only execution assumption for these profiles while
+retaining separate model execution, canonical state and publication authority.
+Earlier dated observations below retain their original boundary.
+
 September 12, 2026 clarification: OpenClaw owns model invocation; the MCP
 service enforces activation-time routes and durable transitions. General
 automatic classification and disclosure packaging remain planned.

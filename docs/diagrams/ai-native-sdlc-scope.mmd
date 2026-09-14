@@ -5,13 +5,13 @@ title: AI-native SDLC platform · expected scope and knowledge flow
 flowchart TB
     HUMAN["People own outcomes and decisions<br/>Every agent has an accountable owner"]:::client
 
-    subgraph PLATFORM["EXPECTED PLATFORM SCOPE — target capabilities"]
-        CONTROL["Controls apply throughout<br/>Role identity · scoped access · budgets<br/>Audit reads, actions and decisions<br/>Include denials and failures"]:::gate
+    subgraph PLATFORM["AI-NATIVE SDLC SCOPE — local profiles and target expansion"]
+        CONTROL["Controls apply throughout<br/>Distinct workloads · scoped grants · total budgets<br/>Audit reads, actions and decisions<br/>Include denials and failures"]:::gate
         PLAN["Discover · plan · specify<br/>Product/BRS and planning agents"]:::local
         BUILD["Design · implement · integrate<br/>Architecture and builder agents"]:::local
         TEST["Evaluate · accept · deliver<br/>QA, security and release agents"]:::local
         OPS["Operate · improve · retire<br/>Incident, maintenance and KB agents"]:::local
-        MCP["Agent runtime + MCP gateway<br/>Plan / act / verify / resume<br/>Scoped tools and reconciled effects"]:::service
+        MCP["Agent runtime + MCP gateway<br/>Durable intent / act / verify / repair / resume<br/>Pinned role packages · leases · reconciled effects"]:::service
 
         subgraph KB["ONE SHARED PRODUCT KNOWLEDGE BASE"]
             PG["PostgreSQL authority<br/>Product · BRS · features · code<br/>Releases · operations · observations · incidents"]:::data
@@ -23,8 +23,11 @@ flowchart TB
         PENDING["Generated conclusions and lessons<br/>Pending → local validation<br/>→ explicit exact-version approval"]:::pending
     end
 
-    SOURCE["Source adapters<br/>BRS/docs · code · logs · metrics<br/>Kafka · lake · audit DB · incident history"]:::external
-    DELIVERY["Delivery and operations<br/>Forge · CI · artifacts · environments<br/>Verify technical and business effects"]:::external
+    PACKAGE["Versioned local agent packages<br/>Regression-qualified activation and rollback"]:::gate
+    HUMAN --> PACKAGE --> MCP
+
+    SOURCE["Source adapters<br/>BRS/docs · current code symbols · history<br/>Native Kafka · S3 · audit · Loki · Prometheus"]:::external
+    DELIVERY["Delivery and operations<br/>Native forge · CI · artifacts · staging<br/>Separate remedy and technical/business verification"]:::external
 
     HUMAN --> CONTROL
     CONTROL --> PLAN & BUILD & TEST & OPS

@@ -1,5 +1,10 @@
 # Documentation scope review and implementation alignment
 
+Historical receipt. Current runtime completion and evidence are recorded in the
+[September 14 scope review](documentation-scope-validation-20260914.md) and
+[completion checklist](sdlc-completion-checklist.md). Statements below retain
+their original revision boundary.
+
 Reviewed September 13, 2026 against `main` revision
 `9fba87f23f0e733a6bba0528b505f647bbac5aef` and the uncommitted documentation
 snapshot recorded with this review. This is a **pre-implementation receipt**.

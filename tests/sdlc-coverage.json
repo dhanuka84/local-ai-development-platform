@@ -1,0 +1,23 @@
+{
+  "schema": "hybrid-ai/sdlc-coverage/v1",
+  "items": [
+    {"id":"A01","checks":["internal/e2e:TestSDLCLocalIntentAndOperatorCLIE2E","internal/e2e:TestSDLCIndependentBuilderEvaluatorE2E"]},
+    {"id":"A02","checks":["internal/e2e:TestSDLCExecutionLeasesAndAuthorityE2E","internal/e2e:TestSDLCIndependentBuilderEvaluatorE2E"]},
+    {"id":"A03","checks":["internal/e2e:TestSDLCIndependentBuilderEvaluatorE2E","internal/e2e:TestSDLCLimitsRevocationAndIngressAuditE2E"],"local_model_check":"internal/e2e:TestSDLCRealLocalModelFeatureE2E"},
+    {"id":"A04","checks":["internal/e2e:TestSDLCProductCodeBridgeE2E","internal/e2e:TestSDLCExecutionLeasesAndAuthorityE2E","internal/e2e:TestSDLCIncidentNativeRecoveryE2E"]},
+    {"id":"A05","checks":["internal/e2e:TestSDLCIndependentBuilderEvaluatorE2E","internal/sdlcworker:TestSandboxAdversarialIsolation"]},
+    {"id":"A06","checks":["internal/e2e:TestSDLCLimitsRevocationAndIngressAuditE2E","internal/e2e:TestSDLCIncidentNativeRecoveryE2E","internal/e2e:TestSDLCNativeSourcesE2E"]},
+    {"id":"A07","checks":["internal/e2e:TestSDLCNativeSourcesE2E","internal/e2e:TestSDLCIndependentBuilderEvaluatorE2E"]},
+    {"id":"A08","checks":["internal/e2e:TestSDLCIncidentNativeRecoveryE2E"]},
+    {"id":"A09","checks":["internal/e2e:TestSDLCLocalIntentAndOperatorCLIE2E","internal/e2e:TestSDLCIndependentBuilderEvaluatorE2E"]},
+    {"id":"A10","checks":["internal/e2e:TestSDLCIndependentBuilderEvaluatorE2E"]},
+    {"id":"A11","checks":["internal/e2e:TestSDLCLimitsRevocationAndIngressAuditE2E","internal/e2e:TestSDLCIncidentNativeRecoveryE2E","internal/e2e:TestSDLCIndependentBuilderEvaluatorE2E"]},
+    {"id":"A12","checks":["internal/e2e:TestSDLCIndependentBuilderEvaluatorE2E","internal/e2e:TestSDLCIncidentNativeRecoveryE2E","internal/e2e:TestSDLCNativeSourcesE2E"]}
+  ],
+  "deferred_acceptance": [
+    "Live cutover requires named deployment, credentials, retained images and change window.",
+    "Representative model/adoption quality requires an agreed task cohort, baseline and observation period.",
+    "Enterprise identity, retention, storage, HA and recovery require target policies, owners and measured SLOs.",
+    "Additional forge, CI, lakehouse and deployment vendors require their own conformance and target acceptance."
+  ]
+}

@@ -29,27 +29,37 @@ func (r *Repository) BootstrapPrincipals(ctx context.Context, principals []domai
 		if _, err := tx.Exec(ctx, `INSERT INTO principals(id,display_name,kind)
             VALUES($1,$2,$3)
             ON CONFLICT (id) DO UPDATE SET display_name=EXCLUDED.display_name,
-              kind=EXCLUDED.kind,active=true,updated_at=now()`, principal.ID, principal.DisplayName, kind); err != nil {
+              updated_at=now() WHERE principals.kind=EXCLUDED.kind`, principal.ID, principal.DisplayName, kind); err != nil {
 			return fmt.Errorf("bootstrap principal %q: %w", principal.ID, err)
 		}
-		if _, err := tx.Exec(ctx, `DELETE FROM principal_credentials
-		    WHERE principal_id=$1 AND label='environment-bootstrap'`, principal.ID); err != nil {
+		var storedKind string
+		if err := tx.QueryRow(ctx, `SELECT kind FROM principals WHERE id=$1`, principal.ID).Scan(&storedKind); err != nil || storedKind != kind {
+			return fmt.Errorf("bootstrap cannot change principal kind for %q", principal.ID)
+		}
+		hash := sha256.Sum256([]byte(principal.Token))
+		// Restarts retain credential IDs and explicit revocations. Rotation
+		// revokes the old credential instead of deleting its delegation history.
+		if _, err := tx.Exec(ctx, `UPDATE principal_credentials SET revoked_at=COALESCE(revoked_at,now())
+		    WHERE principal_id=$1 AND label='environment-bootstrap' AND ($3 OR token_sha256<>$2)`, principal.ID, hash[:], principal.Token == ""); err != nil {
 			return err
 		}
 		if principal.Token != "" {
-			hash := sha256.Sum256([]byte(principal.Token))
 			if _, err := tx.Exec(ctx, `INSERT INTO principal_credentials(principal_id,token_sha256,label)
-			    VALUES($1,$2,'environment-bootstrap')`, principal.ID, hash[:]); err != nil {
+			    VALUES($1,$2,'environment-bootstrap') ON CONFLICT(token_sha256) DO NOTHING`, principal.ID, hash[:]); err != nil {
 				return fmt.Errorf("bootstrap credential for %q: %w", principal.ID, err)
 			}
+			var credentialOwner string
+			if err := tx.QueryRow(ctx, `SELECT principal_id FROM principal_credentials WHERE token_sha256=$1`, hash[:]).Scan(&credentialOwner); err != nil || credentialOwner != principal.ID {
+				return errors.New("bootstrap credential is already assigned to a different principal")
+			}
 		}
-		if _, err := tx.Exec(ctx, `DELETE FROM principal_role_bindings WHERE principal_id=$1`, principal.ID); err != nil {
+		if _, err := tx.Exec(ctx, `DELETE FROM principal_role_bindings WHERE principal_id=$1 AND (NOT(project_id=ANY($2)) OR NOT(role=ANY($3)))`, principal.ID, principal.ProjectIDs, principal.Roles); err != nil {
 			return err
 		}
 		for _, projectID := range principal.ProjectIDs {
 			for _, role := range principal.Roles {
 				if _, err := tx.Exec(ctx, `INSERT INTO principal_role_bindings(principal_id,project_id,role)
-                    VALUES($1,$2,$3)`, principal.ID, projectID, role); err != nil {
+                    VALUES($1,$2,$3) ON CONFLICT DO NOTHING`, principal.ID, projectID, role); err != nil {
 					return fmt.Errorf("bootstrap role %s/%s for %q: %w", projectID, role, principal.ID, err)
 				}
 			}

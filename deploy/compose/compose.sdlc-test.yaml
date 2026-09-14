@@ -1,0 +1,74 @@
+# Host-run trusted workers need disposable dependency ports. Untrusted evaluator
+# containers still receive no network and no Docker socket.
+services:
+  gitea:
+    image: docker.gitea.com/gitea:1.26.4-rootless@sha256:cd1d2614b403fc9b085fa52ceb4424dde9c4dcf5da8e3263abb27955562070c4
+    ports: ["127.0.0.1::3000"]
+    environment:
+      GITEA__security__INSTALL_LOCK: "true"
+      GITEA__database__DB_TYPE: sqlite3
+      GITEA__service__DISABLE_REGISTRATION: "true"
+      GITEA__server__OFFLINE_MODE: "true"
+      GITEA__server__DISABLE_SSH: "true"
+      GITEA__log__LEVEL: Warn
+    # Gitea's native receive hooks update its branch/PR database after Git writes.
+    tmpfs: ["/var/lib/gitea:exec,uid=1000,gid=1000,mode=0700", "/etc/gitea:uid=1000,gid=1000,mode=0700"]
+    healthcheck:
+      test: [CMD, wget, -q, --spider, http://127.0.0.1:3000/api/healthz]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  kafka:
+    image: apache/kafka-native:4.3.1@sha256:2885898ba17065023f1bd605f3a81efcfa986014f062b73b91ef5462485f9060
+    ports: ["127.0.0.1:${SDLC_TEST_KAFKA_PORT:?set by the disposable runner}:19092"]
+    environment:
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+      KAFKA_NODE_ID: "1"
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: INTERNAL://:9092,EXTERNAL://:19092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://127.0.0.1:${SDLC_TEST_KAFKA_PORT}
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: "0"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+    healthcheck:
+      test: [CMD, /bin/bash, -c, ": > /dev/tcp/127.0.0.1/9092"]
+      interval: 2s
+      timeout: 3s
+      retries: 45
+  loki:
+    image: grafana/loki:3.7.2@sha256:191d4fdfb7264f16989f0a57f320872620a5a7c2ceeec6229212c4190ec49b86
+    command: ["-config.file=/etc/loki/sdlc.yaml"]
+    ports: ["127.0.0.1::3100"]
+    volumes:
+      - ../sdlc-test/loki.yaml:/etc/loki/sdlc.yaml:ro
+    tmpfs: [/tmp]
+  prometheus:
+    image: prom/prometheus:v3.14.0@sha256:5ce7540c3c00ef4ab0c9d2c995c6a5b9c421f44b4a115d97a2c7af3b1c21cbb0
+    ports: ["127.0.0.1::9090"]
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.path=/prometheus", "--web.enable-remote-write-receiver"]
+    volumes:
+      - ../sdlc-test/prometheus.yaml:/etc/prometheus/prometheus.yml:ro
+    tmpfs: ["/prometheus:uid=65534,gid=65534,mode=0700"]
+  minio:
+    ports: ["127.0.0.1::9000"]
+  postgres:
+    ports: ["127.0.0.1::5432"]
+  milvus:
+    ports: ["127.0.0.1::19530"]
+  cerbos:
+    ports: ["127.0.0.1::3593"]
+  otel-collector:
+    ports: ["127.0.0.1::4318"]
+
+# Docker suppresses published ports on an internal-only bridge. These trusted
+# synthetic dependencies use an ordinary private bridge with loopback-only host
+# ports; the untrusted evaluator always runs on network=none.
+networks:
+  default:
+    internal: false

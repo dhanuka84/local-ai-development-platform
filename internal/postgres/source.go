@@ -26,7 +26,7 @@ func (r *Repository) RecordSourceObservation(ctx context.Context, receipt domain
 		return err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	if err = requireProductActor(ctx, tx, receipt.Actor, receipt.ProjectID, "operations", "incident_diagnosis"); err != nil {
+	if err = requireExecutionSourceActor(ctx, tx, receipt.Actor, receipt.ProjectID, receipt.ProductID, receipt.QuerySHA256); err != nil {
 		return err
 	}
 	if err = requireDatabaseHumanRole(ctx, tx, receipt.Owner, receipt.ProjectID, "operations"); err != nil {

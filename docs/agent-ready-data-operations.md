@@ -238,8 +238,10 @@ item. Its debug exporter is an operational view, not an archival backend.
 These contracts are one part of the shared product KB. The
 [AI-native ingestion scope](ai-native-sdlc-expectations.md#from-collected-data-to-reusable-knowledge)
 now has [product records and evaluated observation tools](product-knowledge-and-evaluated-sources.md).
-Their bounded HTTP protocol still requires operator-provided native log, metric,
-Kafka, lake and external audit bridges. `generation_capture` remains a pending
+The [native source adapter](sdlc-runtime.md#connect-operational-evidence) now
+provides reviewed log, metric, Kafka, S3 and PostgreSQL audit bridges. Target
+credentials, views, field policy and producer completeness markers remain
+operator configuration. `generation_capture` remains a pending
 generated-KB path; it is not an automatic observation-publication API.
 
 `context://registry/v1` publishes source-controlled definitions for inspection;

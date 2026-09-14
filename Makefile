@@ -2,13 +2,17 @@ SHELL := /bin/sh
 .DEFAULT_GOAL := help
 BUILD_CHECK_IMAGE ?= local-ai-platform-buildcheck:go1.26.8
 
-.PHONY: agent-ready-acceptance agent-ready-integration agent-ready-e2e agent-ready-functional agent-ready-pilot
+.PHONY: agent-ready-acceptance agent-ready-integration agent-ready-e2e agent-ready-functional agent-ready-pilot sdlc-functional
 agent-ready-functional: agent-ready-e2e ## Verify local functionality and report deferred rollout/adoption requirements separately
+	$(MAKE) sdlc-functional
 
 agent-ready-e2e: agent-ready-integration ## Run checklist-mapped E2E and integration tests and retain machine-readable evidence
 
 agent-ready-integration: ## Build and run all agent-ready integration checks in isolated disposable services
 	sh scripts/agent_ready_acceptance.sh
+
+sdlc-functional: ## Exercise scoped host workers and isolated product evaluation against disposable services
+	sh scripts/sdlc_functional_acceptance.sh
 
 agent-ready-acceptance: ## Run the deterministic two-task scenario against explicitly disposable services
 	@test -n "$$TEST_DATABASE_URL" && test -n "$$TEST_MILVUS_ADDRESS" && test -n "$$TEST_CERBOS_ADDRESS" || { echo 'Set disposable TEST_DATABASE_URL, TEST_MILVUS_ADDRESS and TEST_CERBOS_ADDRESS'; exit 1; }
@@ -435,6 +439,7 @@ build: ## Build all binaries into ./bin
 	go build -o bin/worker ./cmd/worker
 	go build -o bin/admin ./cmd/admin
 	go build -o bin/workpacket ./cmd/workpacket
+	go build -o bin/ ./cmd/sdlc ./cmd/sdlc-worker ./cmd/source-adapter ./cmd/sdlc-verifier
 
 migrate: mcp-preflight ## Apply PostgreSQL migrations through the Compose admin image
 	$(COMPOSE) run --rm migrate migrate

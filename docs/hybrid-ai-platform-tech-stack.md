@@ -97,11 +97,12 @@ deterministic; it does not benchmark inference or certify a real cloud session.
 
 Versioned product/BRS/feature/operations/incident records and bounded source
 ingestion are described in the [product KB guide](product-knowledge-and-evaluated-sources.md).
-The agreed product target still needs richer lifecycle links, a durable agent supervisor,
-versioned agent/evaluator packages, MCP source and delivery adapters, and
-role-scoped access and audit across that flow. These extend the existing Go,
-PostgreSQL, AGE, Milvus and OpenClaw boundaries; they are not new installed
-services. See the [component map](sdlc-guide.md#required-platform-components).
+The [SDLC runtime](sdlc-runtime.md) adds durable execution, versioned packages,
+role-scoped access, native readers and delivery/remediation workers across those
+same Go/PostgreSQL/AGE/Milvus boundaries. Trusted host workers launch isolated
+product evaluation. Kafka, S3, Loki, Prometheus and Gitea are native disposable
+acceptance dependencies and optional target integrations, not newly installed
+services in the live stack. See the [closure evidence](sdlc-completion-checklist.md).
 
 The earlier stack proposal included a TypeScript MCP service, pgvector/QMD as
 the main retrieval store, Git as the runtime KB authority, a protected hook

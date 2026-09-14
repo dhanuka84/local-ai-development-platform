@@ -8,9 +8,11 @@ import (
 // Operation metadata is deliberately typed: no prompts, arbitrary payloads,
 // credentials, raw output, or model reasoning can be added to telemetry.
 type OperationScope struct {
-	ProjectID  string `json:"project_id,omitempty"`
-	WorkflowID string `json:"workflow_id,omitempty"`
-	TaskID     string `json:"task_id,omitempty"`
+	ProjectID       string `json:"project_id,omitempty"`
+	WorkflowID      string `json:"workflow_id,omitempty"`
+	TaskID          string `json:"task_id,omitempty"`
+	ExecutionID     string `json:"execution_id,omitempty"`
+	ExecutionStepID string `json:"execution_step_id,omitempty"`
 }
 type EvidenceReference struct {
 	Kind    string `json:"kind"`

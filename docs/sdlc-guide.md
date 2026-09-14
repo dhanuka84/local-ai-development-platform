@@ -3,8 +3,8 @@
 Navigation: [Documentation index](README.md) · [SDLC gap assessment](sdlc-gap-assessment.md) ·
 [Expectations and scope](ai-native-sdlc-expectations.md) · [Developer guide](developer-guide.md).
 
-Re-evaluated September 13, 2026 against `main` revision
-`9fba87f23f0e733a6bba0528b505f647bbac5aef`.
+Scope established September 13, 2026. Runtime mapping updated September 14;
+see the [current closure evidence](sdlc-completion-checklist.md).
 
 ## Product direction and current position
 
@@ -29,15 +29,13 @@ exceptions while authorized routine work continues. Success is a verified
 product outcome with controlled cost and effects. Chat quality, generated code
 volume and the number of agents are insufficient measures.
 
-The current implementation is a **governed agent foundation with bounded local
-task demonstrations**. Its retrieval, evidence, policy, workflow and verifier
-components are useful building blocks. The complete intent-to-delivered-outcome
-loop is still a target. In particular,
-[`development-local.lobster`](../automation/workflows/development-local.lobster)
-requires an existing packet and patch and runs evaluation/verification.
-Generation is supplied by a client or the bounded pilot. The
-[controller](../automation/openclaw-plugin/src/controller.ts) persists and mirrors
-workflow/task state; the general execution supervisor remains to be built.
+The implementation now has a durable local execution runtime, versioned role
+packages, protected independent evaluation, native source readers and delivery/
+remediation adapters. The [runtime guide](sdlc-runtime.md) gives configuration
+and commands; the [closure checklist](sdlc-completion-checklist.md) gives exact
+functional evidence. The existing OpenClaw controller continues to mirror task
+state; the new `sdlc-worker` processes execute the role-specific stages while
+MCP and PostgreSQL own authoritative state and decisions.
 
 The forge, issue tracker, registry and deployment system remain systems of
 record for their objects. In the AI-native target, agents operate those systems
@@ -58,7 +56,7 @@ explicitly identified as implemented.
 
 **Check the running installation first.** On September 13 the local MCP endpoint
 advertised 20 tools against the baseline's 32 source registrations. The new
-product-KB implementation registers 43 with code indexing enabled.
+runtime implementation registers 60 with code indexing enabled.
 Several validation, definition and trace tools were absent. Current-source
 instructions require a compatible deployment; see [G01](sdlc-gap-assessment.md#g01).
 The September 12 result of 28/28 functional requirements and 132 passing
@@ -78,8 +76,10 @@ MCP tools provide the controlled boundary for reading this context, collecting
 additional evidence and submitting evaluated records. The
 [product KB and source guide](product-knowledge-and-evaluated-sources.md) describes
 implemented records, accepted intent and a bounded HTTP adapter protocol.
-Native production connectors, richer lifecycle links and the execution supervisor
-remain extensions. Fixed platform metrics remain separate.
+The [runtime guide](sdlc-runtime.md) connects those contracts to native source
+readers, revision-specific code bridges and durable role execution. Actual
+production access remains a target deployment task. Fixed platform metrics
+remain separate.
 
 The following target map makes KB use explicit at every stage. A recorded
 artifact or validated observation is not automatically approved reusable
@@ -135,7 +135,8 @@ flowchart TD
     Q -->|"Authorized continuation"| P
 ```
 
-The diagram is the target execution architecture. MCP and PostgreSQL provide
+The diagram summarizes the expected execution architecture. The local runtime
+implements bounded feature and incident profiles. MCP and PostgreSQL provide
 several existing boundaries; the complete loop and its delivery adapters are
 not established by the current local functional suite.
 
@@ -166,24 +167,25 @@ it is a design principle, not a claim of a standardized “AI-native” certific
 
 ## Required platform components
 
-| Component | Responsibility in the AI-native target | Current starting point |
+| Component | Responsibility in the AI-native target | Current implementation |
 |---|---|---|
-| Intent and specification service | Maintain outcomes, criterion versions, assumptions, scope and change impact | Immutable request/intake and governed definitions; full specification contract missing |
-| Durable agent supervisor | Run plan/action/evaluate cycles, recover after interruption, schedule dependencies and reconcile effects | Workflow/task records and OpenClaw state mirror; general runner planned |
-| Versioned agent packages | Bind role instructions, model/client version, tool schemas, evaluation suite and rollout policy | Example agent configuration and provider provenance |
-| Shared product KB and context builder | Connect structural and semantic product knowledge; select current authorized evidence within a context budget and isolate working memory | PostgreSQL authority, AGE/Milvus and approved KB lifecycle; wider product/observation ontology missing |
-| MCP source adapters and evaluated ingestion | Collect bounded BRS/code/log/metric/Kafka/lake/audit evidence, validate and link it with source/time lineage | Product records, exact intent bindings, bounded HTTP ingestion and deterministic observation reconciliation implemented; native connectors and execution remain |
-| Capability and execution gateway | Bind agent role, delegator and owner; enforce tool/data/action scope, credentials, resource budgets, isolation and retry semantics | Cerbos, task delegation and work-packet verification; full runtime enforcement incomplete |
-| Independent evaluation service | Check product behavior and agent behavior against protected criteria | Executed patch validation and deterministic platform E2E |
-| Delivery and observation adapters | Operate forge/CI/registry/environments, read back effects and initiate bounded follow-up work | Local commands, CI and deployment runbooks; complete adapters missing |
-| Human control surface | Show intent, progress, evidence, uncertainty, cost, decisions, cancellation and recovery | API/CLI/controller views; complete outcome-oriented interface missing |
-| Governed improvement service | Propose lessons and agent/config changes, evaluate candidates and control rollout/rollback | Pending KB capture and exact-version knowledge decisions |
-| Audit and accountability service | Correlate every read/write/decision, including denials and failures, to the actor, role, policy, evidence and actual effect | Existing audit/trace/artifact foundations; complete agent/source/action coverage requires extension |
+| Intent and specification service | Maintain outcomes, criterion versions, assumptions, scope and change impact | Local `draft`/`clarify`, immutable intent, accepted BRS bindings and protected executable criteria |
+| Durable agent supervisor | Run plan/action/evaluate cycles, recover after interruption, schedule dependencies and reconcile effects | PostgreSQL runs/leases/events and separate serial role workers; repair, fencing, cancellation and reconciliation |
+| Versioned agent packages | Bind role instructions, model/client version, tool schemas, evaluation suite and rollout policy | Pinned local model/image, instructions/capabilities/budgets and regression-controlled activation/rollback |
+| Shared product KB and context builder | Connect structural and semantic product knowledge; select current authorized evidence within a context budget and isolate working memory | Product/BRS/feature/code/observations, authoritative semantic/structural hydration, current code-symbol bridges and frozen disclosure |
+| MCP source adapters and evaluated ingestion | Collect bounded BRS/code/log/metric/Kafka/lake/audit evidence, validate and link it with source/time lineage | Native Kafka/S3/audit/Loki/Prometheus plus fixed read-only MCP bridge; evaluated source retention and BRS reconciliation |
+| Capability and execution gateway | Bind agent role, delegator and owner; enforce tool/data/action scope, credentials, resource budgets, isolation and retry semantics | Cerbos plus transactional live grants and cumulative budgets; distinct roles and isolated test containers |
+| Independent evaluation service | Check product behavior and agent behavior against protected criteria | Independent protected product tests and technical/business recovery verification; separate fixture/local-model reports |
+| Delivery and observation adapters | Operate forge/CI/registry/environments, read back effects and initiate bounded follow-up work | Gitea/Git, CI, immutable artifacts/filesystem staging and fixed HTTP remedies with read-back; additional vendors require conformance |
+| Human control surface | Show intent, progress, evidence, uncertainty, cost, decisions, cancellation and recovery | Operator CLI: intent, status, costs, blockers, evidence, steering, recovery, feedback and package decisions |
+| Governed improvement service | Propose lessons and agent/config changes, evaluate candidates and control rollout/rollback | Pending KB/requirement/test/runbook/package proposals and exact regression-controlled package rollout/rollback |
+| Audit and accountability service | Correlate every read/write/decision, including denials and failures, to the actor, role, policy, evidence and actual effect | Immutable correlated model/source/action/handoff evidence, early schema/auth denials and outcome reports |
 
 ### Specify intent as an executable contract
 
 Before an agent runs substantial work, the target system should bind the
-following information. These are proposed contract requirements, not fields
+following information. These requirements map to accepted intent, target, package,
+run and evidence records in the runtime; they are not all fields
 that can already be submitted to the current MCP intake API.
 
 | Contract element | Why the agent/runtime needs it |
@@ -258,7 +260,7 @@ own objects. Today, completing that cross-system chain is a supervised procedure
 
 This table is a proposed working convention, not an implemented requirements
 schema. Workflow metadata and immutable evidence can carry references, but the
-platform does not yet enforce requirement-to-test-to-release completeness.
+execution runtime enforces accepted requirement-to-packet-to-candidate-to-delivery links for its feature profile; broader target-specific lifecycle records still need their own acceptance.
 See [G02](sdlc-gap-assessment.md#g02).
 
 ### Human accountability and agent responsibilities
@@ -324,33 +326,33 @@ deployment evidence from the delivery system.
 ## AI ownership across the lifecycle
 
 This table defines the target behavior at each stage. The final column shows
-the current foundation and the primary AI-native gap IDs. People retain the
+the current executable support and any target-specific boundary. People retain the
 accountability defined above while agents perform the authorized work.
 
-| Stage | Agent execution target | Evaluator and required result | Human contribution | Current foundation / gaps |
+| Stage | Agent execution target | Evaluator and required result | Human contribution | Current executable support |
 |---|---|---|---|---|
-| [01 Discovery and feasibility](#stage-01) | Discovery agent investigates available evidence and options | Source-backed opportunity brief; unsupported assumptions exposed | Define the user outcome and business constraints | Retrieval exists; A01, A04 |
-| [02 Planning and risk](#stage-02) | Planner proposes scope, dependencies, cost and permitted actions | Feasible bounded plan and authority check | Set priorities, budgets and material risk decisions | Intake/policy exists; A01, A02, A06 |
-| [03 Requirements and acceptance criteria](#stage-03) | Specification agent converts intent into versioned criteria and test proposals | Consistency, coverage and testability checks; protected accepted criteria | Resolve semantic ambiguity and accept product intent | Definitions exist; A01, A05 |
-| [04 Architecture and design](#stage-04) | Architect inspects code, compares designs and generates contracts/prototypes | Compatibility, threat and prototype evidence | Decide consequential tradeoffs beyond assigned scope | Code graphs/ADRs exist; A03–A05 |
-| [05 Environment and repository readiness](#stage-05) | Environment agent selects allowed tools, source snapshots and local runtime | Tool conformance, credential scope and readiness checks | Supply unavailable infrastructure authority | Compose/indexing/delegation exist; A06, A12 |
-| [06 Decompose and govern tasks](#stage-06) | Planner dispatches bounded tasks, checkpoints and reconciles dependencies | Valid packets, dependency/source versions and recoverable progress | Resolve budget/scope exceptions | FIFO and state records exist; A02, A03 |
-| [07 Implement and test locally](#stage-07) | Builder implements, tests and repairs within limits | Exact patch plus executable behavioral evidence | Resolve unbounded uncertainty or exhausted authority | Verifier and bounded pilot exist; A02, A03, A05, A06 |
-| [08 Review and integrate](#stage-08) | Review/integration agents assess changes, operate the forge and reconcile CI | Independent findings and passing exact-merge checks | Exercise required code/QA decisions | Review records/CI exist; A05, A07 |
-| [09 System and nonfunctional testing](#stage-09) | Evaluator exercises product journeys, negative cases and agreed budgets | Criterion-level outcomes in controlled environments | Judge cases requiring domain or subjective expertise | Platform E2E exists; A05, A11 |
-| [10 User acceptance](#stage-10) | Acceptance agent assembles demos, evidence, defects and recommendation | Traceable product evidence and actual user observations | Accept the product outcome and residual risks | Attributed gates exist; A01, A09 |
-| [11 Package and release](#stage-11) | Release agent builds, inventories, signs and proposes a versioned release | Reproducible artifact, provenance and supply-chain checks | Decide releases outside delegated policy | Build commands exist; A06, A07, A12 |
-| [12 Deploy, migrate and verify](#stage-12) | Delivery agent promotes the artifact and verifies/reconciles environment effects | Actual deployment, smoke, data and recovery evidence | Authorize target scope or consequential recovery | Local runbooks exist; A07, A08, A12 |
-| [13 Operate and respond](#stage-13) | Incident agent compares BRS/code/history with collected logs, metrics, Kafka/lake/audit evidence; a separately authorized role performs recovery | Supported diagnosis and verified business recovery without scope/budget violations | Own the incident and consequential recovery decisions | Health/traces/recovery tools exist; source connectors and full KB loop need A04, A07, A08, A11, A12 |
-| [14 Maintain and improve](#stage-14) | Local maintenance agent repairs; improvement agent proposes lessons/config changes | Fresh product checks plus agent regression evaluations | Exact-version KB publication and governed rollout decisions | KB governance exists; A03, A08, A10, A11 |
-| [15 Retire](#stage-15) | Retirement agent maps dependents, prepares migration and executes authorized closure | Verified client/resource removal and retained evidence recovery | Decide retirement, data disposition and irreversible effects | Graph/evidence foundations exist; A07–A09, A12 |
+| [01 Discovery and feasibility](#stage-01) | Discovery agent investigates available evidence and options | Source-backed opportunity brief; unsupported assumptions exposed | Define the user outcome and business constraints | KB search and local intent draft expose missing evidence and decisions |
+| [02 Planning and risk](#stage-02) | Planner proposes scope, dependencies, cost and permitted actions | Feasible bounded plan and authority check | Set priorities, budgets and material risk decisions | Criteria-linked plans, target scopes, persistent budgets and attributable intent |
+| [03 Requirements and acceptance criteria](#stage-03) | Specification agent converts intent into versioned criteria and test proposals | Consistency, coverage and testability checks; protected accepted criteria | Resolve semantic ambiguity and accept product intent | Versioned BRS/intent plus protected packet/reconciliation criteria and QA/PO acceptance |
+| [04 Architecture and design](#stage-04) | Architect inspects code, compares designs and generates contracts/prototypes | Compatibility, threat and prototype evidence | Decide consequential tradeoffs beyond assigned scope | Current code/repository graphs, accepted design records and bounded builder proposals; product-specific architecture judgment remains accountable |
+| [05 Environment and repository readiness](#stage-05) | Environment agent selects allowed tools, source snapshots and local runtime | Tool conformance, credential scope and readiness checks | Supply unavailable infrastructure authority | Native readiness contracts, exact source snapshots, pinned packages, separate credentials and disposable environments |
+| [06 Decompose and govern tasks](#stage-06) | Planner dispatches bounded tasks, checkpoints and reconciles dependencies | Valid packets, dependency/source versions and recoverable progress | Resolve budget/scope exceptions | Durable serial stage dispatch, stable action IDs, fenced leases and evidence; portfolio staffing remains organization-specific |
+| [07 Implement and test locally](#stage-07) | Builder implements, tests and repairs within limits | Exact patch plus executable behavioral evidence | Resolve unbounded uncertainty or exhausted authority | Local file/patch proposals, separate protected tests and bounded evidence-based repair |
+| [08 Review and integrate](#stage-08) | Review/integration agents assess changes, operate the forge and reconcile CI | Independent findings and passing exact-merge checks | Exercise required code/QA decisions | Native branch/PR reconciliation and independently verified CI; target merge/review rules remain explicit |
+| [09 System and nonfunctional testing](#stage-09) | Evaluator exercises product journeys, negative cases and agreed budgets | Criterion-level outcomes in controlled environments | Judge cases requiring domain or subjective expertise | Protected packet checks, sandbox negatives and BRS reconciliation; configure product-specific performance/security oracles |
+| [10 User acceptance](#stage-10) | Acceptance agent assembles demos, evidence, defects and recommendation | Traceable product evidence and actual user observations | Accept the product outcome and residual risks | CLI outcome/evidence export and explicit product decisions; actual user cohort evidence requires its observation period |
+| [11 Package and release](#stage-11) | Release agent builds, inventories, signs and proposes a versioned release | Reproducible artifact, provenance and supply-chain checks | Decide releases outside delegated policy | Immutable content-addressed archives and release provenance; configure target signing/registry policies separately |
+| [12 Deploy, migrate and verify](#stage-12) | Delivery agent promotes the artifact and verifies/reconciles environment effects | Actual deployment, smoke, data and recovery evidence | Authorize target scope or consequential recovery | Filesystem staging/read-back and actual backup/restore-resume proof; additional deployment/migration targets require conformance |
+| [13 Operate and respond](#stage-13) | Incident agent compares BRS/code/history with collected logs, metrics, Kafka/lake/audit evidence; a separately authorized role performs recovery | Supported diagnosis and verified business recovery without scope/budget violations | Own the incident and consequential recovery decisions | Five native evidence kinds, competing hypotheses, separate remedy and independent technical/business recovery |
+| [14 Maintain and improve](#stage-14) | Local maintenance agent repairs; improvement agent proposes lessons/config changes | Fresh product checks plus agent regression evaluations | Exact-version KB publication and governed rollout decisions | Local-only maintenance packages, pending improvements and evaluated package activation/rollback |
+| [15 Retire](#stage-15) | Retirement agent maps dependents, prepares migration and executes authorized closure | Verified client/resource removal and retained evidence recovery | Decide retirement, data disposition and irreversible effects | Dependency/context queries, bounded authority revocation and evidence recovery; irreversible target retirement requires named resources and retention decisions |
 
 ## Current execution mechanics for each stage
 
-Use these commands and handoffs through a supervised agent/client today.
-They ground the AI responsibilities above in the assessed implementation.
-The proposed agent supervisor and adapters must eventually perform and verify
-the manual connections described here; their existence is not assumed.
+The commands below expose stage-specific knowledge and governance operations.
+For automatic progression across feature and incident stages, use the
+[runtime and operator guide](sdlc-runtime.md). Manual target decisions remain
+explicit where the configured grant or adapter does not cover the action.
 
 <a id="stage-01"></a>
 ### 01. Discovery and feasibility
@@ -524,8 +526,10 @@ application. Recheck the merge result if integration changes the tested source.
 Branch protection and required checks must be verified in the forge separately.
 
 **Exit:** reviewers accept the exact change and required CI results are tied to
-the merge revision. Git/CI event ingestion and enforced platform-to-PR binding
-remain [G05](sdlc-gap-assessment.md#g05).
+the merge revision. The feature runtime binds its Gitea PR, published commit,
+CI receipt, artifact and staging result to the exact run and candidate. General
+webhook ingestion, other forge vendors and default-branch merge policy require
+target integration; the local profile leaves the PR open for review.
 
 <a id="stage-09"></a>
 ### 09. System, security and nonfunctional testing

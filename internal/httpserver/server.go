@@ -49,6 +49,16 @@ func New(address, authMode string, authenticator Authenticator, localPrincipal d
 
 func authenticate(mode string, authenticator Authenticator, localPrincipal domain.Principal, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		deny := func() {
+			if auditor, ok := authenticator.(interface{ AuditAuthenticationFailure(context.Context) error }); ok {
+				if err := auditor.AuditAuthenticationFailure(r.Context()); err != nil {
+					writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "authentication audit unavailable"})
+					return
+				}
+			}
+			w.Header().Set("WWW-Authenticate", "Bearer")
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		}
 		if mode == "none" {
 			if localPrincipal.ID != "" {
 				r = r.WithContext(identity.WithPrincipal(r.Context(), localPrincipal))
@@ -58,14 +68,12 @@ func authenticate(mode string, authenticator Authenticator, localPrincipal domai
 		}
 		header := r.Header.Get("Authorization")
 		if !strings.HasPrefix(header, "Bearer ") || authenticator == nil {
-			w.Header().Set("WWW-Authenticate", "Bearer")
-			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			deny()
 			return
 		}
 		principal, err := authenticator.AuthenticateToken(r.Context(), strings.TrimSpace(strings.TrimPrefix(header, "Bearer ")))
 		if err != nil {
-			w.Header().Set("WWW-Authenticate", "Bearer")
-			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			deny()
 			return
 		}
 		r = r.WithContext(identity.WithPrincipal(r.Context(), principal))

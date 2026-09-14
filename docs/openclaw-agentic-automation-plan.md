@@ -1100,18 +1100,15 @@ cannot grant themselves that authority.
 
 ## 20. Implementation status and next increments
 
-| Area | Implemented foundation | Remaining increment |
-|---|---|---|
-| Authority and workflow | Principal/project roles, Cerbos, workflow/task state, exact-version evidence and delegated Development credentials | [A06](sdlc-gap-assessment.md#a06): extended agent/source capabilities, budgets and isolation; [A11](sdlc-gap-assessment.md#a11): complete audit |
-| Knowledge and context | Approved lessons/definitions, code/repository graph, authoritative hydration and projections | [A01/A04](sdlc-gap-assessment.md#a04): shared product/BRS/feature/incident model, evaluated observations and executable criteria |
-| Execution | Controller mirror, typed contracts, supplied-patch verification and bounded local pilot | [A02/A03/A05](sdlc-gap-assessment.md#a02): durable local worker loop, versioned packages and independent evaluation |
-| Sources and delivery | Existing platform MCP and local build/CI/runbooks | [A07](sdlc-gap-assessment.md#a07): bounded evidence, forge/CI/artifact/environment adapters and effect reconciliation |
-| Operations and learning | Health/reindex/recovery commands and governed pending capture | [A08/A10](sdlc-gap-assessment.md#a08): KB-driven diagnosis, authorized remedy, measured outcome and evaluated feedback |
-| User and deployment | Current status/decision APIs and local deployment | [A09/A12](sdlc-gap-assessment.md#a09): coherent outcome/exception surface, compatible runtime and target trust/recovery |
+The [runtime guide](sdlc-runtime.md) and [A01–A12 closure record](sdlc-completion-checklist.md)
+are the current implementation reference. The controller retains workflow/task
+coordination. Separate local role workers now consume accepted intent, construct
+current KB context, execute bounded build/evaluate/repair cycles, operate native
+sources and effects, and retain accountable evidence under MCP/PostgreSQL control.
 
-The [primary closure order](sdlc-gap-assessment.md#recommended-closure-order)
-governs new implementation work. Start with a compatible local baseline and a
-small shared-KB/source/role/audit slice, then prove one feature and one incident
-through a bounded serial execution loop. The earlier phases describe component
-design history; they are not a claim that already implemented foundations are
-still missing or that general autonomous execution is complete.
+The serial feature and incident profiles, independent evaluator, versioned
+packages, scoped grants, operator CLI and pending improvement loop are
+implemented. Additional parallel specialists, organization-specific vendor
+integrations and enterprise deployment remain expansions requiring their own
+acceptance. Earlier phases in this plan retain design history and do not define
+the current implementation count.

@@ -45,6 +45,20 @@ func (r *Repository) RecordGeneration(ctx context.Context, capture domain.Genera
 		return domain.KnowledgeItem{}, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
+	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1,0))`, "generation:"+capture.ID); err != nil {
+		return domain.KnowledgeItem{}, err
+	}
+	var priorID, promptSHA, responseSHA, project string
+	priorErr := tx.QueryRow(ctx, `SELECT k.id::text,g.prompt_artifact_sha256,g.output_artifact_sha256,g.project_id FROM generations g JOIN knowledge_items k ON k.source_generation_id=g.id WHERE g.id=$1`, capture.ID).Scan(&priorID, &promptSHA, &responseSHA, &project)
+	if priorErr == nil {
+		if promptSHA != capture.PromptArtifact.SHA256 || responseSHA != capture.OutputArtifact.SHA256 || project != capture.ProjectID {
+			return domain.KnowledgeItem{}, domain.ErrVersionConflict
+		}
+		return scanKnowledge(tx.QueryRow(ctx, `SELECT `+knowledgeColumns+` FROM knowledge_items WHERE id=$1`, priorID))
+	}
+	if !errors.Is(priorErr, pgx.ErrNoRows) {
+		return domain.KnowledgeItem{}, priorErr
+	}
 
 	if _, err := tx.Exec(ctx, `INSERT INTO projects(id, display_name) VALUES($1,$1) ON CONFLICT (id) DO NOTHING`, capture.ProjectID); err != nil {
 		return domain.KnowledgeItem{}, fmt.Errorf("ensure project: %w", err)

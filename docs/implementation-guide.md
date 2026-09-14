@@ -20,16 +20,18 @@ These components are the implemented foundation for the
 structural and semantic knowledge throughout the lifecycle. Current contracts
 cover code/repository graphs, governed definitions, approved software knowledge,
 versioned product records, accepted intent and bounded source observations.
-The [product KB guide](product-knowledge-and-evaluated-sources.md) explains the
-new structural/semantic context and business-reconciliation tools. Native
-source bridges and the complete agent execution loop remain tracked in
-[A01–A12](sdlc-gap-assessment.md#primary-ai-native-gaps).
+The [product KB guide](product-knowledge-and-evaluated-sources.md) explains
+structural/semantic context and business reconciliation. The
+[runtime guide](sdlc-runtime.md) covers `internal/execution`, the transactional
+`internal/postgres/execution*` implementation, `internal/service/execution*`,
+`internal/sdlcworker`, `internal/sourceadapter`, and the `sdlc`, `sdlc-worker`,
+`source-adapter` and isolated `sdlc-verifier` binaries.
 
-OpenClaw and its execution workers own model-driven execution; the current
-plugin mirrors task state. The Go MCP service owns typed data/action boundaries,
-state validation and authoritative records. The target supervisor must connect
-those responsibilities without introducing a second conflicting router inside
-the retrieval service.
+External role workers own model invocation and tool effects. The Go MCP service
+owns typed boundaries, derived transitions, current context, scoped grants,
+package decisions and authoritative records. Migrations 20 and 21 add durable
+runs, leases, budgets, immutable events and package campaigns/activation history.
+The OpenClaw plugin retains its existing coordination responsibilities.
 
 ## Components
 
@@ -471,16 +473,14 @@ Milvus is intentionally versioned by collection name. To change the embedding mo
 ## Known boundaries
 
 - Product records, accepted intent, source observations and structural/semantic
-  context are implemented. Automatic code-symbol bridging and richer lifecycle
-  relationships remain [A04](sdlc-gap-assessment.md#a04).
-- The bounded HTTP source protocol needs operator-provided native bridges.
-  Forge/CI/artifact/environment actions and production integrations remain
-  [A07](sdlc-gap-assessment.md#a07). Fixed platform metrics remain separate.
-- Four human role bindings, controller/task identities and validation-executor
-  checks are foundations. The wider agent role matrix, source/field/action
-  scopes and complete read/action audit require [A06](sdlc-gap-assessment.md#a06)
-  and [A11](sdlc-gap-assessment.md#a11). Existing traces do not observe arbitrary
-  client or external-system work.
+  context are implemented. Accepted code bindings hydrate exact active revisions
+  and symbols; richer product ontologies require their own reviewed contracts.
+- Native Kafka/S3/PostgreSQL/Loki/Prometheus readers and fixed MCP, forge, CI,
+  artifact, staging and remedy contracts are implemented. Additional vendors and
+  production targets need their own conformance and acceptance evidence.
+- Five distinct SDLC workloads have owner-attributed scoped grants, persistent
+  budgets, source/field/action restrictions and correlated audit. Traces cover
+  platform-owned boundaries; arbitrary external client work is not observable.
 - The current local artifact store does not compress blobs; content addressing and permissions are implemented. Enterprise object storage should add encryption, retention, and lifecycle policies.
 - Local bearer principals and Cerbos authorization are implemented. Enterprise
   identity federation, token lifecycle administration, and workload identity

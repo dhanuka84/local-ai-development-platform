@@ -27,7 +27,7 @@ func (r *Repository) RecordProductEvaluation(ctx context.Context, in domain.Obse
 		return out, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	if err = requireProductActor(ctx, tx, in.Actor, in.ProjectID, "operations", "incident_diagnosis"); err != nil {
+	if err = requireExecutionSourceActor(ctx, tx, in.Actor, in.ProjectID, in.ProductID, ""); err != nil {
 		return out, err
 	}
 	if in.Method != "hybrid-ai/observation-reconciliation/v1" || (in.Outcome != "satisfied" && in.Outcome != "violated" && in.Outcome != "inconclusive") {

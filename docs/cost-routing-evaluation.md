@@ -10,7 +10,9 @@ This routing protocol is one part of
 The wider [A05/A11 scope](sdlc-gap-assessment.md#a05) requires protected product
 criteria, KB/context quality, source correctness, tool/role compliance,
 independent outcomes, uncertainty, recovery and human intervention measures.
-The 30-task suite below is proposed and must be constructed and versioned;
+The [completion record](sdlc-completion-checklist.md) now proves those controls
+for disposable feature/incident profiles and reports a separate real local-model
+feature trial. The 30-task suite below is proposed and must be constructed and versioned;
 it is not an existing benchmark result.
 
 ## Outcome
@@ -45,8 +47,8 @@ Status meanings:
 | Task classification | Partial | Work packets require `development` or `maintenance`, mode, data class, and categories. | Add an OpenClaw coordinator step that always emits the packet before delegated execution. |
 | Risk assessment | Implemented at packet boundary | Protected categories, destructive actions, restricted data, approvals, and disclosure rules are evaluated deterministically. | Add organization-specific category rules and actor authorization at the enterprise gateway. |
 | Bounded context and write scope | Partial | Allowed/forbidden file patterns, patch-byte, file-count, and diff-line limits are enforced; supplied review manifests are stored immutably. | Build an automatic minimal cloud context packager with secret/DLP scanning before export. |
-| Result verification | Implemented locally | Candidate patches apply in a disposable clone; exact argv checks run with timeouts; scope, diff limits, side effects, and binary patches are checked. | Run the verifier inside an egress-denied OS/container sandbox for untrusted repositories. |
-| Bounded local delegation | Implemented and functionally tested | Task-scoped CLI credentials, actual gateway expiry/revocation, issuer-role withdrawal, packet verification and complete traces. OpenClaw controller contracts remain separate. | Complete the general isolated runner and representative adoption evaluation. |
+| Result verification | Implemented locally | The SDLC evaluator runs exact protected checks in a pinned container with no network, restricted UID/capabilities, read-only mounts and resource limits; attack cases are tested. | Qualify each target evaluator image and measure representative product outcomes. |
+| Bounded local delegation | Implemented and functionally tested | Task-scoped CLI credentials plus five SDLC workloads, live expiry/revocation, owner grants, total budgets and exported traces. | Run representative adoption evaluation and target workload-identity acceptance. |
 | Codex final review | Configured + persistence implemented | An allowed RAG miss enters the provider-gated read-only OpenAI lane; `review_record` stores reviewer/model/verdict plus raw-output and context-manifest artifacts. Cloud cannot revise candidate content. | Automate sanitized package issuance and record a complete live review trace. |
 | Validated improvements become reusable | Implemented with explicit user approval/read-back gates | Actual gateway/worker E2E verifies trusted validation, exact-version publication, source withdrawal, stale projections and Task B reuse with its new entry pending. | Measure retrieval and outcome quality on representative review-derived KB entries. |
 | PostgreSQL knowledge authority | Implemented | Workflow state, provenance, approvals, relationships, code snapshots, and outbox are canonical. | Add enterprise tenant isolation and managed HA operation. |

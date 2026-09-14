@@ -220,12 +220,14 @@ services:
       CODEGRAPH_ALLOWED_ROOTS: /workspace
       CODEGRAPH_ANALYZER_CACHE_ROOT: /var/cache/hybrid-analyzer
       PRODUCT_SOURCE_REGISTRY: /etc/hybrid-ai/product-sources.json
+      SDLC_RUNTIME_REGISTRY: /etc/hybrid-ai/sdlc-registry.json
     ports:
       - "127.0.0.1:8080:8080"
     volumes:
       - artifact-data:/var/lib/hybrid-ai/artifacts
       - analyzer-cache:/var/cache/hybrid-analyzer
       - ${PRODUCT_SOURCE_REGISTRY_HOST_PATH:-../../examples/sources/empty.json}:/etc/hybrid-ai/product-sources.json:ro
+      - ${SDLC_RUNTIME_REGISTRY_HOST_PATH:-../../examples/agents/empty.json}:/etc/hybrid-ai/sdlc-registry.json:ro
       - ${CODEGRAPH_HOST_ROOT:-../..}:/workspace:ro
     secrets:
       - postgres_password

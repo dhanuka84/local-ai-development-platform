@@ -36,9 +36,11 @@ The [AI-native scope view](../ai-native-sdlc-expectations.md#scope-at-a-glance)
 is also a target architecture. It connects all lifecycle stages to the shared
 structural/semantic KB, MCP source and action capabilities, evaluated ingestion,
 role accountability and audit. Its external-source boxes identify integration
-boundaries. The [gap assessment](../sdlc-gap-assessment.md) distinguishes existing
-foundations from the connectors, ontology and execution capabilities to build.
-The [scope validation receipt](../documentation-scope-validation-20260913.md)
+boundaries. The [gap assessment](../sdlc-gap-assessment.md) distinguishes the
+implemented local feature/incident profiles from additional target integrations
+and measured adoption requirements. The scope view includes the durable runtime,
+native connectors, package governance and separate recovery verification.
+The [scope validation receipt](../documentation-scope-validation-20260914.md)
 records the documentation and diagram review against those expectations.
 
 Arrows show calls, data movement or lifecycle progression as labeled. A dotted

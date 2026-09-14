@@ -32,6 +32,8 @@ The executable platform includes:
   definitions, metrics and graph tools.
 - PostgreSQL for authoritative records; Apache AGE and Milvus for rebuildable
   graph and semantic projections.
+- Five scoped SDLC roles with durable execution, independent evaluation and
+  native source/delivery/remediation adapters; see the [runtime guide](sdlc-runtime.md).
 - A worker for indexing, source checks, evidence retention alerts and trace
   export; an admin CLI and a local two-task pilot executable.
 - Ollama integration for local coding and embeddings, plus a separate OpenClaw

@@ -20,11 +20,13 @@ extends these policies to product/source/field/environment/purpose/time/action
 scope for each agent responsibility. Product records and source queries now
 have policies, including human-only QA/decisions and a diagnostic read role.
 The service also enforces operator-configured purpose/field limits and rechecks
-retained source data. Broader delegation, budgets and environment controls
-remain [A06 work](../../docs/sdlc-gap-assessment.md#a06). Tool discovery or a
-prompt role must not grant them. Each new capability needs permitted and denied
-cases plus attribution to its delegator and accountable owner; complete
-source-to-action audit coverage is [A11](../../docs/sdlc-gap-assessment.md#a11).
+retained source data. `resource_sdlc_execution.yaml` governs run and package
+operations for five distinct workloads and accountable human operators. Database
+transactions additionally enforce live grants, environment, current context,
+lease fences and total budgets. Permitted and denied policy fixtures accompany
+native execution tests; [the runtime guide](../../docs/sdlc-runtime.md) describes
+source-to-action audit and evidence export. Tool discovery or a prompt role
+never grants authority.
 
 Validate all policies and tests with:
 

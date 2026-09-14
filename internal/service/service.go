@@ -11,6 +11,7 @@ import (
 
 	"github.com/dhanuka84/hybrid-ai-platform/components/codegraph"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/domain"
+	"github.com/dhanuka84/hybrid-ai-platform/internal/execution"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/graphrag"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/sources"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/telemetry"
@@ -36,7 +37,10 @@ type Service struct {
 	graphRAG                   *graphrag.Service
 	traceRetentionDays         int
 	sources                    *sources.Registry
+	executions                 *execution.Registry
 }
+
+func (s *Service) ConfigureExecutions(registry *execution.Registry) { s.executions = registry }
 
 func (s *Service) ConfigureSources(registry *sources.Registry) { s.sources = registry }
 

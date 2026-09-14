@@ -18,11 +18,12 @@ The [AI-native product scope](ai-native-sdlc-expectations.md) applies at both
 local and enterprise scale: a shared structural/semantic KB, evaluated source
 ingestion, accountable agent roles and audited access throughout the SDLC.
 The [product KB and source protocol](product-knowledge-and-evaluated-sources.md)
-are implemented locally. A cluster deployment still needs native source bridges,
-target-specific access controls and the general execution supervisor. Implement the
-[A01–A11 capabilities](sdlc-gap-assessment.md#primary-ai-native-gaps) and prove
-their source/field/environment policies in the target environment alongside
-the deployment controls in [A12](sdlc-gap-assessment.md#a12).
+and [role execution runtime](sdlc-runtime.md) are implemented locally. A cluster
+deployment must provision target credentials, native view contracts, worker
+isolation and enterprise access controls, then execute the local conformance
+profiles and its own availability/retention/recovery acceptance. The
+[completion register](sdlc-completion-checklist.md) separates these target inputs
+from completed local capability work.
 
 ## Invariants
 

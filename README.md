@@ -1,35 +1,30 @@
 # Hybrid AI Software Engineering Platform
 
-A local-first foundation for an AI-native SDLC platform centered on shared
-structural and semantic product knowledge. OpenClaw provides workflow
-coordination, Ollama runs local models, and MCP gives agents governed access to
-knowledge and tools. Codex and Kimi are optional cloud services; the platform
-never sends work to them as a hidden fallback.
+An AI-native SDLC platform centered on shared structural and semantic product
+knowledge. Local model workers progress accepted intent through implementation,
+independent evaluation, delivery and operational recovery. The MCP gateway
+controls authority, durable state, evidence and reuse; PostgreSQL is authoritative,
+with AGE and Milvus as governed projections.
 
-Start with the [developer guide](docs/developer-guide.md) for what, why and how,
-or the [documentation index](docs/README.md) for every guide and evidence record.
-The [expectations and scope diagram](docs/ai-native-sdlc-expectations.md) define
-the shared KB, MCP source connections, accountable agent roles, access controls
-and audit requirements. The [AI-native lifecycle guide](docs/sdlc-guide.md)
-maps them across 15 stages, and the [gap assessment](docs/sdlc-gap-assessment.md)
-identifies the implementation work needed for that target. The
-[September 13 documentation review](docs/documentation-scope-validation-20260913.md)
-records the file-by-file scope assessment and corrected guidance.
-The new [product KB and evaluated-source guide](docs/product-knowledge-and-evaluated-sources.md)
-covers implemented intent, ingestion, permissions and business-reconciliation tools.
-The September 12 run passed **28/28 local functional requirements**; live rollout
-and enterprise acceptance remain [explicitly deferred](docs/agent-ready-gap-checklist.md).
+Start with the [runtime guide](docs/sdlc-runtime.md) for setup and end-to-end use,
+the [expectations and diagram](docs/ai-native-sdlc-expectations.md) for scope, and
+the [15-stage lifecycle guide](docs/sdlc-guide.md) for agent responsibilities.
+The [assessment](docs/sdlc-gap-assessment.md) and
+[completion checklist](docs/sdlc-completion-checklist.md) map the implementation
+to A01–A12 and distinguish executed local proofs from deferred target acceptance.
+The [documentation index](docs/README.md) links current guides and historical receipts.
 
 ## How it works
 
-1. An agent searches approved KB entries and the current code graph.
-2. A local Ollama model or Codex works on the task and runs checks.
-3. Codex or Kimi may review a small, sanitized package when policy allows it.
-4. Generated KB entries stay pending until the user explicitly approves the
-   exact validated version. Governed definitions use a separate validated,
-   task-authorized publication path.
-5. PostgreSQL saves the official record. Apache AGE expands exact topology and
-   Milvus makes approved records easy to find by meaning.
+1. An accountable operator submits accepted intent, criteria, scoped workers and budgets.
+2. Each stage hydrates current structural/semantic KB context and relevant source evidence.
+3. A pinned local model proposes work; a separate evaluator verifies protected product tests or business criteria.
+4. Assigned delivery/remediation workers perform fixed authorized actions and reconcile their read-back.
+5. Exact model output, sources, role handoffs, denials, usage and effects remain auditable. Improvement proposals stay pending until their own approval requirements are satisfied.
+
+The [local execution guide](docs/sdlc-runtime.md) describes native Kafka/S3/audit/log/metric readers, forge/CI/artifact/staging effects and the operator CLI.
+Optional cloud review belongs to the existing separate policy-controlled integration;
+the SDLC workers have no cloud fallback.
 
 Maintenance always uses local Ollama models. A single developer can perform
 the Development, QA, Product Owner, and Operations roles. Larger teams can
@@ -46,6 +41,10 @@ The repository implements:
 - Immutable SHA-256 prompt/output artifacts, preserving original whitespace and line endings.
 - Versioned product/BRS/feature/intent knowledge, scoped source observations,
   local semantic discovery, structural context and exact-criterion reconciliation.
+- Durable bounded SDLC execution with five distinct workload roles, expiring leases,
+  package qualification/activation/rollback, cumulative budgets and an operator CLI.
+- Native Kafka, S3, PostgreSQL audit, Loki and Prometheus readers; independently
+  verified feature delivery and technical/business incident recovery.
 - An asynchronous indexing worker and administrative CLI.
 - A versioned workflow state machine with authenticated principals, Cerbos
   policy enforcement, immutable transition evidence, and optimistic/idempotent
@@ -809,7 +808,9 @@ workflow_task_begin -> FIFO activation -> approved RAG lookup
   -> RAG read-back -> complete -> activate next queued task
 ```
 
-Available tools:
+Selected core tools are listed below. The complete current surface also includes
+the [product tools](docs/product-knowledge-and-evaluated-sources.md#available-tools)
+and [SDLC execution/package tools](docs/sdlc-runtime.md).
 
 | Tool | Effect |
 |---|---|
@@ -838,7 +839,7 @@ Supported repository edge types are `depends_on`, `provides_api_to`, `deploys_wi
 ## Repository layout
 
 ```text
-cmd/                 gateway, indexing worker, and admin CLI
+cmd/                 gateway, index/SDLC workers, source adapter, verifier and CLIs
 components/          code graph analyzer plus bounded-work policy/verifier
 automation/          OpenClaw controller plugin and Lobster workflows
 contracts/           versioned workflow JSON Schemas

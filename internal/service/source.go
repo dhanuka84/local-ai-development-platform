@@ -46,7 +46,7 @@ func (s *Service) authorizeRetainedObservation(ctx context.Context, record domai
 	if record.Source.SchemaVersion != d.SchemaVersion {
 		return domain.ErrQualityBlocked
 	}
-	p, err := s.AuthorizeProjectAction(ctx, record.ProjectID, "product_source", d.ID, "read_observation", map[string]any{"classification": d.Classification})
+	p, err := s.authorizeExecutionSource(ctx, d, "read_observation", record.Source.Purpose)
 	if err != nil {
 		return err
 	}
@@ -56,6 +56,9 @@ func (s *Service) authorizeRetainedObservation(ctx context.Context, record domai
 	}
 	var envelope domain.SourceEnvelope
 	if json.Unmarshal([]byte(record.Content), &envelope) != nil {
+		return domain.ErrQualityBlocked
+	}
+	if d.AdapterSHA256 != "" && envelope.AdapterSHA256 != d.AdapterSHA256 {
 		return domain.ErrQualityBlocked
 	}
 	allowedField := func(field string) bool {
@@ -89,7 +92,9 @@ func (s *Service) QueryProductSource(ctx context.Context, q domain.SourceQuery) 
 	if err != nil {
 		return out, err
 	}
-	ctx = domain.WithOperationScope(ctx, domain.OperationScope{ProjectID: q.ProjectID, WorkflowID: domain.ScopeFromContext(ctx).WorkflowID, TaskID: domain.ScopeFromContext(ctx).TaskID})
+	scope := domain.ScopeFromContext(ctx)
+	scope.ProjectID = q.ProjectID
+	ctx = domain.WithOperationScope(ctx, scope)
 	r, ok := s.repository.(domain.SourceRepository)
 	if !ok || s.sources == nil {
 		return out, domain.ErrEvidenceUnavailable
@@ -98,7 +103,7 @@ func (s *Service) QueryProductSource(ctx context.Context, q domain.SourceQuery) 
 	if !ok {
 		return out, ErrForbidden
 	}
-	if _, err = s.AuthorizeProjectAction(ctx, q.ProjectID, "product_source", d.ID, "query", map[string]any{"classification": d.Classification, "purpose": q.Purpose}); err != nil {
+	if _, err = s.authorizeExecutionSource(ctx, d, "query", q.Purpose); err != nil {
 		return out, err
 	}
 	role, ok := selectRole(p, q.ProjectID, d.Roles)
@@ -109,6 +114,9 @@ func (s *Service) QueryProductSource(ctx context.Context, q domain.SourceQuery) 
 	delegator := ""
 	if p.Delegation != nil {
 		delegator = p.Delegation.DelegatedBy
+	}
+	if run, ok := executionGrant(ctx); ok {
+		delegator = run.Owner
 	}
 	ctx = telemetry.WithAccountability(ctx, q.ProductID, d.Owner, delegator)
 	raw, _ := json.Marshal(q)
@@ -139,7 +147,7 @@ func (s *Service) QueryProductSource(ctx context.Context, q domain.SourceQuery) 
 			}
 		}
 	}
-	if !slices.Contains([]string{"operations", "incident_diagnosis"}, role) {
+	if !slices.Contains([]string{"operations", "incident_diagnosis", "sdlc_diagnosis", "sdlc_evaluator"}, role) {
 		return out, ErrForbidden
 	}
 	previous, e := r.GetSourceReceipt(ctx, q.ProjectID, q.SourceID, p.ID, q.IdempotencyKey)

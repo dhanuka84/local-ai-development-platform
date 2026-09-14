@@ -34,6 +34,7 @@ type runtime struct {
 	env                                      map[string]string
 	repo                                     *postgres.Repository
 	generationResponses                      chan []byte
+	generationCallbacks                      chan func([]byte) []byte
 	stopGateway, stopWorker                  func()
 }
 
@@ -56,7 +57,7 @@ func startRuntime(t *testing.T) *runtime {
 	f := &runtime{t: t, ctx: ctx, root: t.TempDir(), project: "pilot-e2e-" + id,
 		operator: "synthetic-operator-" + id, executor: "synthetic-executor-" + id,
 		developer: "synthetic-development-only-" + id, controller: "synthetic-controller-" + id,
-		foreign: "synthetic-foreign-" + id, bin: os.Getenv("TEST_BINARY_DIR"), generationResponses: make(chan []byte, 8)}
+		foreign: "synthetic-foreign-" + id, bin: os.Getenv("TEST_BINARY_DIR"), generationResponses: make(chan []byte, 8), generationCallbacks: make(chan func([]byte) []byte, 8)}
 	if err = os.Chmod(f.root, 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -98,9 +99,12 @@ func startRuntime(t *testing.T) *runtime {
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
 		case "/api/tags":
-			_, _ = io.WriteString(w, `{"models":[]}`)
+			_, _ = io.WriteString(w, `{"models":[{"name":"synthetic-e2e-fixture","model":"synthetic-e2e-fixture","digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}]}`)
 		case "/api/generate":
+			raw, _ := io.ReadAll(io.LimitReader(r.Body, 1024*1024))
 			select {
+			case callback := <-f.generationCallbacks:
+				_, _ = w.Write(callback(raw))
 			case answer := <-f.generationResponses:
 				_, _ = w.Write(answer)
 			default:

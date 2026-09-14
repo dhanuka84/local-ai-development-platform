@@ -2,6 +2,11 @@
 
 **Status:** Local controller foundation implemented; broader orchestration remains proposed.
 
+September 14 update: [ADR-0012](0012-bounded-sdlc-runtime.md) implements separate
+local feature/incident execution and five distinct workload roles. This ADR's
+OpenClaw managed-flow proposal and dated observations remain specific to that
+integration; they no longer describe all execution available in the platform.
+
 September 12, 2026 clarification: the TypeScript Task Flow adapter, Go/SQL
 workflow authority, Cerbos integration and contracts are implemented. A general
 automatic classifier/runner, disclosure packager, webhook relay, scheduled

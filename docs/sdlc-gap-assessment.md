@@ -3,140 +3,79 @@
 Navigation: [Lifecycle usage guide](sdlc-guide.md) · [Documentation index](README.md) ·
 [Expectations and scope](ai-native-sdlc-expectations.md) ·
 [Existing agent-ready checklist](agent-ready-gap-checklist.md).
-The [documentation scope review](documentation-scope-validation-20260913.md)
+The [documentation scope review](documentation-scope-validation-20260914.md)
 records the repository-wide claim and example corrections.
 
-Baseline assessment: September 13, 2026 against `main` revision
-`9fba87f23f0e733a6bba0528b505f647bbac5aef`. Updated with implementation progress
-on `feature/ai-native-sdlc-20260913`; see the [validation receipt](ai-native-sdlc-implementation-20260913.md).
+Scope established September 13, 2026 against `main` revision
+`9fba87f23f0e733a6bba0528b505f647bbac5aef`. Reassessed September 14 against
+`feature/ai-native-sdlc-20260913`, based on `645bd582d8eaead73e4ed11114926a33d7bde54d`
+plus the source snapshot named in the [completion checklist](sdlc-completion-checklist.md).
 
 ## Assessment outcome
 
-The product target is an AI-native, AI-centric SDLC platform: agents progress
-authorized intent to verified product outcomes, and people direct intent,
-constraints and accountable decisions. A shared structural/semantic KB supplies
-product, BRS, code, feature, operational and incident context throughout that
-work. MCP tools collect bounded source evidence and feed evaluated records
-back into the KB. Each agent role has distinct responsibilities, delegated
-access and an accountable owner; the whole path must be auditable. The
-[revised lifecycle guide](sdlc-guide.md) defines the agent execution loop and
-assigns agent responsibilities across all 15 stages.
+The implementation now supplies the bounded AI-native operating model defined
+for local functional acceptance: shared structural/semantic product knowledge,
+accepted intent, distinct accountable workers, independent evaluation, native
+source collection, delivery/remediation effects, governed improvement and a
+usable operator CLI. The [runtime guide](sdlc-runtime.md) explains configuration
+and use. The [15-stage guide](sdlc-guide.md) maps these capabilities across the
+lifecycle; the [scope diagram](diagrams/ai-native-sdlc-scope.svg) preserves the
+broader product expectations.
 
-The code is a **governed agent foundation with product context, evaluated source
-ingestion and bounded local task demonstrations**. Its authoritative context, workflow state, permission checks,
-verification and knowledge controls should be retained. The missing core is a
-durable, evaluated execution loop over that shared product KB, with source
-adapters and role-specific governance connecting the work between those
-boundaries. Versioned product/BRS/feature/intent/observation/incident records
-and a bounded HTTP source-view protocol are now implemented. Native Kafka,
-lake, log and audit bridges, delivery effects and a complete execution
-supervisor still require work.
+The exact closure status and executed tests are in the
+[A01–A12 checklist](sdlc-completion-checklist.md). Its evidence separates native
+service proofs, deterministic model protocol fixtures and a real local-model
+feature trial. A model assertion or a passing infrastructure health check cannot
+complete either the feature or incident profile.
 
-The initial assessment treated manual handoffs and external systems as parts
-of a team delivery procedure. Under this target, agents need usable adapters,
-current context, independent evaluators and authority to complete those handoffs.
-Requirements, context and model evaluation therefore move into the first
-implementation slice. Production integrations still depend on their target.
-
-There are **12 primary AI-native capability gaps (A01–A12)**. The **16 earlier
-delivery findings (G01–G16)** remain supporting evidence and are cross-mapped
-below. These are two views of overlapping work, not 28 independent gaps.
-Priorities and owner roles are recommendations, not assigned commitments,
-estimates or an industry maturity score.
-
-**Alignment verdict: partial.** The selected storage, projection, MCP, identity
-and knowledge-governance foundations support the direction. They do not yet
-implement the complete AI-native SDLC operating model. In particular, a
-successful code/KB task is not evidence of an agent delivering a product feature
-or resolving a production incident from collected evidence.
-
-The [expectations register EXP-01–EXP-10](ai-native-sdlc-expectations.md#expectations-and-related-functionality)
-maps each requested behavior to these gaps and observable completion evidence.
-The [scope diagram](diagrams/ai-native-sdlc-scope.svg) depicts the intended
-architecture; it does not represent the observed deployment.
-
-### What changes in the evaluation
-
-| Question | AI-native acceptance expectation |
-|---|---|
-| Does an AI help at a lifecycle stage? | Can an agent perform the authorized work, inspect the result and continue or escalate from evidence? |
-| Does a workflow remember status? | Can a durable execution supervisor resume, replan, enforce budgets and reconcile partial external effects? |
-| Can the system retrieve knowledge? | Do both KB dimensions connect BRS, features, code, operations and observations into current, scoped context at every stage? |
-| Can MCP connect a source? | Are source queries bounded and authorized, and are their results validated, time/version-bound and eligible before KB reuse? |
-| Does an agent have a role label? | Does its authenticated identity carry enforceable responsibilities and permissions, a delegator and an accountable owner? |
-| Are there logs? | Can an authorized reviewer reconstruct source reads, decisions, effects, denials and failures across the whole task? |
-| Can an agent summarize an incident? | Can it compare live evidence with BRS/code/history, test competing hypotheses and verify separately authorized business recovery? |
-| Are generated changes tested? | Are accepted criteria protected, evaluators independently controlled, and both product and agent behavior assessed? |
-| Are tools and deployment scripts available? | Can agents call them through typed scoped adapters and verify the effects in the actual target? |
-| Are humans assigned to every stage? | Can humans direct outcomes and exceptions while delegated routine work progresses without repeated permission requests? |
-| Is a useful answer captured? | Can validated feedback improve knowledge and agent/config releases without automatic self-approval? |
-
-The clearest source evidence is
-[`development-local.lobster`](../automation/workflows/development-local.lobster):
-it requires a packet and patch, then runs evaluate/verify.
-[`controller.ts`](../automation/openclaw-plugin/src/controller.ts) creates,
-queues, transitions and mirrors workflow state. These establish useful
-contracts but do not constitute a general agent that produces and delivers a
-change from product intent.
+**Alignment verdict: aligned within the configured local functional profiles.**
+This is not a claim of universal autonomous software development, representative
+model quality or production readiness. Additional target integrations, live
+cutover, named enterprise identity/storage/retention/HA controls and measured
+adoption cohorts require their specified target inputs. These are explicit
+acceptance boundaries, not substitutes for failing local functionality.
 
 ## Implementation alignment with each expectation
 
-This matrix includes the implementation described in the
-[product KB guide](product-knowledge-and-evaluated-sources.md). **Partial** means
-required behavior remains missing. **Not implemented end to end** means the
-complete path is absent even when supporting tools exist. Composite statuses
-are not a maturity percentage. Live availability remains a separate finding.
-
-| Expectation | Alignment | Implemented evidence | Missing behavior needed for the expectation | Gaps |
-|---|---|---|---|---|
-| EXP-01 — Two-dimensional product KB | Partial | Versioned [product records](../internal/domain/product.go), local semantic projection/read-back, PostgreSQL structural context and [AGE product projection](../internal/age/product.go) | Automatic code-symbol/product bridging, deeper lifecycle relationships and richer task relevance | [A01](#a01), [A04](#a04) |
-| EXP-02 — KB in every SDLC stage | Partial | [Accepted intent context](../internal/service/intent.go), product context and existing task-context recording | Autonomous stage-specific construction and requirement-to-test-to-release/effect progression | [A01](#a01), [A02](#a02), [A04](#a04), [A07](#a07), [A10](#a10) |
-| EXP-03 — MCP sources and actions | Partial | [Eleven product tools](../internal/mcpserver/product.go), bounded HTTP source-view protocol, existing graph/metric tools | Native system bridges, source-wide budgets and forge/CI/artifact/environment actions with read-back | [A07](#a07), [A12](#a12) |
-| EXP-04 — Evaluated ingestion and reuse | Partial | Schema/time/field/offset/snapshot validation, immutable receipts, idempotent observation retention and eligibility checks | Native source truth/coverage verification, broader correction/enrichment lineage and generalized feedback pipelines | [A04](#a04), [A10](#a10) |
-| EXP-05 — Accountable agent roles | Partial | [Principal/workflow records](../internal/domain/workflow.go), [task delegation](../internal/domain/delegation.go), human role and validation-executor boundaries | Versioned packages for the target responsibilities, general role-capability delegation and explicit owner/delegator attribution across all agent work | [A03](#a03), [A06](#a06) |
-| EXP-06 — Access control throughout | Partial | Cerbos, expiring Development task credentials, source-purpose/field policies and retained-observation reauthorization | General role delegation, per-product/environment grants, execution isolation and total resource budgets | [A06](#a06), [A12](#a12) |
-| EXP-07 — Complete audit | Partial | Original generation bytes, input hashes, source receipts, owner/role attribution, immutable evaluations and existing traces | Complete external reads/actions, agent handoffs and accepted-outcome measurements | [A11](#a11), [A12](#a12) |
-| EXP-08 — End-to-end agent execution | Partial | Protected versioned intent bindings, deterministic observation evaluator, workflow states, controller and bounded pilot | Durable plan/action/evaluate/repair supervisor, independent product-test execution, delivery reconciliation and exception interface | [A01](#a01), [A02](#a02), [A03](#a03), [A05](#a05), [A07](#a07), [A09](#a09) |
-| EXP-09 — KB-driven incident resolution | Not implemented end to end | Bounded source collection, BRS-bound reconciliation with satisfied/violated/inconclusive results, platform recovery commands | Competing causal hypotheses, diagnostic agent, separately authorized remediation and independently observed technical/business recovery | [A04](#a04), [A07](#a07), [A08](#a08), [A11](#a11) |
-| EXP-10 — Governed improvement | Partial | [Capture/validation/review services](../internal/service/service.go), exact-version knowledge decisions and validated reuse | Observation-to-requirement/test/runbook feedback, versioned agent/config improvements, held-out evaluation, controlled rollout/rollback and measured accepted outcomes | [A03](#a03), [A05](#a05), [A10](#a10), [A11](#a11) |
-
-The 12 A-items below specify owners, dependencies and observable closure tests
-for these missing behaviors. Documentation corrections clarify the contracts;
-they do not implement a missing connector, execute a real-model benchmark or
-close a platform capability gap.
+| Expectation | Current implementation | Evidence and practical boundary |
+|---|---|---|
+| EXP-01 — Shared two-dimensional KB | Immutable product/BRS/feature/code/intent/observation records, governed relations, AGE/Milvus projections and PostgreSQL hydration | Product projection tests plus an actual analyzer-to-product code bridge; exact active revision/symbol checks reject stale heads |
+| EXP-02 — KB throughout the SDLC | Every executable stage receives accepted intent, scoped semantic/structural context, exact prior-step evidence and appropriate source windows | Frozen context survives lease recovery; changed BRS, code graph or target blocks old work; the lifecycle guide defines inputs/outputs for all 15 stages |
+| EXP-03 — MCP sources and actions | Native Kafka/S3/PostgreSQL/Loki/Prometheus readers; fixed read-only MCP source bridge; Gitea/Git, CI, artifact/staging and fixed HTTP remedy adapters | Disposable native protocols prove read-back and interruption recovery; each additional vendor/target needs its own conformance |
+| EXP-04 — Evaluated ingestion and reuse | Schema, field, window, snapshot/offset, completeness and retention checks; immutable source receipts; deterministic BRS reconciliation | Delayed/invalid evidence cannot establish recovery; stored observations are reauthorized, and interpretations stay separate |
+| EXP-05 — Accountable roles | Five distinct role workloads, an authenticated owner, versioned packages, exact grants and role handoffs | Actual separate worker processes; human acceptance/package authority does not transfer to the builder |
+| EXP-06 — Access throughout | Cerbos plus transactional live credential, role, product, source, purpose, environment, deadline and budget checks; isolated product evaluation | Cross-role reads/actions, expired/revoked credentials, budget exhaustion, concurrent dispatch and sandbox attacks are tested |
+| EXP-07 — Audit and evidence | Exact model request/response/manifest, source receipts, native effects, immutable state events and early MCP/authentication denials | Correlated retained evidence covers platform-owned boundaries; protected credentials/rejected payloads are omitted from audit |
+| EXP-08 — End-to-end execution | Durable build/evaluate/repair/deliver/verify loop, restart and backup recovery, stable action IDs and optimistic controls | Incorrect patch rejected; repaired candidate delivered through native forge and staging; publisher crash reconciled after database/artifact restore |
+| EXP-09 — KB-driven incident resolution | Competing causal hypotheses grounded in BRS/history plus five source kinds, separate fixed remedy, independent technical and new-window business verification | Late lake and failed remedy block; misleading historical explanation is contradicted; audit and lake recovery criteria must both pass |
+| EXP-10 — Governed improvement | Pending KB, requirement, test, runbook and package proposals; regression-derived qualification; exact activation and rollback | Repeated feedback is idempotent, no generated KB auto-publication, and package upgrade/rollback gates dispatch |
 
 ## Implementation progress
 
-The new [product KB and source boundary](product-knowledge-and-evaluated-sources.md)
-implements the first shared-context dependency slice. Its disposable acceptance
-passed **28/28 existing mapped checks, 11 suites and 139 test/subtest results**.
-The new tests are additional capability evidence; the original 28-item map is
-not a coverage claim for all 12 AI-native gaps. See the
-[exact source snapshot and checks](ai-native-sdlc-implementation-20260913.md).
-
-| Gap | Implemented in this change | Remaining closure requirement |
+| Gap | Delivered capability | Completion evidence |
 |---|---|---|
-| A01 | Strict versioned intent, exact BRS/context bindings, criterion IDs, protected packet digests, visible assumptions and clarification blockers | Agent-assisted compilation/clarification and complete intent-to-effect links |
-| A02 | Current context and evaluator boundaries now available to a supervisor | Durable agent plan/action/evaluate/repair execution, cancellation and effect reconciliation |
-| A03 | Existing local-only embedding/provider controls retained | Evaluated builder/evaluator packages, routing/budgets, regressions and rollback |
-| A04 | Immutable product versions/relations, distinct observations, local semantic discovery with authoritative hydration, AGE projection and bounded PostgreSQL structural context | Automatic code-symbol bridges, richer lifecycle ontology, deeper context construction and source refresh/resume behavior |
-| A05 | Server-executed versioned observation oracle and immutable outcomes; exact accepted work-packet bindings | Independent protected product-test execution, held-out agent evaluation and full completion authority |
-| A06 | Incident Diagnosis read role, fixed source/field/purpose scopes, inherited field restrictions, owner attribution and existing delegated Development proposals | General role delegation, product/environment scopes, cumulative budgets and execution isolation |
-| A07 | Operator-configured bounded HTTP source views with schema/time/offset/snapshot validation and idempotent committed retention | Native Kafka/lake/log/audit bridges and delivery/operational action adapters with effect reconciliation |
-| A08 | Reproduce a known BRS violation, recognize a reconciled window and expose delayed lake uncertainty | Causal investigation, autonomous diagnosis, separately authorized remedy and verified recovery |
-| A09 | Machine-readable intent readiness, blockers, context and evaluation evidence | Outcome/progress/exception interface connected to execution |
-| A10 | Evaluated observations and results retained separately from pending generated lessons | Governed observation-to-product/test/runbook/agent-package improvement and controlled rollout |
-| A11 | Exact original generation bytes, tool-input digests, source actor/role/owner receipts, immutable evaluation evidence | Complete external action/handoff audit and accepted-outcome metrics/cohorts |
-| A12 | Compatible disposable gateway/worker/schema/policy/vector/graph acceptance | Retained live cutover and target identity/storage/retention/HA/recovery acceptance |
+| A01 | Local intent drafting/clarification, exact accepted bindings and criterion links through plan/files/patch/tests/effects | CLI intake and independent feature E2Es |
+| A02 | Durable serial execution, bounded repair, lease fencing, pause/cancel/resume and read-only reconciliation grants | Restart, stale context, interrupted publisher and native backup/restore E2Es |
+| A03 | Digest-pinned local packages, capability routes, conservative budgets, concurrency and regression-controlled activation/rollback | Positive/negative canaries and a separate real local-model feature trial |
+| A04 | Current semantic/structural KB context, active code-symbol bridges, frozen disclosure, repair feedback and refreshed operational observations | Product projection, code-head invalidation, context recovery and native incident tests |
+| A05 | Separate pinned evaluator process/container, protected tests, exact candidate verification and server-derived completion | Incorrect/held-out behavior, test tampering, forged stdout, timeout and OS isolation proofs |
+| A06 | Distinct workload identity with run/product/source/field/purpose/environment/time scope and persistent total budgets | Policy suite and live credential/lease/source/concurrency E2Es |
+| A07 | Native source readers and bounded forge/CI/artifact/staging/remedy contracts with stable IDs and read-back | Native service suite, unchanged Kafka consumer-group offsets, delivery interruption and remedy retry |
+| A08 | KB-grounded causal comparison and independently observed technical/business incident recovery | Five native source kinds, misleading history, late lake and failed-remedy E2E |
+| A09 | Operator CLI for drafting, acceptance, submission, progress, costs, blockers, evidence, control, feedback and packages | Actual separate CLI processes and exact evidence export |
+| A10 | Pending outcome-derived improvements plus package regression, activation and rollback | Pending/idempotent feedback and immutable package campaign/decision E2E |
+| A11 | Attributed model/source/action/handoff/denial evidence and distinct fixture/local-model outcome measures | Exact artifacts, correlated audit tests and machine-readable acceptance report |
+| A12 | Compatible disposable gateway/worker/schema/policy/vector/graph/native services and resumable restore | Combined existing 28-item and new 12-item functional profiles, required repository checks |
 
-The specific capture-byte defect is fixed. Composite A-items remain open until
-their full proof contracts pass. In particular, synthetic source reconciliation
-is not an end-to-end diagnostic/remediation agent, and the HTTP source protocol
-is not a native Kafka consumer. The next dependency slice is A03/A05/A02:
-protected independent evaluation and a bounded local execution worker consuming
-these accepted intent/context contracts.
+See [the checklist](sdlc-completion-checklist.md) for commands, snapshot hashes,
+counts and remaining target inputs. The earlier 28-item checklist covers
+supporting foundation work; it is not a substitute for these 12 scope proofs.
 
 ## Evidence and interpretation
+
+The following evidence table and original A/G finding narratives preserve the
+September 13 baseline. Their missing-capability descriptions explain why work
+was required; current closure is the implementation matrix above.
 
 | Evidence | What it establishes | Limit |
 |---|---|---|
@@ -172,6 +111,10 @@ repository, disposable source systems and a serial agent loop; it does not
 require a fleet of agents or a production cluster.
 
 ## Primary AI-native gaps
+
+Original finding and proof contracts, retained for traceability. Current
+implementation and closure evidence are listed above; future target acceptance
+is recorded separately in the completion checklist.
 
 The descriptions below retain the baseline findings and full acceptance
 contracts. Use [implementation progress](#implementation-progress) for what the

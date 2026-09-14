@@ -12,3 +12,9 @@ resourcePolicy:
       condition:
         match:
           expr: V.project
+    - actions: ["query", "read_observation"]
+      effect: EFFECT_ALLOW
+      roles: ["sdlc_diagnosis", "sdlc_evaluator"]
+      condition:
+        match:
+          expr: V.project && !request.principal.attr.human && request.resource.attr.execution_authorized == true && request.resource.attr.environment in ["disposable", "staging"]

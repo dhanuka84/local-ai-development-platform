@@ -49,9 +49,10 @@ defines the target product/BRS, architecture, implementation, evaluation,
 security, release, diagnosis, maintenance, curation and coordination agents.
 Each needs workload identity, delegated task/scope and an accountable owner;
 selecting a prompt or Make alias does not provision those capabilities.
-Current task delegation is limited to local Development. Wider role/source
-permissions and comprehensive audit remain [A06](sdlc-gap-assessment.md#a06)
-and [A11](sdlc-gap-assessment.md#a11).
+The existing task delegation remains scoped to local Development. The separate
+[SDLC runtime](sdlc-runtime.md#execution-and-responsibility) provisions five
+distinct workload roles with per-run, product, source, field, purpose and
+environment scope, total budgets and correlated audit.
 
 Use the [15-stage KB map](sdlc-guide.md#the-shared-kb-throughout-the-sdlc) for each
 role's inputs and evaluated outputs. The commands below operate the existing

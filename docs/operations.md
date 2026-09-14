@@ -22,8 +22,10 @@ The [AI-native operations scope](ai-native-sdlc-expectations.md#production-troub
 adds KB-driven product diagnosis using BRS, deployed code, historical incidents
 and evaluated log/metric/Kafka/lake/audit evidence. The
 [bounded source registry and reconciliation tools](product-knowledge-and-evaluated-sources.md)
-are implemented. Native connectors and the diagnosis/remediation supervisor
-remain [A07/A08 work](sdlc-gap-assessment.md#a07).
+are implemented. The [runtime guide](sdlc-runtime.md) configures native
+connectors, the diagnostic/remediation workers and independent recovery. The
+[completion checklist](sdlc-completion-checklist.md) records local proofs and
+separates target production acceptance.
 `ops-logs`, platform health, trace export and the four fixed platform metrics
 inspect this platform; they are not arbitrary production data-source tools.
 Diagnosis and remediation require separate role/action authority, local

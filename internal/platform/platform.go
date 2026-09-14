@@ -13,6 +13,7 @@ import (
 	"github.com/dhanuka84/hybrid-ai-platform/internal/authorization"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/config"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/domain"
+	"github.com/dhanuka84/hybrid-ai-platform/internal/execution"
 	graphfallback "github.com/dhanuka84/hybrid-ai-platform/internal/graph"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/graphrag"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/milvus"
@@ -54,6 +55,13 @@ func Open(ctx context.Context, cfg config.Config) (*Platform, error) {
 		return nil, fmt.Errorf("configure product source registry: %w", err)
 	}
 	svc.ConfigureSources(sourceRegistry)
+	executionRegistry, err := execution.Load(cfg.SDLCRegistry)
+	if err != nil {
+		repository.Close()
+		_ = vectors.Close(ctx)
+		return nil, fmt.Errorf("configure SDLC execution registry: %w", err)
+	}
+	svc.ConfigureExecutions(executionRegistry)
 	if err := svc.ConfigureTraceRetention(cfg.TraceRetentionDays); err != nil {
 		repository.Close()
 		_ = vectors.Close(ctx)

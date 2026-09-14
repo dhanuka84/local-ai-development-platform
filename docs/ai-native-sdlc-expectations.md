@@ -80,9 +80,10 @@ The implementation now adds versioned product/feature/intent/observation/inciden
 records, bounded source ingestion and business reconciliation to the existing
 code, repository, governed-definition and approved-knowledge foundations. See
 the [implemented source boundary](product-knowledge-and-evaluated-sources.md).
-The complete vocabulary below remains the target. Native Kafka, lake, log and
-audit bridges and agent execution still require integration; the HTTP adapter
-protocol alone does not establish a production connection. `platform_metric_query`
+The complete vocabulary below remains the target. The [local runtime](sdlc-runtime.md)
+connects role workers to native Kafka, S3, audit, log and metric readers,
+feature delivery and verified incident recovery. Target production access and
+additional integration vendors require their own acceptance. `platform_metric_query`
 continues to query fixed platform metrics.
 
 ```mermaid
@@ -204,8 +205,8 @@ Use the following target ingestion/evaluation path under authorized policy:
    authoritative records; verify read-back. Subsequent tasks recheck
    applicability, freshness, permission and observation time.
 
-The validated-observation store and general ingestion-policy path in step 7
-are proposed extensions. Existing `generation_capture` creates pending
+The validated-observation store and source-policy path in step 7 are implemented
+by the [evaluated-source boundary](product-knowledge-and-evaluated-sources.md). Existing `generation_capture` creates pending
 knowledge. Do not bypass its approval gate by labeling a generated diagnosis
 as a source fact or by writing directly to Milvus.
 
