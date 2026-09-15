@@ -1,7 +1,6 @@
 package service
 
 import (
-	"context"
 	"errors"
 	"math"
 	"os/exec"
@@ -34,23 +33,23 @@ func TestSourceVerificationChecksExactAllowlistedBranch(t *testing.T) {
 	revision := git("rev-parse", "HEAD")
 	manifest := domain.SourceManifest{SchemaVersion: "hybrid-ai/knowledge-source/v1", Sources: []domain.KnowledgeSource{{Kind: "repository", Reference: root, Branch: "main", Revision: revision}}}
 	svc := New(&fakeRepository{}, artifacts.NewLocalStore(t.TempDir()), nil, nil, false, false)
-	if err := svc.verifySources(context.Background(), manifest); !errors.Is(err, domain.ErrQualityBlocked) {
+	if err := svc.verifySources(t.Context(), manifest); !errors.Is(err, domain.ErrQualityBlocked) {
 		t.Fatalf("unconfigured root allowed: %v", err)
 	}
 	svc.ConfigureSourceRoots([]string{root})
-	if err := svc.verifySources(context.Background(), manifest); err != nil {
+	if err := svc.verifySources(t.Context(), manifest); err != nil {
 		t.Fatal(err)
 	}
 	git("-c", "user.name=Synthetic Fixture", "-c", "user.email=fixture@example.invalid", "commit", "--quiet", "--allow-empty", "-m", "changed")
-	if err := svc.verifySources(context.Background(), manifest); !errors.Is(err, domain.ErrQualityBlocked) || !strings.Contains(err.Error(), "source_changed") {
+	if err := svc.verifySources(t.Context(), manifest); !errors.Is(err, domain.ErrQualityBlocked) || !strings.Contains(err.Error(), "source_changed") {
 		t.Fatalf("changed branch allowed: %v", err)
 	}
 	manifest.Sources[0].ApplicableThrough = git("rev-parse", "HEAD")
-	if err := svc.verifySources(context.Background(), manifest); err != nil {
+	if err := svc.verifySources(t.Context(), manifest); err != nil {
 		t.Fatalf("explicit bounded applicability: %v", err)
 	}
 	git("-c", "user.name=Synthetic Fixture", "-c", "user.email=fixture@example.invalid", "commit", "--quiet", "--allow-empty", "-m", "outside range")
-	if err := svc.verifySources(context.Background(), manifest); !errors.Is(err, domain.ErrQualityBlocked) {
+	if err := svc.verifySources(t.Context(), manifest); !errors.Is(err, domain.ErrQualityBlocked) {
 		t.Fatal("open-ended applicability was accepted", err)
 	}
 }
@@ -78,7 +77,7 @@ func TestSearchRejectsStaleCrossProjectAndMalformedVectors(t *testing.T) {
 			}
 			repo := &fakeRepository{items: []domain.KnowledgeItem{item}, lexical: []domain.SearchHit{{KnowledgeItem: item}}}
 			svc := New(repo, &fakeArtifacts{}, &fakeEmbedder{vectors: [][]float32{{1}}}, &fakeVectors{hits: []domain.VectorHit{hit}}, true, false)
-			result, _, err := svc.Search(context.Background(), project, "query", 5)
+			result, _, err := svc.Search(t.Context(), project, "query", 5)
 			if !errors.Is(err, domain.ErrQualityBlocked) || len(result) != 0 {
 				t.Fatalf("result=%v err=%v", result, err)
 			}

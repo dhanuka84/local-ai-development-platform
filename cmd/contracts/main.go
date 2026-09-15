@@ -2,8 +2,9 @@ package main
 
 import (
 	"fmt"
-	"github.com/dhanuka84/hybrid-ai-platform/contracts"
 	"os"
+
+	"github.com/dhanuka84/hybrid-ai-platform/contracts"
 )
 
 func main() {

@@ -90,7 +90,7 @@ func TestSearchUsesHydratedMilvusSeedsAndRanksExpansion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	result, err := service.Search(context.Background(), Request{
+	result, err := service.Search(t.Context(), Request{
 		ProjectID: " product ", Query: " impact ", Repository: "api", SeedLimit: 2,
 	})
 	if err != nil {
@@ -114,7 +114,7 @@ func TestSearchFallsBackToPostgresLexicalSeeds(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	result, err := service.Search(context.Background(), Request{ProjectID: "product", Query: "impact"})
+	result, err := service.Search(t.Context(), Request{ProjectID: "product", Query: "impact"})
 	if err != nil {
 		t.Fatal(err)
 	}

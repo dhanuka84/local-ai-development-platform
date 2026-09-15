@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"time"
+
 	"github.com/dhanuka84/hybrid-ai-platform/internal/contextregistry"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/domain"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/telemetry"
-	"time"
 )
 
 func (w *Worker) refreshDefinitions(ctx context.Context) error {
@@ -89,7 +90,10 @@ func (w *Worker) indexDefinition(ctx context.Context, event domain.OutboxEvent) 
 		return err
 	}
 	defer func() { err = errors.Join(err, finish(err)) }()
-	raw, _ := json.Marshal(d.ContextDefinition)
+	raw, err := json.Marshal(d.ContextDefinition)
+	if err != nil {
+		return err
+	}
 	embeddings, err := w.embedder.Embed(ctx, []string{string(raw)})
 	if err != nil {
 		return err

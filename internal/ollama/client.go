@@ -1,3 +1,5 @@
+// Package ollama calls the configured local model service for embeddings.
+// Requests propagate caller cancellation and use a bounded HTTP client timeout.
 package ollama
 
 import (
@@ -43,7 +45,10 @@ func (c *Client) Embed(ctx context.Context, input []string) ([][]float32, error)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		body, err := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		if err != nil {
+			return nil, fmt.Errorf("read Ollama embed failure (%s): %w", resp.Status, err)
+		}
 		return nil, fmt.Errorf("Ollama embed API returned %s: %s", resp.Status, strings.TrimSpace(string(body)))
 	}
 	var result struct {

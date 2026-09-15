@@ -1,7 +1,6 @@
 package ollama
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -17,7 +16,7 @@ func TestEmbed(t *testing.T) {
 	}))
 	defer server.Close()
 
-	got, err := New(server.URL, "test").Embed(context.Background(), []string{"hello"})
+	got, err := New(server.URL, "test").Embed(t.Context(), []string{"hello"})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -20,22 +21,32 @@ import (
 )
 
 func main() {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	if err := run(ctx); err != nil {
+		slog.Error("fatal", "error", err)
+		os.Exit(1)
+	}
+}
+
+func run(ctx context.Context) (err error) {
 	cfg, err := config.Load()
 	if err != nil {
-		fail(err)
+		return err
 	}
 	logger := logging.New(cfg.LogLevel)
 	slog.SetDefault(logger)
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-
 	app, err := platform.Open(ctx, cfg)
 	if err != nil {
-		fail(err)
+		return err
 	}
-	defer func() { _ = app.Close(context.Background()) }()
+	defer func() {
+		closeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
+		defer cancel()
+		err = errors.Join(err, app.Close(closeCtx))
+	}()
 	if err := app.Initialize(ctx); err != nil {
-		fail(err)
+		return err
 	}
 	var localPrincipal domain.Principal
 	for _, bootstrap := range cfg.AuthPrincipals {
@@ -51,9 +62,9 @@ func main() {
 	if cfg.MCPTransport == "stdio" {
 		logger.Info("starting MCP gateway", "transport", "stdio")
 		if err := server.Run(ctx, &mcp.StdioTransport{}); err != nil && !errors.Is(err, context.Canceled) {
-			fail(err)
+			return err
 		}
-		return
+		return nil
 	}
 
 	httpServer := httpserver.New(cfg.HTTPAddress, cfg.AuthMode, app.Service, localPrincipal, server, logger, func(r *http.Request) map[string]string {
@@ -61,19 +72,10 @@ func main() {
 		defer cancel()
 		return app.Service.Dependencies(checkCtx)
 	})
-	go func() {
-		<-ctx.Done()
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-		defer cancel()
-		_ = httpServer.Shutdown(shutdownCtx)
-	}()
-	logger.Info("starting MCP gateway", "transport", "streamable-http", "address", cfg.HTTPAddress, "endpoint", "/mcp")
-	if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		fail(err)
+	listener, err := net.Listen("tcp", cfg.HTTPAddress)
+	if err != nil {
+		return err
 	}
-}
-
-func fail(err error) {
-	slog.Error("fatal", "error", err)
-	os.Exit(1)
+	logger.Info("starting MCP gateway", "transport", "streamable-http", "address", cfg.HTTPAddress, "endpoint", "/mcp")
+	return httpserver.Serve(ctx, httpServer, listener, 15*time.Second)
 }

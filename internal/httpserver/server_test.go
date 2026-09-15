@@ -69,7 +69,7 @@ func TestStatelessStreamableHTTPListsTools(t *testing.T) {
 	httpTestServer := httptest.NewServer(server.Handler)
 	defer httpTestServer.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 	client := mcp.NewClient(&mcp.Implementation{Name: "http-test", Version: "1.0.0"}, nil)
 	session, err := client.Connect(ctx, &mcp.StreamableClientTransport{

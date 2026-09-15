@@ -17,7 +17,7 @@ func TestVersionedKnowledgeProjectionIntegration(t *testing.T) {
 	if address == "" {
 		t.Skip("TEST_MILVUS_ADDRESS is not set")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 60*time.Second)
 	defer cancel()
 	id, _ := domain.NewID()
 	collection := "agent_ready_fixture_" + strings.ReplaceAll(id, "-", "")

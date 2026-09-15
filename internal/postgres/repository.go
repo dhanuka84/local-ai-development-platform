@@ -1,3 +1,7 @@
+// Package postgres persists authoritative platform state and immutable evidence.
+// Deferred transaction rollback preserves the primary operation error: pgx treats
+// rollback after commit as already closed and closes connections on other rollback
+// failures. Row iterators are closed and their terminal errors are checked.
 package postgres
 
 import (

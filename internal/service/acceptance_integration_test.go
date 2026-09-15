@@ -4,6 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log/slog"
+	"os"
+	"os/exec"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/dhanuka84/hybrid-ai-platform/components/workpacket"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/artifacts"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/authorization"
@@ -13,13 +21,6 @@ import (
 	"github.com/dhanuka84/hybrid-ai-platform/internal/postgres"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/worker"
 	"github.com/dhanuka84/hybrid-ai-platform/migrations"
-	"io"
-	"log/slog"
-	"os"
-	"os/exec"
-	"strings"
-	"testing"
-	"time"
 )
 
 type acceptanceEmbedder struct{}
@@ -44,7 +45,7 @@ func TestAgentReadyAcceptanceIntegration(t *testing.T) {
 	if db == "" || address == "" || policy == "" {
 		t.Skip("requires disposable TEST_DATABASE_URL, TEST_MILVUS_ADDRESS and TEST_CERBOS_ADDRESS")
 	}
-	ctx := context.Background()
+	ctx := t.Context()
 	r, err := postgres.Open(ctx, db)
 	if err != nil {
 		t.Fatal(err)
@@ -150,7 +151,7 @@ func TestAgentReadyAcceptanceIntegration(t *testing.T) {
 	}
 	a = transition(a, "LEARNING_PROMOTED", "", "")
 	w := worker.New(r, acceptanceEmbedder{}, vectors, slog.New(slog.NewTextHandler(io.Discard, nil)), time.Second, 1000)
-	for i := 0; i < 20; i++ {
+	for range 20 {
 		if _, err = w.ProcessOnce(ctx); err != nil {
 			t.Fatal(err)
 		}
@@ -203,11 +204,14 @@ func TestAgentReadyAcceptanceIntegration(t *testing.T) {
 	if err != nil || result.Value == nil || *result.Value != .5 || result.Numerator != 1 || result.Denominator != 2 {
 		t.Fatalf("metric=%+v err=%v", result, err)
 	}
-	for i := 0; i < 20; i++ {
+	for range 20 {
 		if _, err = w.ProcessOnce(ctx); err != nil {
 			t.Fatal(err)
 		}
-		d, _ := r.ContextDefinition(ctx, project, request.MetricID, 1)
+		d, err := r.ContextDefinition(ctx, project, request.MetricID, 1)
+		if err != nil {
+			t.Fatal(err)
+		}
 		if d.ProjectionVerifiedAt != nil {
 			break
 		}
@@ -221,7 +225,7 @@ func TestAgentReadyAcceptanceIntegration(t *testing.T) {
 		t.Fatal("cross-project metric escaped authorization")
 	}
 	// Exact documented 8/20 arithmetic fixture, explicitly synthetic rows.
-	for i := 0; i < 18; i++ {
+	for i := range 18 {
 		id, _ := domain.NewID()
 		fixtureItem := capture(domain.WorkflowTaskCheckpoint{ID: id, Title: "Arithmetic fixture"})
 		_, err = r.Pool().Exec(ctx, `INSERT INTO workflow_task_checkpoints(id,workflow_id,ordinal,task_key,title,task_type,state,route,execution_mode,version,rag_query,rag_backend,rag_hit_ids,rag_max_score,match_threshold,request_artifact_sha256,created_by,candidate_id,completed_at) SELECT $1,workflow_id,ordinal+$2,$3,title,task_type,state,route,execution_mode,version,rag_query,rag_backend,rag_hit_ids,rag_max_score,match_threshold,request_artifact_sha256,created_by,$5,now() FROM workflow_task_checkpoints WHERE id=$4`, id, i+1, fmt.Sprint("arithmetic-", i), b.ID, fixtureItem.ID)
@@ -301,7 +305,10 @@ func TestAgentReadyAcceptanceIntegration(t *testing.T) {
 	if git("status", "--porcelain") != "" {
 		t.Fatal("verifier modified source")
 	}
-	raw, _ := json.Marshal(evidence)
+	raw, marshalErr := json.Marshal(evidence)
+	if marshalErr != nil {
+		t.Fatal(marshalErr)
+	}
 	if strings.Contains(string(raw), "synthetic acceptance\n") {
 		t.Fatal("raw command output leaked into trace")
 	}

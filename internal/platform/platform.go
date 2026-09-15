@@ -1,9 +1,13 @@
+// Package platform wires services and owns their external dependencies.
+// Open and Close make acquisition and cleanup explicit at application startup.
 package platform
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
+	"time"
 
 	golanganalyzer "github.com/dhanuka84/hybrid-ai-platform/components/codegraph/golang"
 	codegraphrouter "github.com/dhanuka84/hybrid-ai-platform/components/codegraph/router"
@@ -35,36 +39,43 @@ type Platform struct {
 	principals    []domain.PrincipalBootstrap
 }
 
-func Open(ctx context.Context, cfg config.Config) (*Platform, error) {
+// Open acquires the platform dependencies and releases them if setup fails.
+// A successful caller owns the returned platform and must call Close.
+func Open(ctx context.Context, cfg config.Config) (_ *Platform, err error) {
 	repository, err := postgres.Open(ctx, cfg.DatabaseURL)
 	if err != nil {
 		return nil, err
 	}
+	defer func() {
+		if err != nil {
+			repository.Close()
+		}
+	}()
 	vectors, err := milvus.Open(ctx, cfg.MilvusAddress, cfg.MilvusDatabase, cfg.MilvusAPIKey, cfg.MilvusCollection, cfg.EmbeddingDimension)
 	if err != nil {
-		repository.Close()
 		return nil, err
 	}
+	defer func() {
+		if err != nil {
+			closeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
+			defer cancel()
+			err = errors.Join(err, vectors.Close(closeCtx))
+		}
+	}()
 	embedder := telemetry.WrapEmbedder(repository, ollama.New(cfg.OllamaURL, cfg.EmbeddingModel))
 	artifactStore := artifacts.NewLocalStore(cfg.ArtifactsPath)
 	svc := service.New(repository, artifactStore, embedder, vectors, cfg.SearchFallback, cfg.AutoApproveLocal)
 	sourceRegistry, err := sources.Load(cfg.ProductSourceRegistry)
 	if err != nil {
-		repository.Close()
-		_ = vectors.Close(ctx)
 		return nil, fmt.Errorf("configure product source registry: %w", err)
 	}
 	svc.ConfigureSources(sourceRegistry)
 	executionRegistry, err := execution.Load(cfg.SDLCRegistry)
 	if err != nil {
-		repository.Close()
-		_ = vectors.Close(ctx)
 		return nil, fmt.Errorf("configure SDLC execution registry: %w", err)
 	}
 	svc.ConfigureExecutions(executionRegistry)
 	if err := svc.ConfigureTraceRetention(cfg.TraceRetentionDays); err != nil {
-		repository.Close()
-		_ = vectors.Close(ctx)
 		return nil, err
 	}
 	svc.ConfigureSourceRoots(cfg.CodeGraphAllowedRoots)
@@ -75,8 +86,6 @@ func Open(ctx context.Context, cfg config.Config) (*Platform, error) {
 	if cfg.GraphBackend == "apache-age" {
 		ageStore, err := age.New(repository.Pool(), repository, cfg.AgeGraphName)
 		if err != nil {
-			_ = vectors.Close(ctx)
-			repository.Close()
 			return nil, fmt.Errorf("configure Apache AGE: %w", err)
 		}
 		graphStore, graphHealth, projector = ageStore, ageStore, ageStore
@@ -86,13 +95,9 @@ func Open(ctx context.Context, cfg config.Config) (*Platform, error) {
 	}
 	graphRAG, err := graphrag.New(repository, embedder, vectors, graphStore)
 	if err != nil {
-		_ = vectors.Close(ctx)
-		repository.Close()
 		return nil, err
 	}
 	if err := svc.ConfigureGraphs(graphStore, graphHealth, graphRAG); err != nil {
-		_ = vectors.Close(ctx)
-		repository.Close()
 		return nil, err
 	}
 	var authorizer domain.Authorizer = authorization.Disabled{}
@@ -100,15 +105,11 @@ func Open(ctx context.Context, cfg config.Config) (*Platform, error) {
 	if cfg.AuthorizationMode == "cerbos" {
 		cerbosAuthorizer, err := authorization.NewCerbos(cfg.CerbosAddress, cfg.CerbosRequestTimeout)
 		if err != nil {
-			_ = vectors.Close(ctx)
-			repository.Close()
 			return nil, err
 		}
 		authorizer, reportAuthorizer = cerbosAuthorizer, true
 	}
 	if err := svc.ConfigureAuthorization(authorizer, reportAuthorizer); err != nil {
-		_ = vectors.Close(ctx)
-		repository.Close()
 		return nil, err
 	}
 	if cfg.CodeGraphEnabled {
@@ -116,24 +117,18 @@ func Open(ctx context.Context, cfg config.Config) (*Platform, error) {
 			Name: "scip-java", Version: "0.13.1", Command: cfg.CodeGraphJVMIndexer, Language: "jvm",
 		})
 		if err != nil {
-			_ = vectors.Close(ctx)
-			repository.Close()
 			return nil, fmt.Errorf("configure JVM code analyzer: %w", err)
 		}
 		typeScriptAnalyzer, err := scipanalyzer.New(scipanalyzer.Config{
 			Name: "scip-typescript", Version: "0.4.0", Command: cfg.CodeGraphTSIndexer, Language: "typescript",
 		})
 		if err != nil {
-			_ = vectors.Close(ctx)
-			repository.Close()
 			return nil, fmt.Errorf("configure TypeScript code analyzer: %w", err)
 		}
 		pythonAnalyzer, err := scipanalyzer.New(scipanalyzer.Config{
 			Name: "scip-python", Version: "0.6.6", Command: cfg.CodeGraphPythonIndexer, Language: "python",
 		})
 		if err != nil {
-			_ = vectors.Close(ctx)
-			repository.Close()
 			return nil, fmt.Errorf("configure Python code analyzer: %w", err)
 		}
 		analyzer, err := codegraphrouter.New(
@@ -149,15 +144,11 @@ func Open(ctx context.Context, cfg config.Config) (*Platform, error) {
 			codegraphrouter.Candidate{Analyzer: pythonAnalyzer, Extensions: []string{".py"}},
 		)
 		if err != nil {
-			_ = vectors.Close(ctx)
-			repository.Close()
 			return nil, fmt.Errorf("configure code analyzer routing: %w", err)
 		}
 		if err := svc.ConfigureCodeGraph(analyzer, cfg.CodeGraphAllowedRoots, service.CodeGraphLimits{
 			MaxFiles: cfg.CodeGraphMaxFiles, MaxEntities: cfg.CodeGraphMaxEntities, MaxRelations: cfg.CodeGraphMaxRelations,
 		}); err != nil {
-			_ = vectors.Close(ctx)
-			repository.Close()
 			return nil, fmt.Errorf("configure code graph: %w", err)
 		}
 	}
@@ -194,6 +185,8 @@ func (p *Platform) Initialize(ctx context.Context) error {
 	return nil
 }
 
+// Close releases PostgreSQL and Milvus resources. Call it only after platform
+// operations have finished; ctx bounds the Milvus close request.
 func (p *Platform) Close(ctx context.Context) error {
 	p.Repository.Close()
 	return p.Vectors.Close(ctx)

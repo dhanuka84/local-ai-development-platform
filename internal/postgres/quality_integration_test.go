@@ -1,7 +1,6 @@
 package postgres
 
 import (
-	"context"
 	"errors"
 	"os"
 	"testing"
@@ -17,7 +16,7 @@ func TestKnowledgeQualityAcrossRetrievalAndRecoveryIntegration(t *testing.T) {
 	if url == "" {
 		t.Skip("TEST_DATABASE_URL is not set")
 	}
-	ctx := context.Background()
+	ctx := t.Context()
 	r, err := Open(ctx, url)
 	if err != nil {
 		t.Fatal(err)
@@ -181,7 +180,7 @@ func TestOutboxRetryExhaustionIntegration(t *testing.T) {
 	if url == "" {
 		t.Skip("TEST_DATABASE_URL is not set")
 	}
-	ctx := context.Background()
+	ctx := t.Context()
 	r, err := Open(ctx, url)
 	if err != nil {
 		t.Fatal(err)

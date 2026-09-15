@@ -1,7 +1,6 @@
 package service
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -15,7 +14,7 @@ import (
 
 func exerciseTaskDelegations(t *testing.T, s *Service, r *postgres.Repository, human domain.PrincipalBootstrap, task domain.WorkflowTaskCheckpoint) {
 	t.Helper()
-	ctx := context.Background()
+	ctx := t.Context()
 	p, err := s.AuthenticateToken(ctx, human.Token)
 	if err != nil {
 		t.Fatal(err)
@@ -36,7 +35,10 @@ func exerciseTaskDelegations(t *testing.T, s *Service, r *postgres.Repository, h
 	}
 	delegateCtx := identity.WithPrincipal(ctx, delegate)
 	captureInput := CaptureInput{ProjectID: task.ProjectID, WorkflowID: task.WorkflowID, Prompt: "Synthetic delegated task", Response: "Synthetic pending delegated lesson", Summary: "Synthetic delegated lesson", Provider: "ollama", Model: "synthetic-fixture", TaskType: "maintenance"}
-	captureJSON, _ := json.Marshal(map[string]string{"project_id": task.ProjectID, "workflow_id": task.WorkflowID, "provider": "ollama"})
+	captureJSON, marshalErr := json.Marshal(map[string]string{"project_id": task.ProjectID, "workflow_id": task.WorkflowID, "provider": "ollama"})
+	if marshalErr != nil {
+		t.Fatal(marshalErr)
+	}
 	captureCtx, captureFinish, err := s.BeginToolOperation(delegateCtx, "generation_capture", captureJSON)
 	if err != nil {
 		t.Fatal(err)
@@ -53,7 +55,10 @@ func exerciseTaskDelegations(t *testing.T, s *Service, r *postgres.Repository, h
 		t.Fatal(err)
 	}
 	for _, candidate := range []domain.KnowledgeItem{ownedCandidate, foreignCandidate} {
-		payload, _ := json.Marshal(map[string]any{"task_id": task.ID, "candidate_id": candidate.ID, "provider": "ollama", "event_type": "LOCAL_RESULT_RECORDED"})
+		payload, marshalErr := json.Marshal(map[string]any{"task_id": task.ID, "candidate_id": candidate.ID, "provider": "ollama", "event_type": "LOCAL_RESULT_RECORDED"})
+		if marshalErr != nil {
+			t.Fatal(marshalErr)
+		}
 		_, end, gateErr := s.BeginToolOperation(delegateCtx, "workflow_task_transition", payload)
 		if (gateErr == nil) != (candidate.ID == ownedCandidate.ID) {
 			t.Fatal("candidate from another actor or task was attachable", gateErr)
@@ -71,12 +76,18 @@ func exerciseTaskDelegations(t *testing.T, s *Service, r *postgres.Repository, h
 		t.Fatal("unbounded TTL allowed")
 	}
 	for _, name := range []string{"workflow_run_create", "knowledge_candidate_decide", "knowledge_validation_record", "context_definition_decide", "knowledge_index_retry"} {
-		input, _ := json.Marshal(map[string]string{"project_id": task.ProjectID})
+		input, marshalErr := json.Marshal(map[string]string{"project_id": task.ProjectID})
+		if marshalErr != nil {
+			t.Fatal(marshalErr)
+		}
 		if _, _, err = s.BeginToolOperation(delegateCtx, name, input); err == nil {
 			t.Fatalf("delegation allowed %s", name)
 		}
 	}
-	input, _ := json.Marshal(map[string]string{"task_id": task.ID})
+	input, marshalErr := json.Marshal(map[string]string{"task_id": task.ID})
+	if marshalErr != nil {
+		t.Fatal(marshalErr)
+	}
 	toolCtx, finish, err := s.BeginToolOperation(delegateCtx, "workflow_task_get", input)
 	if err != nil {
 		t.Fatal(err)

@@ -5,6 +5,8 @@ import (
 	"fmt"
 )
 
+// NewID returns a random UUID. The error result is retained for compatibility;
+// crypto/rand.Read never returns an error on the supported Go baseline.
 func NewID() (string, error) {
 	var value [16]byte
 	if _, err := rand.Read(value[:]); err != nil {

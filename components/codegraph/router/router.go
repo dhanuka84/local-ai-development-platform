@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"io/fs"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -187,7 +187,7 @@ func merge(root, repositoryName, branch, revision string, dirty bool, started ti
 			orderedEntities[index].Metadata["revision"] = revision
 		}
 	}
-	sort.Strings(analyzers)
+	slices.Sort(analyzers)
 	snapshot := codegraph.Snapshot{
 		RepositoryPath: root, RepositoryName: repositoryName, Branch: branch, Revision: revision,
 		Analyzer:        "multi-language",

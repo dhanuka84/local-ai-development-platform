@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -622,6 +622,6 @@ func sortedIndexFiles(root string) ([]string, error) {
 		}
 		return nil
 	})
-	sort.Strings(paths)
+	slices.Sort(paths)
 	return paths, err
 }

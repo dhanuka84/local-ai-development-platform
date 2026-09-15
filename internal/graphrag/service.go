@@ -1,3 +1,5 @@
+// Package graphrag combines semantic discovery with bounded graph expansion.
+// Retrieved candidates are hydrated from the authoritative repository before use.
 package graphrag
 
 import (

@@ -268,7 +268,10 @@ func TestAgentReadyGatewayE2E(t *testing.T) {
 		if !trace.Complete || len(trace.Missing) != 0 || len(trace.Records) == 0 {
 			t.Fatalf("incomplete owned trace: %+v", trace.Missing)
 		}
-		raw, _ := json.Marshal(trace)
+		raw, marshalErr := json.Marshal(trace)
+		if marshalErr != nil {
+			t.Fatal(marshalErr)
+		}
 		if strings.Contains(string(raw), lesson) || strings.Contains(string(raw), f.operator) {
 			t.Fatal("raw content or credential leaked into telemetry")
 		}

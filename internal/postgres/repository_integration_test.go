@@ -1,7 +1,6 @@
 package postgres
 
 import (
-	"context"
 	"crypto/sha256"
 	"errors"
 	"os"
@@ -18,7 +17,7 @@ func TestRepositoryWorkflowIntegration(t *testing.T) {
 	if databaseURL == "" {
 		t.Skip("TEST_DATABASE_URL is not set")
 	}
-	ctx := context.Background()
+	ctx := t.Context()
 	repository, err := Open(ctx, databaseURL)
 	if err != nil {
 		t.Fatal(err)
@@ -141,7 +140,7 @@ func TestRepositoryWorkflowIntegration(t *testing.T) {
 		err  error
 	}
 	concurrentResults := make(chan concurrentTaskResult, 2)
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		taskID, _ := domain.NewID()
 		eventID, _ := domain.NewID()
 		go func() {

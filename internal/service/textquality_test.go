@@ -10,7 +10,7 @@ import (
 
 func TestTextQualitySignals(t *testing.T) {
 	for _, tc := range []struct{ text, flag string }{
-		{" \n\t", "empty_text"}, {"bad\xfftext", "invalid_utf8"}, {"replaced \ufffd character", "replacement_character_requires_review"}, {"control\x01text", "unexpected_control_character"}, {"unfinished...", "possible_truncation_requires_review"}, {strings.Repeat("a", domain.QualityTextLimit+1), "text_exceeds_inspection_limit"},
+		{text: " \n\t", flag: "empty_text"}, {text: "bad\xfftext", flag: "invalid_utf8"}, {text: "replaced \ufffd character", flag: "replacement_character_requires_review"}, {text: "control\x01text", flag: "unexpected_control_character"}, {text: "unfinished...", flag: "possible_truncation_requires_review"}, {text: strings.Repeat("a", domain.QualityTextLimit+1), flag: "text_exceeds_inspection_limit"},
 	} {
 		t.Run(tc.flag, func(t *testing.T) {
 			if !strings.Contains(strings.Join(textFlags(tc.text), ","), tc.flag) {
@@ -31,7 +31,7 @@ func TestLexicalDuplicateEvaluationDoesNotClaimMeaning(t *testing.T) {
 		t.Fatal("unrelated fixture marked similar")
 	}
 	words := []string{}
-	for i := 0; i < 80; i++ {
+	for i := range 80 {
 		words = append(words, fmt.Sprintf("term%d", i))
 	}
 	before := strings.Join(words, " ") + " always enable the feature"

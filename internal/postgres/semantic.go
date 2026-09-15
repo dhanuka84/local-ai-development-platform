@@ -1,13 +1,15 @@
 package postgres
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"time"
+
 	"github.com/dhanuka84/hybrid-ai-platform/internal/contextregistry"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/domain"
 	"github.com/jackc/pgx/v5"
-	"time"
 )
 
 const definitionColumns = `definition,project_id,sha256,registry_sha256,status,validated_at,COALESCE(approved_by,''),approved_at,projected_at,projection_model,projection_dimension`
@@ -18,16 +20,24 @@ func scanDefinition(row pgx.Row) (d domain.GovernedDefinition, err error) {
 	if err == nil {
 		err = json.Unmarshal(raw, &d.ContextDefinition)
 	}
-	return
+	return d, err
 }
 func (r *Repository) ValidateContextRegistry(ctx context.Context, v domain.RegistryValidation, defs []domain.ContextDefinition) error {
 	expected, sha, err := contextregistry.Load()
 	if err != nil {
 		return err
 	}
-	a, _ := json.Marshal(expected)
-	b, _ := json.Marshal(defs)
-	if sha != v.RegistrySHA256 || string(a) != string(b) || v.Evidence.SHA256 == "" || v.CompletedAt.After(time.Now().Add(time.Second)) {
+	expectedJSON, err := json.Marshal(expected)
+	if err != nil {
+		return err
+	}
+	definitionsJSON, err := json.Marshal(defs)
+	if err != nil {
+		return err
+	}
+	// Approval binds the canonical JSON bytes, including definition order and
+	// nil versus empty collections; semantic equivalence is insufficient here.
+	if sha != v.RegistrySHA256 || !bytes.Equal(expectedJSON, definitionsJSON) || v.Evidence.SHA256 == "" || v.CompletedAt.After(time.Now().Add(time.Second)) {
 		return domain.ErrValidationRequired
 	}
 	tx, err := r.pool.Begin(ctx)
@@ -40,7 +50,10 @@ func (r *Repository) ValidateContextRegistry(ctx context.Context, v domain.Regis
 	}
 	for _, d := range defs {
 		if d.Kind == "metric" {
-			query, _ := contextregistry.SQL(d.ID)
+			query, err := contextregistry.SQL(d.ID)
+			if err != nil {
+				return err
+			}
 			if _, err = tx.Exec(ctx, "EXPLAIN "+query, v.ProjectID, time.Now().Add(-time.Hour), time.Now(), ""); err != nil {
 				return err
 			}
@@ -53,7 +66,10 @@ func (r *Repository) ValidateContextRegistry(ctx context.Context, v domain.Regis
 		return err
 	}
 	for _, d := range defs {
-		raw, _ := json.Marshal(d)
+		raw, err := json.Marshal(d)
+		if err != nil {
+			return err
+		}
 		tag, err := tx.Exec(ctx, `INSERT INTO context_definitions(project_id,id,version,kind,definition,sha256,registry_sha256,validated_at)
  VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(project_id,id,version) DO UPDATE SET validated_at=EXCLUDED.validated_at
  WHERE context_definitions.sha256=EXCLUDED.sha256 AND context_definitions.registry_sha256=EXCLUDED.registry_sha256`, v.ProjectID, d.ID, d.Version, d.Kind, raw, domain.Digest(raw), sha, v.CompletedAt)
@@ -88,7 +104,10 @@ func (r *Repository) DecideContextDefinition(ctx context.Context, in domain.Defi
 	if err != nil {
 		return d, err
 	}
-	raw, _ := json.Marshal(in)
+	raw, err := json.Marshal(in)
+	if err != nil {
+		return d, err
+	}
 	sha := domain.Digest(append(raw, []byte(in.Actor)...))
 	var previous string
 	err = tx.QueryRow(ctx, `SELECT request_sha256 FROM context_definition_decisions WHERE project_id=$1 AND definition_id=$2 AND idempotency_key=$3`, in.ProjectID, in.DefinitionID, in.IdempotencyKey).Scan(&previous)
@@ -270,7 +289,10 @@ func (r *Repository) QueryPlatformMetric(ctx context.Context, in domain.MetricRe
 	if d.Status != "approved" || d.RegistrySHA256 != actual || time.Since(d.ValidatedAt) > 30*24*time.Hour {
 		return out, domain.ErrQualityBlocked
 	}
-	query, _ := contextregistry.SQL(in.MetricID)
+	query, err := contextregistry.SQL(in.MetricID)
+	if err != nil {
+		return out, err
+	}
 	out = domain.MetricResult{ProjectID: in.ProjectID, MetricID: in.MetricID, Version: in.Version, Unit: d.Unit, Start: in.Start.UTC(), End: in.End.UTC(), DefinitionSHA256: d.SHA256, RegistrySHA256: actual, Freshness: "authoritative repeatable-read PostgreSQL snapshot; definition validated within 30 days", Coverage: "platform-recorded events only; external unobserved work excluded"}
 	if err = tx.QueryRow(ctx, `SELECT now()`).Scan(&out.QueriedAt); err != nil {
 		return out, err
@@ -278,10 +300,11 @@ func (r *Repository) QueryPlatformMetric(ctx context.Context, in domain.MetricRe
 	if err = tx.QueryRow(ctx, query, in.ProjectID, in.Start, in.End, in.Dimensions["task_type"]).Scan(&out.Value, &out.Numerator, &out.Denominator, &out.Failures); err != nil {
 		return out, err
 	}
-	if in.MetricID == "pending_index_age_seconds" {
+	switch {
+	case in.MetricID == "pending_index_age_seconds":
 		out.Backlog = out.Numerator
 		out.Explanation = "Current snapshot backlog; requested time window is not applied."
-	} else if out.Value == nil {
+	case out.Value == nil:
 		out.Explanation = "No eligible denominator; value is unknown, not zero."
 	}
 	return out, tx.Commit(ctx)

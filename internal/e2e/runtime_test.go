@@ -48,7 +48,7 @@ func startRuntime(t *testing.T) *runtime {
 			t.Fatalf("missing %s in explicitly enabled E2E run", name)
 		}
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
+	ctx, cancel := context.WithTimeout(t.Context(), 4*time.Minute)
 	t.Cleanup(cancel)
 	id, err := domain.NewID()
 	if err != nil {

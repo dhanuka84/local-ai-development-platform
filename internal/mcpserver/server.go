@@ -1,3 +1,5 @@
+// Package mcpserver exposes typed tools over the governed service layer.
+// Tool registration records operation evidence without granting publication authority.
 package mcpserver
 
 import (

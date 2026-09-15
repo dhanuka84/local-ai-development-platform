@@ -278,7 +278,7 @@ func TestCapturePreservesReusableProcedure(t *testing.T) {
 	artifacts := &fakeArtifacts{}
 	svc := New(repository, artifacts, &fakeEmbedder{}, &fakeVectors{}, true, false)
 
-	item, err := svc.Capture(context.Background(), CaptureInput{
+	item, err := svc.Capture(t.Context(), CaptureInput{
 		ProjectID: " product ", Prompt: " fix it ", Response: " done ",
 		Procedure: []string{" inspect ", "", " test "}, ValidationEvidence: []string{" go test ./... "},
 		Tags: []string{"Go", "go", " MCP "}, RepositoryRevision: "abc123", Outcome: "success",
@@ -331,7 +331,7 @@ func TestRecordReviewStoresImmutableEvidence(t *testing.T) {
 	artifacts := &fakeArtifacts{}
 	svc := New(repository, artifacts, &fakeEmbedder{}, &fakeVectors{}, true, false)
 
-	review, err := svc.RecordReview(context.Background(), domain.ReviewRecord{
+	review, err := svc.RecordReview(t.Context(), domain.ReviewRecord{
 		KnowledgeID: " candidate ", Reviewer: " local-developer ", Provider: " ollama ", Model: " local-model ",
 		Verdict: " REVISE ", Comments: "summary", RawOutput: "exact remote output",
 		ContextManifest: `{"revision":"abc123","paths":["internal/service/service.go"]}`,
@@ -356,7 +356,7 @@ func TestRecordReviewStoresImmutableEvidence(t *testing.T) {
 
 func TestRecordReviewPreventsCloudFromRevisingCandidate(t *testing.T) {
 	svc := New(&fakeRepository{}, &fakeArtifacts{}, &fakeEmbedder{}, &fakeVectors{}, true, false)
-	_, err := svc.RecordReview(context.Background(), domain.ReviewRecord{
+	_, err := svc.RecordReview(t.Context(), domain.ReviewRecord{
 		KnowledgeID: "candidate", Reviewer: "cloud-reviewer", Provider: "openai", Model: "reviewer-model",
 		Verdict: "revise", ImprovedContent: "cloud-authored replacement",
 		ValidationEvidence: []string{"claimed validation"},
@@ -368,7 +368,7 @@ func TestRecordReviewPreventsCloudFromRevisingCandidate(t *testing.T) {
 
 func TestRecordReviewRejectsInvalidContextManifest(t *testing.T) {
 	svc := New(&fakeRepository{}, &fakeArtifacts{}, &fakeEmbedder{}, &fakeVectors{}, true, false)
-	_, err := svc.RecordReview(context.Background(), domain.ReviewRecord{
+	_, err := svc.RecordReview(t.Context(), domain.ReviewRecord{
 		KnowledgeID: "candidate", Reviewer: "kimi", Verdict: "comment", ContextManifest: "not-json",
 	})
 	if !errors.Is(err, ErrInvalidInput) {
@@ -378,7 +378,7 @@ func TestRecordReviewRejectsInvalidContextManifest(t *testing.T) {
 
 func TestRecordReviewRequiresFreshEvidenceForRevision(t *testing.T) {
 	svc := New(&fakeRepository{}, &fakeArtifacts{}, &fakeEmbedder{}, &fakeVectors{}, true, false)
-	_, err := svc.RecordReview(context.Background(), domain.ReviewRecord{
+	_, err := svc.RecordReview(t.Context(), domain.ReviewRecord{
 		KnowledgeID: "candidate", Reviewer: "codex", Verdict: "revise", ImprovedContent: "cloud suggestion",
 	})
 	if !errors.Is(err, ErrInvalidInput) {
@@ -395,7 +395,7 @@ func TestSearchPreservesMilvusRankingAndApproval(t *testing.T) {
 	vectors := &fakeVectors{hits: []domain.VectorHit{fixtureVectorHit(repository.items[1], .9), {ID: "pending", Score: .8}, fixtureVectorHit(repository.items[0], .7)}}
 	svc := New(repository, &fakeArtifacts{}, &fakeEmbedder{vectors: [][]float32{{1}}}, vectors, true, false)
 
-	hits, backend, err := svc.Search(context.Background(), "project", "query", 5)
+	hits, backend, err := svc.Search(t.Context(), "project", "query", 5)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -407,7 +407,7 @@ func TestSearchPreservesMilvusRankingAndApproval(t *testing.T) {
 func TestSearchFallsBackToPostgres(t *testing.T) {
 	repository := &fakeRepository{lexical: []domain.SearchHit{{KnowledgeItem: domain.KnowledgeItem{ID: "fallback", ProjectID: "project", Status: domain.CandidateApproved}}}}
 	svc := New(repository, &fakeArtifacts{}, &fakeEmbedder{err: errors.New("offline")}, &fakeVectors{}, true, false)
-	hits, backend, err := svc.Search(context.Background(), "project", "query", 5)
+	hits, backend, err := svc.Search(t.Context(), "project", "query", 5)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -419,7 +419,7 @@ func TestSearchFallsBackToPostgres(t *testing.T) {
 func TestRepositoryRelationRequiresEvidenceAndNormalizesType(t *testing.T) {
 	repository := &fakeRepository{}
 	svc := New(repository, &fakeArtifacts{}, &fakeEmbedder{}, &fakeVectors{}, true, false)
-	_, err := svc.UpsertRepositoryRelation(context.Background(), domain.RepositoryRelation{
+	_, err := svc.UpsertRepositoryRelation(t.Context(), domain.RepositoryRelation{
 		ProjectID: "product", From: domain.SoftwareRepository{Name: "api", CanonicalURL: "https://example/api.git"},
 		To:           domain.SoftwareRepository{Name: "web", CanonicalURL: "https://example/web.git"},
 		RelationType: " PROVIDES_API_TO ", Evidence: "web imports api client", ApprovedBy: "owner",
@@ -430,7 +430,7 @@ func TestRepositoryRelationRequiresEvidenceAndNormalizesType(t *testing.T) {
 	if repository.upsertRelation.RelationType != "provides_api_to" {
 		t.Fatalf("relation type = %q", repository.upsertRelation.RelationType)
 	}
-	_, err = svc.UpsertRepositoryRelation(context.Background(), domain.RepositoryRelation{
+	_, err = svc.UpsertRepositoryRelation(t.Context(), domain.RepositoryRelation{
 		ProjectID: "product", From: domain.SoftwareRepository{Name: "api", CanonicalURL: "a"},
 		To: domain.SoftwareRepository{Name: "web", CanonicalURL: "b"}, RelationType: "depends_on", ApprovedBy: "owner",
 	})
@@ -467,7 +467,7 @@ func TestIndexCodeRepositoryEnforcesAllowedRoot(t *testing.T) {
 	if err := svc.ConfigureCodeGraph(analyzer, []string{root}, CodeGraphLimits{MaxFiles: 10, MaxEntities: 20, MaxRelations: 30}); err != nil {
 		t.Fatal(err)
 	}
-	analysis, err := svc.IndexCodeRepository(context.Background(), CodeIndexInput{
+	analysis, err := svc.IndexCodeRepository(t.Context(), CodeIndexInput{
 		ProjectID: "product", RepositoryPath: repositoryPath, Branch: "feature/indexing", RequestedBy: "codex",
 		Repository: domain.SoftwareRepository{Name: "repo", CanonicalURL: "https://example.test/repo.git"},
 	})
@@ -478,7 +478,7 @@ func TestIndexCodeRepositoryEnforcesAllowedRoot(t *testing.T) {
 		analysis.Branch != "feature/indexing" || repository.codeSnapshot.Revision != "abc123" {
 		t.Fatalf("analysis=%#v request=%#v", analysis, analyzer.request)
 	}
-	_, err = svc.IndexCodeRepository(context.Background(), CodeIndexInput{
+	_, err = svc.IndexCodeRepository(t.Context(), CodeIndexInput{
 		ProjectID: "product", RepositoryPath: filepath.Dir(root), RequestedBy: "codex",
 		Repository: domain.SoftwareRepository{Name: "repo", CanonicalURL: "https://example.test/repo.git"},
 	})
@@ -493,7 +493,7 @@ func TestCodeSearchPreservesVectorRankingAndRepositoryFilter(t *testing.T) {
 	}}
 	vectors := &fakeVectors{codeHits: []domain.VectorHit{{ID: "b", Score: .9}, {ID: "a", Score: .8}}}
 	svc := New(repository, &fakeArtifacts{}, &fakeEmbedder{vectors: [][]float32{{1}}}, vectors, true, false)
-	entities, backend, err := svc.SearchCodeEntities(context.Background(), "product", "repo-1", "save", 5)
+	entities, backend, err := svc.SearchCodeEntities(t.Context(), "product", "repo-1", "save", 5)
 	if err != nil {
 		t.Fatal(err)
 	}

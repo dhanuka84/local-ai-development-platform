@@ -2,12 +2,26 @@ package workpacket
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 )
+
+func TestResolveWorkspaceHonorsCancellation(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git is required")
+	}
+	repository := t.TempDir()
+	runGitTest(t, repository, "init", "--quiet")
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	if _, err := resolveWorkspace(ctx, repository); !errors.Is(err, context.Canceled) {
+		t.Fatalf("resolveWorkspace error = %v; want cancellation", err)
+	}
+}
 
 func TestVerifyPatchUsesDisposableCloneAndEnforcesScope(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
@@ -36,7 +50,7 @@ func TestVerifyPatchUsesDisposableCloneAndEnforcesScope(t *testing.T) {
 	packet.AllowedFiles = []string{"app.txt"}
 	packet.Checks = []Check{{Name: "diff-check", Argv: []string{"git", "diff", "--cached", "--check"}, TimeoutSeconds: 10}}
 	packet.Limits = Limits{MaxChangedFiles: 1, MaxDiffLines: 5, MaxPatchBytes: 10000}
-	result := VerifyPatch(context.Background(), packet, patch)
+	result := VerifyPatch(t.Context(), packet, patch)
 	if !result.Accepted || len(result.ChangedFiles) != 1 || result.ChangedFiles[0].Path != "app.txt" {
 		t.Fatalf("verification failed: %#v", result)
 	}
@@ -49,7 +63,7 @@ func TestVerifyPatchUsesDisposableCloneAndEnforcesScope(t *testing.T) {
 	}
 
 	packet.AllowedFiles = []string{"docs/**"}
-	result = VerifyPatch(context.Background(), packet, patch)
+	result = VerifyPatch(t.Context(), packet, patch)
 	if result.Accepted || !containsText(result.Errors, "outside the work-packet scope") {
 		t.Fatalf("out-of-scope patch accepted: %#v", result)
 	}
@@ -82,7 +96,7 @@ func TestVerifyPatchRejectsCheckSideEffects(t *testing.T) {
 	packet.AllowedFiles = []string{"app.txt"}
 	packet.Checks = []Check{{Name: "side-effect", Argv: []string{"git", "checkout", "HEAD", "--", "app.txt"}, TimeoutSeconds: 10}}
 	packet.Limits = Limits{MaxChangedFiles: 1, MaxDiffLines: 5}
-	result := VerifyPatch(context.Background(), packet, patch)
+	result := VerifyPatch(t.Context(), packet, patch)
 	if result.Accepted || !containsText(result.Errors, "changed the staged patch") {
 		t.Fatalf("check side effect was not rejected: %#v", result)
 	}
@@ -116,11 +130,11 @@ func TestPythonVerificationSuppressesBytecodeButRejectsOtherSideEffects(t *testi
 	packet.Limits = Limits{MaxChangedFiles: 1, MaxDiffLines: 2}
 	patch := []byte("--- /dev/null\n+++ b/fixture_module.py\n@@ -0,0 +1,1 @@\n+answer = 42\n")
 	packet.Checks = []Check{{Name: "python import", Argv: []string{"python3", "-c", "import fixture_module; assert fixture_module.answer == 42"}, TimeoutSeconds: 10}}
-	if result := VerifyPatch(context.Background(), packet, patch); !result.Accepted {
+	if result := VerifyPatch(t.Context(), packet, patch); !result.Accepted {
 		t.Fatalf("ordinary Python import rejected: %#v", result)
 	}
 	packet.Checks[0].Argv[2] += "; open('unapproved.txt', 'w').write('side effect')"
-	if result := VerifyPatch(context.Background(), packet, patch); result.Accepted || !containsText(result.Errors, "untracked files") {
+	if result := VerifyPatch(t.Context(), packet, patch); result.Accepted || !containsText(result.Errors, "untracked files") {
 		t.Fatalf("unapproved Python write accepted: %#v", result)
 	}
 }

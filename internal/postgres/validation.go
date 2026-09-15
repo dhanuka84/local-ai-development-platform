@@ -136,9 +136,10 @@ func (r *Repository) DecideKnowledge(ctx context.Context, decision domain.Knowle
 		taskType := item.TaskType
 		var linkedType string
 		lookupErr := tx.QueryRow(ctx, `SELECT task_type FROM workflow_task_checkpoints WHERE candidate_id=$1`, item.ID).Scan(&linkedType)
-		if lookupErr == nil {
+		switch {
+		case lookupErr == nil:
 			taskType = linkedType
-		} else if !errors.Is(lookupErr, pgx.ErrNoRows) {
+		case !errors.Is(lookupErr, pgx.ErrNoRows):
 			return item, lookupErr
 		}
 		purpose := domain.TaskPurpose(taskType)

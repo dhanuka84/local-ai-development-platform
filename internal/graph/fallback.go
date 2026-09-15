@@ -1,3 +1,5 @@
+// Package graph provides an explicit fallback between graph-store implementations.
+// Fallback events are logged at this routing boundary.
 package graph
 
 import (

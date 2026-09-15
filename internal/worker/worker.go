@@ -1,3 +1,5 @@
+// Package worker processes queued projections with explicit cancellation and retry.
+// It validates approved source records before updating derived stores.
 package worker
 
 import (

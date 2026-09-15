@@ -14,7 +14,7 @@ import (
 	"go/types"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -524,7 +524,7 @@ func discoverModules(root string) ([]string, error) {
 	if len(modules) == 0 {
 		return nil, errors.New("no go.mod found in repository")
 	}
-	sort.Strings(modules)
+	slices.Sort(modules)
 	return modules, nil
 }
 

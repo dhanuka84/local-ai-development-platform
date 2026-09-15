@@ -1,3 +1,6 @@
+// Package service coordinates authenticated workflows and knowledge governance.
+// Generated candidates remain pending; validation and explicit decisions are
+// separate operations with repository-enforced evidence and authorization checks.
 package service
 
 import (
@@ -200,10 +203,7 @@ func (s *Service) SearchCodeEntities(ctx context.Context, projectID, repositoryI
 	}
 	embeddings, embedErr := s.embedder.Embed(ctx, []string{query})
 	if embedErr == nil && len(embeddings) == 1 {
-		candidateLimit := limit * 5
-		if candidateLimit > 100 {
-			candidateLimit = 100
-		}
+		candidateLimit := min(limit*5, 100)
 		vectorHits, searchErr := s.vectors.SearchCodeEntities(ctx, projectID, repositoryID, embeddings[0], candidateLimit)
 		if searchErr == nil {
 			ids := make([]string, 0, len(vectorHits))

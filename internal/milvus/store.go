@@ -1,3 +1,5 @@
+// Package milvus manages derived vector projections and candidate retrieval.
+// A vector match is not authoritative knowledge or proof of current eligibility.
 package milvus
 
 import (

@@ -25,9 +25,10 @@ func (r *Repository) KnowledgeQuality(ctx context.Context, id string) (domain.Kn
 // This is an internal receipt boundary: callers must actually verify the
 // immutable manifest, not infer freshness from a heartbeat or index timestamp.
 func (r *Repository) RecordSourceCheck(ctx context.Context, id string, version int, validationID string, valid bool, reason string) error {
-	if valid {
+	switch {
+	case valid:
 		reason = "verified"
-	} else if reason != "source_changed" && reason != "source_unavailable" && reason != "evidence_unavailable" {
+	case reason != "source_changed" && reason != "source_unavailable" && reason != "evidence_unavailable":
 		return fmt.Errorf("invalid source failure reason")
 	}
 	tx, err := r.pool.Begin(ctx)

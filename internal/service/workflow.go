@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/dhanuka84/hybrid-ai-platform/internal/domain"
@@ -224,7 +225,7 @@ func (s *Service) TransitionWorkflow(ctx context.Context, input TransitionWorkfl
 	}
 	priorActorIDs := priorActors(run, spec.gate)
 	distinctRequired := run.Governance.RequiresDistinctPrincipal(spec.gate)
-	if distinctRequired && contains(priorActorIDs, principal.ID) {
+	if distinctRequired && slices.Contains(priorActorIDs, principal.ID) {
 		return domain.WorkflowRun{}, domain.WorkflowEvent{}, fmt.Errorf("%w: governance requires a distinct principal for %s", ErrForbidden, spec.gate)
 	}
 	resourceKind, resourceID, action := "workflow_run", run.ID, "transition"
@@ -330,7 +331,7 @@ func priorActors(run domain.WorkflowRun, gate string) []string {
 			result = append(result, run.ImplementedBy)
 		}
 	}
-	if gate == "product_approval" && run.QAValidatedBy != "" && !contains(result, run.QAValidatedBy) {
+	if gate == "product_approval" && run.QAValidatedBy != "" && !slices.Contains(result, run.QAValidatedBy) {
 		result = append(result, run.QAValidatedBy)
 	}
 	return result
@@ -341,21 +342,7 @@ func terminalState(state string) bool {
 }
 
 func oneOf(value string, options ...string) bool {
-	for _, option := range options {
-		if value == option {
-			return true
-		}
-	}
-	return false
-}
-
-func contains(values []string, target string) bool {
-	for _, value := range values {
-		if value == target {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(options, value)
 }
 
 func nonNilMap(value map[string]any) map[string]any {

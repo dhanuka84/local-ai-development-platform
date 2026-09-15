@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"strings"
 	"testing"
 
@@ -13,13 +12,13 @@ func TestLocalRevisionRefusesStaleOrUnboundCheckpoint(t *testing.T) {
 	task := domain.WorkflowTaskCheckpoint{ID: "task-b", State: domain.TaskStateValidationRequired, Version: 3, CandidateID: "candidate"}
 	for _, revision := range []*patchRepair{nil, {ExpectedTaskVersion: 2, KnowledgeID: "candidate"}, {ExpectedTaskVersion: 3, KnowledgeID: "different"}, {ExpectedTaskVersion: 3, KnowledgeID: "candidate", Method: "recount"}} {
 		r := runner{spec: spec{ReviseTaskB: revision}}
-		if _, err := r.reviseTaskB(context.Background(), task, "lesson"); err == nil {
+		if _, err := r.reviseTaskB(t.Context(), task, "lesson"); err == nil {
 			t.Fatal("unbound local revision accepted")
 		}
 	}
 	task.State = domain.TaskStateCompleted
 	r := runner{spec: spec{ReviseTaskB: &patchRepair{ExpectedTaskVersion: 3, KnowledgeID: "candidate"}}}
-	if _, err := r.reviseTaskB(context.Background(), task, "lesson"); err == nil {
+	if _, err := r.reviseTaskB(t.Context(), task, "lesson"); err == nil {
 		t.Fatal("completed task accepted for revision")
 	}
 }

@@ -211,6 +211,7 @@ func (b *cappedBuffer) Write(value []byte) (int, error) {
 		if len(value) > remaining {
 			value = value[:remaining]
 		}
+		// bytes.Buffer.Write always returns a nil error.
 		_, _ = b.Buffer.Write(value)
 	}
 	return written, nil

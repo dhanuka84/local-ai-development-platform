@@ -18,7 +18,7 @@ func (noopAnalyzer) Analyze(context.Context, codegraph.Request) (codegraph.Snaps
 }
 
 func TestServerPublishesValidatedToolSchemasAndSafetyHints(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	svc := &service.Service{}
 	if err := svc.ConfigureCodeGraph(noopAnalyzer{}, []string{t.TempDir()}, service.CodeGraphLimits{
 		MaxFiles: 1, MaxEntities: 1, MaxRelations: 1,

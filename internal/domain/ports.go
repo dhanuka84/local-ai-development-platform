@@ -1,8 +1,10 @@
 package domain
 
-import "context"
+import (
+	"context"
 
-import "github.com/dhanuka84/hybrid-ai-platform/components/codegraph"
+	"github.com/dhanuka84/hybrid-ai-platform/components/codegraph"
+)
 
 type Repository interface {
 	Ping(context.Context) error

@@ -8,7 +8,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/signal"
 	"strconv"
+	"syscall"
 	"time"
 
 	"github.com/dhanuka84/hybrid-ai-platform/components/workpacket"
@@ -26,13 +28,15 @@ import (
 )
 
 func main() {
-	if err := run(context.Background(), os.Args[1:]); err != nil {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	if err := run(ctx, os.Args[1:]); err != nil {
 		fmt.Fprintln(os.Stderr, "admin:", err)
 		os.Exit(1)
 	}
 }
 
-func run(ctx context.Context, args []string) error {
+func run(ctx context.Context, args []string) (err error) {
 	if len(args) == 0 {
 		return errors.New("usage: admin <migrate|age-rebuild|milvus-init|doctor|reindex|compact-code-outbox|repository-upsert|candidates|get|validate|approve|reject|delegate-task|revoke-task-delegation> [arguments]")
 	}
@@ -86,7 +90,11 @@ func run(ctx context.Context, args []string) error {
 		if err != nil {
 			return err
 		}
-		defer func() { _ = store.Close(context.Background()) }()
+		defer func() {
+			closeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
+			defer cancel()
+			err = errors.Join(err, store.Close(closeCtx))
+		}()
 		if err := store.EnsureCollection(ctx); err != nil {
 			return err
 		}
@@ -180,8 +188,8 @@ func run(ctx context.Context, args []string) error {
 			return err
 		}
 		return json.NewEncoder(os.Stdout).Encode(struct {
-			Count int         `json:"count"`
-			Items interface{} `json:"items"`
+			Count int `json:"count"`
+			Items any `json:"items"`
 		}{Count: len(items), Items: items})
 	case "get":
 		if len(args) != 2 {
@@ -313,15 +321,16 @@ func openRepository(ctx context.Context, cfg config.Config) (*postgres.Repositor
 	return repository, nil
 }
 
-func doctor(ctx context.Context, cfg config.Config) error {
+func doctor(ctx context.Context, cfg config.Config) (err error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	status := make(map[string]string)
 	if cfg.AuthorizationMode == "cerbos" {
 		authorizer, err := authorization.NewCerbos(cfg.CerbosAddress, cfg.CerbosRequestTimeout)
+		if err == nil {
+			err = authorizer.Ping(ctx)
+		}
 		if err != nil {
-			status["cerbos"] = err.Error()
-		} else if err := authorizer.Ping(ctx); err != nil {
 			status["cerbos"] = err.Error()
 		} else {
 			status["cerbos"] = "ok"
@@ -339,9 +348,10 @@ func doctor(ctx context.Context, cfg config.Config) error {
 		}
 		if cfg.GraphBackend == "apache-age" {
 			graphStore, graphErr := age.New(repository.Pool(), repository, cfg.AgeGraphName)
+			if graphErr == nil {
+				graphErr = graphStore.Ping(ctx)
+			}
 			if graphErr != nil {
-				status["apache-age"] = graphErr.Error()
-			} else if graphErr := graphStore.Ping(ctx); graphErr != nil {
 				status["apache-age"] = graphErr.Error()
 			} else {
 				status["apache-age"] = "ok"
@@ -357,14 +367,20 @@ func doctor(ctx context.Context, cfg config.Config) error {
 	if err != nil {
 		status["milvus"] = err.Error()
 	} else {
-		defer func() { _ = store.Close(context.Background()) }()
+		defer func() {
+			closeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
+			defer cancel()
+			err = errors.Join(err, store.Close(closeCtx))
+		}()
 		if err := store.Ping(ctx); err != nil {
 			status["milvus"] = err.Error()
 		} else {
 			status["milvus"] = "ok"
 		}
 	}
-	_ = json.NewEncoder(os.Stdout).Encode(status)
+	if err := json.NewEncoder(os.Stdout).Encode(status); err != nil {
+		return fmt.Errorf("write dependency status: %w", err)
+	}
 	for _, value := range status {
 		if value != "ok" {
 			return errors.New("one or more dependencies are unavailable")

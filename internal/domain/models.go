@@ -1,3 +1,6 @@
+// Package domain defines the platform contracts shared by services and adapters.
+// Persisted states and JSON field names are compatibility boundaries. Collection
+// nilness and embedded fields are intentional parts of those contracts.
 package domain
 
 import (
@@ -65,19 +68,8 @@ type KnowledgeItem struct {
 
 func (k KnowledgeItem) RetrievalText() string {
 	return k.Title + "\nProblem:\n" + k.Problem + "\nSummary:\n" + k.Summary +
-		"\nProcedure:\n" + joinLines(k.Procedure) + "\nSolution:\n" + k.Content +
-		"\nValidation:\n" + joinLines(k.ValidationEvidence)
-}
-
-func joinLines(values []string) string {
-	result := ""
-	for i, value := range values {
-		if i > 0 {
-			result += "\n"
-		}
-		result += value
-	}
-	return result
+		"\nProcedure:\n" + strings.Join(k.Procedure, "\n") + "\nSolution:\n" + k.Content +
+		"\nValidation:\n" + strings.Join(k.ValidationEvidence, "\n")
 }
 
 type SearchHit struct {

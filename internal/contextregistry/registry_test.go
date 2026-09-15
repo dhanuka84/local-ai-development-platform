@@ -1,9 +1,10 @@
 package contextregistry
 
 import (
-	"github.com/dhanuka84/hybrid-ai-platform/internal/domain"
 	"testing"
 	"time"
+
+	"github.com/dhanuka84/hybrid-ai-platform/internal/domain"
 )
 
 func TestReviewedRegistryAndBoundedRequests(t *testing.T) {

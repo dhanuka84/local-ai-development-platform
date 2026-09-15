@@ -24,7 +24,7 @@ func TestFallbackUsesRecursiveStoreWhenAGEFails(t *testing.T) {
 	primary := &storeFake{err: errors.New("projection stale")}
 	fallback := &storeFake{subgraph: domain.KnowledgeSubgraph{Backend: "postgres-recursive"}}
 	store := WithFallback(primary, fallback, slog.New(slog.NewTextHandler(io.Discard, nil)))
-	result, err := store.ExpandKnowledgeGraph(context.Background(), domain.KnowledgeGraphRequest{})
+	result, err := store.ExpandKnowledgeGraph(t.Context(), domain.KnowledgeGraphRequest{})
 	if err != nil {
 		t.Fatal(err)
 	}

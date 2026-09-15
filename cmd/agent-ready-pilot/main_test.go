@@ -3,15 +3,16 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"testing"
+
 	"github.com/dhanuka84/hybrid-ai-platform/internal/artifacts"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/config"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/domain"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/platform"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/service"
-	"net/http"
-	"net/http/httptest"
-	"os"
-	"testing"
 )
 
 type traceFixture struct {
@@ -26,13 +27,13 @@ func (r *traceFixture) AppendOperation(_ context.Context, v domain.OperationReco
 }
 func TestPilotRefusesUnisolatedExecution(t *testing.T) {
 	t.Setenv("AGENT_READY_PILOT_ISOLATED", "")
-	if err := run(context.Background(), []string{"missing.json"}); err == nil {
+	if err := run(t.Context(), []string{"missing.json"}); err == nil {
 		t.Fatal("missing isolation accepted")
 	}
-	if err := localEndpoint(context.Background(), "http://8.8.8.8:11434"); err == nil {
+	if err := localEndpoint(t.Context(), "http://8.8.8.8:11434"); err == nil {
 		t.Fatal("public provider accepted")
 	}
-	if err := localEndpoint(context.Background(), "https://localhost:11434"); err == nil {
+	if err := localEndpoint(t.Context(), "https://localhost:11434"); err == nil {
 		t.Fatal("unexpected endpoint accepted")
 	}
 }
@@ -58,7 +59,7 @@ func TestLocalGenerationPreservesExactOutputAndDisclosureManifest(t *testing.T) 
 	store := artifacts.NewLocalStore(t.TempDir())
 	repo := &traceFixture{}
 	r := runner{app: &platform.Platform{Service: service.New(repo, store, nil, nil, false, false)}, store: store, cfg: config.Config{OllamaURL: server.URL}, spec: spec{Model: "fixture:1"}}
-	ctx := domain.WithOperationScope(context.Background(), domain.OperationScope{ProjectID: "pilot-fixture", WorkflowID: "fixture"})
+	ctx := domain.WithOperationScope(t.Context(), domain.OperationScope{ProjectID: "pilot-fixture", WorkflowID: "fixture"})
 	result, err := r.generate(ctx, "synthetic bounded prompt")
 	if err != nil {
 		t.Fatal(err)
@@ -112,7 +113,7 @@ func TestThinkingOnlyOutputRemainsFailedEvidence(t *testing.T) {
 	store := artifacts.NewLocalStore(t.TempDir())
 	repo := &traceFixture{}
 	r := runner{app: &platform.Platform{Service: service.New(repo, store, nil, nil, false, false)}, store: store, cfg: config.Config{OllamaURL: server.URL}, spec: spec{Model: "fixture:1"}}
-	ctx := domain.WithOperationScope(context.Background(), domain.OperationScope{ProjectID: "pilot-fixture"})
+	ctx := domain.WithOperationScope(t.Context(), domain.OperationScope{ProjectID: "pilot-fixture"})
 	if _, err := r.generate(ctx, "synthetic bounded prompt"); err == nil {
 		t.Fatal("thinking was accepted as a generated patch")
 	}

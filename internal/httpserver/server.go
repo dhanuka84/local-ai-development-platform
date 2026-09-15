@@ -1,9 +1,13 @@
+// Package httpserver owns HTTP transport, authentication, and request logging.
+// Application dependencies remain owned by the calling command.
 package httpserver
 
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -16,6 +20,36 @@ import (
 type DependencyCheck func(r *http.Request) map[string]string
 type Authenticator interface {
 	AuthenticateToken(context.Context, string) (domain.Principal, error)
+}
+
+// Serve owns listener and server, joining the serving goroutine and graceful
+// shutdown before returning. On timeout it closes remaining connections and
+// returns an error; handlers must observe their request's cancellation.
+func Serve(ctx context.Context, server *http.Server, listener net.Listener, shutdownTimeout time.Duration) (err error) {
+	defer func() { err = errors.Join(err, server.Close()) }()
+	served := make(chan error, 1)
+	go func() { served <- server.Serve(listener) }()
+
+	select {
+	case err = <-served:
+		if errors.Is(err, http.ErrServerClosed) {
+			return nil
+		}
+		return err
+	case <-ctx.Done():
+		// Request cancellation starts shutdown; draining needs its own deadline.
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		defer cancel()
+		shutdownErr := server.Shutdown(shutdownCtx)
+		if shutdownErr != nil {
+			shutdownErr = errors.Join(shutdownErr, server.Close())
+		}
+		serveErr := <-served
+		if errors.Is(serveErr, http.ErrServerClosed) {
+			serveErr = nil
+		}
+		return errors.Join(serveErr, shutdownErr)
+	}
 }
 
 func New(address, authMode string, authenticator Authenticator, localPrincipal domain.Principal, mcpServer *mcp.Server, logger *slog.Logger, check DependencyCheck) *http.Server {
@@ -92,5 +126,8 @@ func requestLog(logger *slog.Logger, next http.Handler) http.Handler {
 func writeJSON(w http.ResponseWriter, status int, value any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(value)
+	if err := json.NewEncoder(w).Encode(value); err != nil {
+		// Headers are committed, so the remaining action is to report the failure.
+		slog.Error("write HTTP response", "error", err)
+	}
 }

@@ -65,10 +65,10 @@ func (f *codeVectorFake) UpsertCodeEntity(_ context.Context, entity domain.CodeE
 	return nil
 }
 
-func (f *codeVectorFake) UpsertCodeEntities(_ context.Context, entities []domain.CodeEntity, embeddings [][]float32) error {
+func (f *codeVectorFake) UpsertCodeEntities(ctx context.Context, entities []domain.CodeEntity, embeddings [][]float32) error {
 	f.batchCalls++
 	for index, entity := range entities {
-		if err := f.UpsertCodeEntity(context.Background(), entity, embeddings[index]); err != nil {
+		if err := f.UpsertCodeEntity(ctx, entity, embeddings[index]); err != nil {
 			return err
 		}
 	}
@@ -86,7 +86,7 @@ func TestProcessCodeEntitiesUsesOneEmbeddingBatch(t *testing.T) {
 	embedder := &codeEmbedderFake{}
 	vectors := &codeVectorFake{}
 	worker := New(repository, embedder, vectors, slog.New(slog.NewTextHandler(io.Discard, nil)), time.Second, 10)
-	processed, err := worker.ProcessOnce(context.Background())
+	processed, err := worker.ProcessOnce(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,7 +107,7 @@ func TestProcessCodeEntityProjectionUsesPostgreSQLEntityID(t *testing.T) {
 	vectors := &codeVectorFake{}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	worker := New(repository, &codeEmbedderFake{}, vectors, logger, time.Second, 10)
-	processed, err := worker.ProcessOnce(context.Background())
+	processed, err := worker.ProcessOnce(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,7 +151,7 @@ func TestRepositoryRelationUpdatesVectorAndAGEProjections(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	worker := New(repository, &codeEmbedderFake{}, vectors, logger, time.Second, 10)
 	worker.ConfigureGraphProjector(projector)
-	processed, err := worker.ProcessOnce(context.Background())
+	processed, err := worker.ProcessOnce(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}

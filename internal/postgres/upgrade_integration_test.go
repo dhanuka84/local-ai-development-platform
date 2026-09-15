@@ -21,7 +21,7 @@ func TestUpgradeFromV7PreservesLegacyEvidenceIntegration(t *testing.T) {
 	if endpoint == "" {
 		t.Skip("requires disposable TEST_DATABASE_URL and database creation rights")
 	}
-	ctx := context.Background()
+	ctx := t.Context()
 	admin, err := pgxpool.New(ctx, endpoint)
 	if err != nil {
 		t.Fatal(err)
@@ -71,7 +71,7 @@ func TestUpgradeFromV7PreservesLegacyEvidenceIntegration(t *testing.T) {
 	`); err != nil {
 		t.Fatal(err)
 	}
-	for attempt := 0; attempt < 2; attempt++ {
+	for attempt := range 2 {
 		if err = migrations.Apply(ctx, pool); err != nil {
 			t.Fatalf("upgrade/repeat %d: %v", attempt, err)
 		}

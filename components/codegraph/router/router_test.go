@@ -54,7 +54,7 @@ func TestRouterCombinesDetectedLanguagesAndIgnoresDependencies(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	snapshot, err := router.Analyze(context.Background(), codegraph.Request{
+	snapshot, err := router.Analyze(t.Context(), codegraph.Request{
 		RepositoryPath: root, RepositoryName: "fixture-repository", Revision: revision,
 	})
 	if err != nil {
@@ -82,7 +82,7 @@ func TestRouterRequiresProjectMarker(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := router.Analyze(context.Background(), codegraph.Request{RepositoryPath: root}); err == nil {
+	if _, err := router.Analyze(t.Context(), codegraph.Request{RepositoryPath: root}); err == nil {
 		t.Fatal("expected unsupported repository error")
 	}
 	if jvmAnalyzer.calls != 0 {
@@ -98,7 +98,7 @@ func TestRouterRejectsUnsupportedRepository(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := router.Analyze(context.Background(), codegraph.Request{RepositoryPath: root}); err == nil {
+	if _, err := router.Analyze(t.Context(), codegraph.Request{RepositoryPath: root}); err == nil {
 		t.Fatal("expected unsupported repository error")
 	}
 }

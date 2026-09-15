@@ -195,10 +195,8 @@ func validatePattern(pattern string) error {
 	if path.IsAbs(pattern) || strings.HasPrefix(pattern, "/") {
 		return fmt.Errorf("file pattern %q must be repository-relative", pattern)
 	}
-	for _, part := range strings.Split(pattern, "/") {
-		if part == ".." {
-			return fmt.Errorf("file pattern %q cannot traverse outside the repository", pattern)
-		}
+	if slices.Contains(strings.Split(pattern, "/"), "..") {
+		return fmt.Errorf("file pattern %q cannot traverse outside the repository", pattern)
 	}
 	return nil
 }

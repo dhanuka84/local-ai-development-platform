@@ -12,7 +12,7 @@ import (
 	"github.com/dhanuka84/hybrid-ai-platform/internal/config"
 )
 
-func taskCredential(ctx context.Context, cfg config.Config, args []string) error {
+func taskCredential(ctx context.Context, cfg config.Config, args []string) (err error) {
 	if args[0] == "revoke-task-delegation" {
 		if len(args) != 2 {
 			return errors.New("usage: admin revoke-task-delegation <delegation-id>")
@@ -42,15 +42,19 @@ func taskCredential(ctx context.Context, cfg config.Config, args []string) error
 	if !parent.IsDir() || parent.Mode().Perm()&0077 != 0 {
 		return errors.New("token file requires a private parent directory (mode 0700)")
 	}
-	f, err := os.OpenFile(args[3], os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	file, err := os.OpenFile(args[3], os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 	if err != nil {
 		return err
 	}
-	committed := false
+	committed, closed := false, false
 	defer func() {
-		_ = f.Close()
+		if !closed {
+			err = errors.Join(err, file.Close())
+		}
 		if !committed {
-			_ = os.Remove(args[3])
+			if removeErr := os.Remove(args[3]); removeErr != nil && !errors.Is(removeErr, os.ErrNotExist) {
+				err = errors.Join(err, removeErr)
+			}
 		}
 	}()
 	svc, ctx, close, err := governanceService(ctx, cfg)
@@ -62,11 +66,15 @@ func taskCredential(ctx context.Context, cfg config.Config, args []string) error
 	if err != nil {
 		return err
 	}
-	if _, err = f.WriteString(token); err == nil {
-		err = f.Sync()
+	if _, err = file.WriteString(token); err == nil {
+		err = file.Sync()
 	}
+	closed = true
+	err = errors.Join(err, file.Close())
 	if err != nil {
-		_, revokeErr := svc.RevokeTaskCredential(ctx, d.ID)
+		revokeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
+		defer cancel()
+		_, revokeErr := svc.RevokeTaskCredential(revokeCtx, d.ID)
 		return errors.Join(err, revokeErr)
 	}
 	committed = true

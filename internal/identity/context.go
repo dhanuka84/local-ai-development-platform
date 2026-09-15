@@ -1,3 +1,5 @@
+// Package identity carries authenticated principal metadata through contexts.
+// It does not authenticate credentials or grant permissions by itself.
 package identity
 
 import (

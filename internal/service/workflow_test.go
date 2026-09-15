@@ -42,7 +42,7 @@ func TestSoloDeveloperCreatesAndCoordinatesWorkflow(t *testing.T) {
 	artifacts := &fakeArtifacts{}
 	authorizer := &fakeAuthorizer{decision: domain.AuthorizationDecision{Allowed: true, CallID: "call-1", PolicyVersion: "default"}}
 	service := workflowService(repository, artifacts, authorizer)
-	ctx := identity.WithPrincipal(context.Background(), soloDeveloper())
+	ctx := identity.WithPrincipal(t.Context(), soloDeveloper())
 
 	run, err := service.CreateWorkflow(ctx, CreateWorkflowInput{
 		ProjectID: "product", Request: "Implement the feature", IdempotencyKey: "issue-42",
@@ -77,7 +77,7 @@ func TestSoloDeveloperUsesExplicitQARoleAtHumanGate(t *testing.T) {
 	artifacts := &fakeArtifacts{}
 	authorizer := &fakeAuthorizer{decision: domain.AuthorizationDecision{Allowed: true}}
 	service := workflowService(repository, artifacts, authorizer)
-	ctx := identity.WithPrincipal(context.Background(), soloDeveloper())
+	ctx := identity.WithPrincipal(t.Context(), soloDeveloper())
 
 	updated, event, err := service.TransitionWorkflow(ctx, TransitionWorkflowInput{
 		WorkflowID: "workflow", ExpectedVersion: 7, EventType: "QA_VALIDATED",
@@ -103,7 +103,7 @@ func TestRegulatedGovernanceRejectsSameImplementerAtQAGate(t *testing.T) {
 	artifacts := &fakeArtifacts{}
 	authorizer := &fakeAuthorizer{decision: domain.AuthorizationDecision{Allowed: true}}
 	service := workflowService(repository, artifacts, authorizer)
-	ctx := identity.WithPrincipal(context.Background(), soloDeveloper())
+	ctx := identity.WithPrincipal(t.Context(), soloDeveloper())
 
 	_, _, err := service.TransitionWorkflow(ctx, TransitionWorkflowInput{
 		WorkflowID: "workflow", ExpectedVersion: 7, EventType: "QA_VALIDATED",
@@ -122,7 +122,7 @@ func TestWorkflowAuthorizationFailureIsFailClosed(t *testing.T) {
 	artifacts := &fakeArtifacts{}
 	authorizer := &fakeAuthorizer{err: errors.New("pdp unavailable")}
 	service := workflowService(repository, artifacts, authorizer)
-	ctx := identity.WithPrincipal(context.Background(), soloDeveloper())
+	ctx := identity.WithPrincipal(t.Context(), soloDeveloper())
 
 	_, _, err := service.TransitionWorkflow(ctx, TransitionWorkflowInput{
 		WorkflowID: "workflow", ExpectedVersion: 3, EventType: "IMPLEMENTATION_COMPLETED",
@@ -139,7 +139,7 @@ func TestNonHumanPrincipalCannotDecideHumanGate(t *testing.T) {
 		Governance: domain.GovernancePolicy{ProjectID: "product", Profile: domain.GovernanceSolo},
 	}}
 	service := workflowService(repository, &fakeArtifacts{}, &fakeAuthorizer{decision: domain.AuthorizationDecision{Allowed: true}})
-	ctx := identity.WithPrincipal(context.Background(), domain.Principal{
+	ctx := identity.WithPrincipal(t.Context(), domain.Principal{
 		ID: "agent:po", Human: false, RoleBindings: map[string][]string{"product": {"product_owner"}},
 	})
 
@@ -156,7 +156,7 @@ func TestProjectActionUsesAuthenticatedIdentityAndProjectContext(t *testing.T) {
 	authorizer := &fakeAuthorizer{decision: domain.AuthorizationDecision{Allowed: true}}
 	service := workflowService(&fakeRepository{}, &fakeArtifacts{}, authorizer)
 	principal, err := service.AuthorizeProjectAction(
-		identity.WithPrincipal(context.Background(), soloDeveloper()),
+		identity.WithPrincipal(t.Context(), soloDeveloper()),
 		"product", "knowledge_candidate", "candidate", "approve", map[string]any{"status": "pending"},
 	)
 	if err != nil {

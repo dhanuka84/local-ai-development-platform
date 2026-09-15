@@ -1,7 +1,6 @@
 package service
 
 import (
-	"context"
 	"os/exec"
 	"strings"
 	"testing"
@@ -36,7 +35,7 @@ func TestExecutedVerifierRecordsActualCommandEvidence(t *testing.T) {
 	if err := svc.ConfigureAuthorization(&fakeAuthorizer{decision: domain.AuthorizationDecision{Allowed: true}}, false); err != nil {
 		t.Fatal(err)
 	}
-	ctx := identity.WithPrincipal(context.Background(), soloDeveloper())
+	ctx := identity.WithPrincipal(t.Context(), soloDeveloper())
 	input := ValidationInput{KnowledgeID: id, ExpectedVersion: 1, SourceManifest: domain.SourceManifest{SchemaVersion: "hybrid-ai/knowledge-source/v1", Sources: []domain.KnowledgeSource{{Kind: "repository", Reference: root, Revision: revision, Branch: "main"}}}, Criteria: []domain.ValidationCriterion{{Name: "synthetic expected change", Passed: true, Observation: "Fixture adds one text line"}}}
 	packet := workpacket.Packet{SchemaVersion: workpacket.SchemaVersion, ID: "synthetic-verifier-fixture", Goal: "Add a fixture text file", Workspace: root, BaseRevision: revision, Mode: workpacket.ModePatch, TaskClass: workpacket.TaskDevelopment, DataClassification: workpacket.DataInternal, LocalOnly: true, AllowedFiles: []string{"fixture.txt"}, Rollback: []string{"Discard disposable clone"}, Checks: []workpacket.Check{{Name: "staged-diff", Argv: []string{"git", "diff", "--cached", "--check"}, TimeoutSeconds: 10}}, Limits: workpacket.Limits{MaxChangedFiles: 1, MaxDiffLines: 5, MaxPatchBytes: 10000}}
 	patch := []byte("diff --git a/fixture.txt b/fixture.txt\nnew file mode 100644\n--- /dev/null\n+++ b/fixture.txt\n@@ -0,0 +1 @@\n+synthetic fixture\n")

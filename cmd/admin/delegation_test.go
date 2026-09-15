@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -18,7 +17,7 @@ func TestCredentialOutputRefusesUnsafeOrExistingFile(t *testing.T) {
 	if err := os.WriteFile(file, []byte("existing credential"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if err := taskCredential(context.Background(), config.Config{}, []string{"delegate-task", "task", "60", file}); err == nil {
+	if err := taskCredential(t.Context(), config.Config{}, []string{"delegate-task", "task", "60", file}); err == nil {
 		t.Fatal("existing file overwritten")
 	}
 	if data, err := os.ReadFile(file); err != nil || string(data) != "existing credential" {
@@ -28,13 +27,13 @@ func TestCredentialOutputRefusesUnsafeOrExistingFile(t *testing.T) {
 	if err := os.Symlink(file, link); err != nil {
 		t.Fatal(err)
 	}
-	if err := taskCredential(context.Background(), config.Config{}, []string{"delegate-task", "task", "60", link}); err == nil {
+	if err := taskCredential(t.Context(), config.Config{}, []string{"delegate-task", "task", "60", link}); err == nil {
 		t.Fatal("symlink output accepted")
 	}
 	if err := os.Chmod(root, 0755); err != nil {
 		t.Fatal(err)
 	}
-	if err := taskCredential(context.Background(), config.Config{}, []string{"delegate-task", "task", "60", filepath.Join(root, "new")}); err == nil {
+	if err := taskCredential(t.Context(), config.Config{}, []string{"delegate-task", "task", "60", filepath.Join(root, "new")}); err == nil {
 		t.Fatal("public parent directory accepted")
 	}
 }

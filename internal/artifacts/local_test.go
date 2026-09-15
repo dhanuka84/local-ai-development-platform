@@ -1,7 +1,6 @@
 package artifacts
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,11 +9,11 @@ import (
 
 func TestLocalStoreIsContentAddressed(t *testing.T) {
 	store := NewLocalStore(t.TempDir())
-	first, err := store.Put(context.Background(), []byte("same"), "text/plain")
+	first, err := store.Put(t.Context(), []byte("same"), "text/plain")
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := store.Put(context.Background(), []byte("same"), "text/plain")
+	second, err := store.Put(t.Context(), []byte("same"), "text/plain")
 	if err != nil {
 		t.Fatal(err)
 	}

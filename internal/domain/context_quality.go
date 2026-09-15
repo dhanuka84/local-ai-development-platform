@@ -51,7 +51,11 @@ type ProjectionManifest struct {
 	VerificationID       string `json:"verification_id"`
 }
 
-func (m ProjectionManifest) Digest() string { data, _ := json.Marshal(m); return Digest(data) }
+func (m ProjectionManifest) Digest() string {
+	// ProjectionManifest contains only strings and integers; encoding cannot fail.
+	data, _ := json.Marshal(m)
+	return Digest(data)
+}
 func (m ProjectionManifest) Check() error {
 	if m.SchemaVersion != "hybrid-ai/knowledge-projection/v1" || m.KnowledgeID == "" || m.Version < 1 || !digestPattern.MatchString(m.ContentSHA256) || !digestPattern.MatchString(m.SourceManifestSHA256) || m.Provider != "ollama" || m.Model == "" || m.Dimension < 1 || m.Coverage != 1 || m.VerificationID == "" {
 		return ErrQualityBlocked

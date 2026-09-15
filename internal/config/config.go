@@ -1,3 +1,5 @@
+// Package config loads and validates explicit gateway and CLI configuration.
+// Call Load or LoadCLI at startup; importing this package performs no secret reads.
 package config
 
 import (

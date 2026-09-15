@@ -24,7 +24,10 @@ func fixtureValidation(t *testing.T, ctx context.Context, r *Repository, item do
 		t.Fatal(err)
 	}
 	manifest := domain.SourceManifest{SchemaVersion: "hybrid-ai/knowledge-source/v1", Sources: []domain.KnowledgeSource{{Kind: "procedure", Reference: "synthetic-fixture", ArtifactSHA256: source.SHA256}}}
-	manifestJSON, _ := json.Marshal(manifest)
+	manifestJSON, marshalErr := json.Marshal(manifest)
+	if marshalErr != nil {
+		t.Fatal(marshalErr)
+	}
 	sourceArtifact, err := store.Put(ctx, manifestJSON, "application/json")
 	if err != nil {
 		t.Fatal(err)
@@ -34,7 +37,10 @@ func fixtureValidation(t *testing.T, ctx context.Context, r *Repository, item do
 		ContentSHA256: domain.Digest([]byte(item.Content)), SourceManifest: manifest, SourceManifestSHA256: sourceArtifact.SHA256, SourceArtifact: sourceArtifact,
 		Method: "manual", Criteria: []domain.ValidationCriterion{{Name: "fixture", Passed: true, Observation: "synthetic test evidence"}}, Verdict: "pass", ValidatedBy: actor,
 		StartedAt: completed.Add(-time.Second), CompletedAt: completed, ValidUntil: completed.Add(24 * time.Hour)}
-	payload, _ := json.Marshal(report)
+	payload, marshalErr := json.Marshal(report)
+	if marshalErr != nil {
+		t.Fatal(marshalErr)
+	}
 	report.ReportArtifact, err = store.Put(ctx, payload, "application/json")
 	if err != nil {
 		t.Fatal(err)
@@ -51,7 +57,7 @@ func TestKnowledgePromotionTransactionIntegration(t *testing.T) {
 	if url == "" {
 		t.Skip("TEST_DATABASE_URL is not set")
 	}
-	ctx := context.Background()
+	ctx := t.Context()
 	r, err := Open(ctx, url)
 	if err != nil {
 		t.Fatal(err)
@@ -99,10 +105,13 @@ func TestKnowledgePromotionTransactionIntegration(t *testing.T) {
 	valid := fixtureValidation(t, ctx, r, item, actor, time.Now().UTC())
 	input := decision(item, valid.ID, "same-decision")
 	results := make(chan error, 2)
-	for i := 0; i < 2; i++ {
-		go func() { _, err := r.DecideKnowledge(ctx, input); results <- err }()
+	for range 2 {
+		go func() {
+			_, err := r.DecideKnowledge(ctx, input)
+			results <- err
+		}()
 	}
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		if err := <-results; err != nil {
 			t.Fatal(err)
 		}

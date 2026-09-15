@@ -16,7 +16,7 @@ func TestActualLocalCollectorAcceptsDurableReceiptIntegration(t *testing.T) {
 	if endpoint == "" {
 		t.Skip("requires a disposable local TEST_OTEL_ENDPOINT")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Second)
 	defer cancel()
 	repo := &testRepository{}
 	_, finish, err := Begin(ctx, repo, "synthetic.collector.check", domain.OperationScope{ProjectID: "synthetic-collector-fixture"}, nil)

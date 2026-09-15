@@ -6,9 +6,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"net"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -74,7 +76,9 @@ func (e *Exporter) ProcessOnce(ctx context.Context) error {
 					success = false
 				}
 			}
-			_ = response.Body.Close()
+			if err := response.Body.Close(); err != nil {
+				success = false
+			}
 		}
 		if err := e.repository.FinishTraceExport(ctx, record.ID, success); err != nil {
 			return err
@@ -88,7 +92,20 @@ func (e *Exporter) ProcessOnce(ctx context.Context) error {
 // end-to-end latency measurement. The parent is the owned operation span.
 func exportJSON(record domain.OperationRecord) ([]byte, error) {
 	attrs := []map[string]any{}
-	for key, value := range map[string]string{"operation.id": record.OperationID, "operation.phase": record.Phase, "operation.outcome": record.Outcome, "project.id": record.ProjectID, "workflow.id": record.WorkflowID, "task.id": record.TaskID, "policy.version": record.PolicyVersion, "policy.decision": record.PolicyDecision, "provider": record.Provider, "model": record.Model} {
+	attributes := map[string]string{
+		"operation.id":      record.OperationID,
+		"operation.phase":   record.Phase,
+		"operation.outcome": record.Outcome,
+		"project.id":        record.ProjectID,
+		"workflow.id":       record.WorkflowID,
+		"task.id":           record.TaskID,
+		"policy.version":    record.PolicyVersion,
+		"policy.decision":   record.PolicyDecision,
+		"provider":          record.Provider,
+		"model":             record.Model,
+	}
+	for _, key := range slices.Sorted(maps.Keys(attributes)) {
+		value := attributes[key]
 		if value != "" {
 			attrs = append(attrs, map[string]any{"key": key, "value": map[string]string{"stringValue": value}})
 		}

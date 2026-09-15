@@ -2,7 +2,7 @@ package postgres
 
 import (
 	"context"
-	"sort"
+	"slices"
 
 	"github.com/dhanuka84/hybrid-ai-platform/internal/domain"
 )
@@ -212,7 +212,7 @@ func mapKeys(values map[string]struct{}) []string {
 	for value := range values {
 		result = append(result, value)
 	}
-	sort.Strings(result)
+	slices.Sort(result)
 	return result
 }
 

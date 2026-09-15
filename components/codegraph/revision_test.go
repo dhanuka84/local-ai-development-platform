@@ -3,7 +3,6 @@
 package codegraph
 
 import (
-	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -29,21 +28,21 @@ func TestResolveRepositoryStateMapsAndValidatesBranch(t *testing.T) {
 	}
 	revision := strings.TrimSpace(string(revisionOutput))
 
-	gotRevision, gotBranch, dirty, err := ResolveRepositoryState(context.Background(), root, revision, "main")
+	gotRevision, gotBranch, dirty, err := ResolveRepositoryState(t.Context(), root, revision, "main")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if gotRevision != revision || gotBranch != "main" || dirty {
 		t.Fatalf("state = revision %q branch %q dirty %t", gotRevision, gotBranch, dirty)
 	}
-	if _, _, _, err := ResolveRepositoryState(context.Background(), root, revision, "feature"); err == nil {
+	if _, _, _, err := ResolveRepositoryState(t.Context(), root, revision, "feature"); err == nil {
 		t.Fatal("expected branch mismatch")
 	}
 
 	if err := os.WriteFile(filepath.Join(root, "dirty.txt"), []byte("dirty\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	_, _, dirty, err = ResolveRepositoryState(context.Background(), root, revision, "main")
+	_, _, dirty, err = ResolveRepositoryState(t.Context(), root, revision, "main")
 	if err != nil || !dirty {
 		t.Fatalf("dirty state = %t, %v", dirty, err)
 	}

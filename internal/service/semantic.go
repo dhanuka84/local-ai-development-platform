@@ -4,13 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
+	"time"
+
 	"github.com/dhanuka84/hybrid-ai-platform/contracts"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/contextregistry"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/domain"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/identity"
 	"go.opentelemetry.io/otel/trace"
-	"strings"
-	"time"
 )
 
 func (s *Service) semantic() (domain.SemanticRepository, error) {
@@ -50,7 +51,10 @@ func (s *Service) ValidateContextRegistry(ctx context.Context, project string) (
 	v.RegistrySHA256 = sha
 	v.Actor = p.ID
 	v.CompletedAt = time.Now().UTC()
-	raw, _ := json.Marshal(map[string]any{"schema": "hybrid-ai/context-registry-validation/v1", "registry_sha256": sha, "actor": p.ID, "checks": []string{"embedded JSON schemas and positive/negative fixtures passed", "metric IDs bound to compiled SQL allowlist"}, "scope": "contract and SQL preparation validation; not an integration test report", "completed_at": v.CompletedAt})
+	raw, err := json.Marshal(map[string]any{"schema": "hybrid-ai/context-registry-validation/v1", "registry_sha256": sha, "actor": p.ID, "checks": []string{"embedded JSON schemas and positive/negative fixtures passed", "metric IDs bound to compiled SQL allowlist"}, "scope": "contract and SQL preparation validation; not an integration test report", "completed_at": v.CompletedAt})
+	if err != nil {
+		return v, err
+	}
 	v.Evidence, err = s.artifacts.Put(ctx, raw, "application/json")
 	if err != nil {
 		return v, err

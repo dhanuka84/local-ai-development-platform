@@ -1,15 +1,15 @@
 package postgres
 
 import (
-	"context"
 	"fmt"
+	"os"
+	"strings"
+	"testing"
+
 	"github.com/dhanuka84/hybrid-ai-platform/internal/artifacts"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/domain"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/telemetry"
 	"github.com/dhanuka84/hybrid-ai-platform/migrations"
-	"os"
-	"strings"
-	"testing"
 )
 
 func TestEvidenceTransactionAndUnknownOutcomeIntegration(t *testing.T) {
@@ -17,7 +17,7 @@ func TestEvidenceTransactionAndUnknownOutcomeIntegration(t *testing.T) {
 	if url == "" {
 		t.Skip("TEST_DATABASE_URL is not set")
 	}
-	ctx := context.Background()
+	ctx := t.Context()
 	r, err := Open(ctx, url)
 	if err != nil {
 		t.Fatal(err)
@@ -33,7 +33,9 @@ func TestEvidenceTransactionAndUnknownOutcomeIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() {
-		_, _ = r.Pool().Exec(ctx, "ALTER TABLE operation_records DROP CONSTRAINT IF EXISTS "+constraint)
+		if _, err := r.Pool().Exec(ctx, "ALTER TABLE operation_records DROP CONSTRAINT IF EXISTS "+constraint); err != nil {
+			t.Errorf("drop evidence fixture constraint: %v", err)
+		}
 	}()
 	store := artifacts.NewLocalStore(t.TempDir())
 	artifact, err := store.Put(ctx, []byte("synthetic evidence fixture"), "text/plain")

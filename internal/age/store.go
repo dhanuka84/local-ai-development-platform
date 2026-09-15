@@ -1,3 +1,6 @@
+// Package age projects authoritative PostgreSQL records into Apache AGE graphs.
+// The caller owns the injected pool. Deferred rollback retains the primary error;
+// pgx closes the connection if rollback of an open transaction fails.
 package age
 
 import (

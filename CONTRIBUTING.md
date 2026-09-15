@@ -23,6 +23,10 @@ Describe target capabilities separately from implemented behavior.
 
 ## Design constraints
 
+- Follow the [Go readability style guide](docs/go-readability-style-guide.md)
+  and the [repository adoption notes](docs/go-readability-adoption.md).
+  Cite GOR rule IDs in substantive reviews. Check cancellation, error causes,
+  cleanup, ordering and nil/empty contracts before accepting a modernization.
 - PostgreSQL is authoritative; do not introduce direct authoritative Milvus writes.
 - All derived-index writes must be retryable and idempotent.
 - New MCP write tools need accurate annotations and an approval policy example.

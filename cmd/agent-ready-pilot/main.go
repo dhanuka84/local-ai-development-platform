@@ -9,6 +9,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"net/url"
+	"os"
+	"os/signal"
+	"strings"
+	"syscall"
+	"time"
+
 	"github.com/dhanuka84/hybrid-ai-platform/components/workpacket"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/artifacts"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/config"
@@ -17,13 +27,6 @@ import (
 	"github.com/dhanuka84/hybrid-ai-platform/internal/platform"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/service"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/telemetry"
-	"io"
-	"net"
-	"net/http"
-	"net/url"
-	"os"
-	"strings"
-	"time"
 )
 
 type spec struct {
@@ -60,12 +63,14 @@ type runner struct {
 }
 
 func main() {
-	if err := run(context.Background(), os.Args[1:]); err != nil {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	if err := run(ctx, os.Args[1:]); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
-func run(ctx context.Context, args []string) error {
+func run(ctx context.Context, args []string) (err error) {
 	if len(args) != 1 || os.Getenv("AGENT_READY_PILOT_ISOLATED") != "true" {
 		return errors.New("usage: AGENT_READY_PILOT_ISOLATED=true agent-ready-pilot <spec.json>; requires an initialized disposable local deployment")
 	}
@@ -105,7 +110,11 @@ func run(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	defer func() { _ = app.Close(context.Background()) }()
+	defer func() {
+		closeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
+		defer cancel()
+		err = errors.Join(err, app.Close(closeCtx))
+	}()
 	// Do not bootstrap identities or approve migrations implicitly. An operator
 	// initializes the isolated deployment and supplies an existing workload token.
 	hash := sha256.Sum256([]byte(cfg.AuthToken))
@@ -311,7 +320,10 @@ func (r *runner) generate(ctx context.Context, prompt string) (output []byte, er
 		},
 	}
 	options := map[string]any{"temperature": 0.2, "num_predict": 2048}
-	manifest, _ := json.Marshal(map[string]any{"schema": "hybrid-ai/disclosed-context/v1", "provider": "ollama", "model": r.spec.Model, "scope": "synthetic goal and file allowlist, or explicitly bound synthetic patch-repair evidence; only Task B receives approved generalized guidance; no unrestricted repository content", "prompt_sha256": domain.Digest([]byte(prompt)), "think": false, "format": format, "options": options})
+	manifest, err := json.Marshal(map[string]any{"schema": "hybrid-ai/disclosed-context/v1", "provider": "ollama", "model": r.spec.Model, "scope": "synthetic goal and file allowlist, or explicitly bound synthetic patch-repair evidence; only Task B receives approved generalized guidance; no unrestricted repository content", "prompt_sha256": domain.Digest([]byte(prompt)), "think": false, "format": format, "options": options})
+	if err != nil {
+		return nil, fmt.Errorf("encode disclosed context: %w", err)
+	}
 	for _, data := range [][]byte{[]byte(prompt), manifest} {
 		artifact, err := r.store.Put(ctx, data, "text/plain")
 		if err != nil {
@@ -324,7 +336,10 @@ func (r *runner) generate(ctx context.Context, prompt string) (output []byte, er
 	// Request the final structured answer explicitly. Thinking-capable models
 	// can otherwise finish with an empty response and separate thinking text.
 	// That text is evidence, never a substitute for the required patch answer.
-	payload, _ := json.Marshal(map[string]any{"model": r.spec.Model, "prompt": prompt, "stream": false, "format": format, "think": false, "options": options})
+	payload, err := json.Marshal(map[string]any{"model": r.spec.Model, "prompt": prompt, "stream": false, "format": format, "think": false, "options": options})
+	if err != nil {
+		return nil, fmt.Errorf("encode local generation request: %w", err)
+	}
 	request, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(r.cfg.OllamaURL, "/")+"/api/generate", bytes.NewReader(payload))
 	if err != nil {
 		return nil, err

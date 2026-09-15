@@ -3,7 +3,6 @@
 package golanganalyzer
 
 import (
-	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -32,7 +31,7 @@ func TestCreate(t *testing.T) { _ = Create(Memory{}) }
 `)
 	initRepository(t, root)
 
-	snapshot, err := New().Analyze(context.Background(), codegraph.Request{
+	snapshot, err := New().Analyze(t.Context(), codegraph.Request{
 		RepositoryPath: root, MaxFiles: 20, MaxEntities: 100, MaxRelations: 500,
 	})
 	if err != nil {
@@ -69,7 +68,7 @@ func TestAnalyzeEnforcesFileLimit(t *testing.T) {
 	writeFixture(t, root, "one.go", "package limit\n")
 	writeFixture(t, root, "two.go", "package limit\n")
 	initRepository(t, root)
-	_, err := New().Analyze(context.Background(), codegraph.Request{RepositoryPath: root, MaxFiles: 1})
+	_, err := New().Analyze(t.Context(), codegraph.Request{RepositoryPath: root, MaxFiles: 1})
 	if err == nil {
 		t.Fatal("expected file limit error")
 	}
@@ -80,14 +79,14 @@ func TestAnalyzeRejectsRevisionMismatchAndDirtyWorktree(t *testing.T) {
 	writeFixture(t, root, "go.mod", "module example.test/revision\n\ngo 1.25\n")
 	writeFixture(t, root, "revision.go", "package revision\n")
 	initRepository(t, root)
-	if _, err := New().Analyze(context.Background(), codegraph.Request{RepositoryPath: root, Revision: "not-head"}); err == nil {
+	if _, err := New().Analyze(t.Context(), codegraph.Request{RepositoryPath: root, Revision: "not-head"}); err == nil {
 		t.Fatal("expected revision mismatch")
 	}
 	writeFixture(t, root, "revision.go", "package revision\n\nconst Dirty = true\n")
-	if _, err := New().Analyze(context.Background(), codegraph.Request{RepositoryPath: root}); err == nil {
+	if _, err := New().Analyze(t.Context(), codegraph.Request{RepositoryPath: root}); err == nil {
 		t.Fatal("expected dirty-worktree rejection")
 	}
-	snapshot, err := New().Analyze(context.Background(), codegraph.Request{RepositoryPath: root, AllowDirty: true})
+	snapshot, err := New().Analyze(t.Context(), codegraph.Request{RepositoryPath: root, AllowDirty: true})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"strings"
 	"testing"
 
@@ -12,13 +11,13 @@ func TestRepairRefusesWrongCheckpointBeforeAnyModelOrRepositoryCall(t *testing.T
 	task := domain.WorkflowTaskCheckpoint{ID: "task-a", State: domain.TaskStateValidationRequired, Version: 3, CandidateID: "candidate"}
 	for _, repair := range []*patchRepair{nil, {ExpectedTaskVersion: 2, KnowledgeID: "candidate"}, {ExpectedTaskVersion: 3, KnowledgeID: "different"}} {
 		r := runner{spec: spec{RepairTaskA: repair}}
-		if _, err := r.repairTaskAPatch(context.Background(), task); err == nil {
+		if _, err := r.repairTaskAPatch(t.Context(), task); err == nil {
 			t.Fatal("stale or unbound recovery accepted")
 		}
 	}
 	r := runner{spec: spec{RepairTaskA: &patchRepair{ExpectedTaskVersion: 3, KnowledgeID: "candidate"}}}
 	task.State = domain.TaskStatePromotionRequired
-	if _, err := r.repairTaskAPatch(context.Background(), task); err == nil {
+	if _, err := r.repairTaskAPatch(t.Context(), task); err == nil {
 		t.Fatal("already validated checkpoint accepted for repair")
 	}
 }
@@ -81,10 +80,10 @@ func TestCheckRepairAnswer(t *testing.T) {
 
 func TestRecountHunksPreservesSourceAndCountsOnlyContent(t *testing.T) {
 	for _, tc := range []struct{ name, before, want string }{
-		{"new file", "--- /dev/null\n+++ b/a.py\n@@ -0,0 +1,3 @@\n+pass\n", "--- /dev/null\n+++ b/a.py\n@@ -0,0 +1,1 @@\n+pass\n"},
-		{"context removal and blank addition", "--- a/a\n+++ b/a\n@@ -2,9 +2,8 @@ func\n same\n-old\n+new\n+\n", "--- a/a\n+++ b/a\n@@ -2,2 +2,3 @@ func\n same\n-old\n+new\n+\n"},
-		{"multiple files and newline marker", "--- a/a\n+++ b/a\n@@ -1,7 +1,7 @@\n-x\n+y\n\\ No newline at end of file\n--- /dev/null\n+++ b/b\n@@ -0,0 +1,4 @@\n+z\n", "--- a/a\n+++ b/a\n@@ -1,1 +1,1 @@\n-x\n+y\n\\ No newline at end of file\n--- /dev/null\n+++ b/b\n@@ -0,0 +1,1 @@\n+z\n"},
-		{"multiple hunks", "--- a/a\n+++ b/a\n@@ -1,9 +1,9 @@\n-x\n+y\n@@ -8,9 +8,9 @@\n next\n-z\n", "--- a/a\n+++ b/a\n@@ -1,1 +1,1 @@\n-x\n+y\n@@ -8,2 +8,1 @@\n next\n-z\n"},
+		{name: "new file", before: "--- /dev/null\n+++ b/a.py\n@@ -0,0 +1,3 @@\n+pass\n", want: "--- /dev/null\n+++ b/a.py\n@@ -0,0 +1,1 @@\n+pass\n"},
+		{name: "context removal and blank addition", before: "--- a/a\n+++ b/a\n@@ -2,9 +2,8 @@ func\n same\n-old\n+new\n+\n", want: "--- a/a\n+++ b/a\n@@ -2,2 +2,3 @@ func\n same\n-old\n+new\n+\n"},
+		{name: "multiple files and newline marker", before: "--- a/a\n+++ b/a\n@@ -1,7 +1,7 @@\n-x\n+y\n\\ No newline at end of file\n--- /dev/null\n+++ b/b\n@@ -0,0 +1,4 @@\n+z\n", want: "--- a/a\n+++ b/a\n@@ -1,1 +1,1 @@\n-x\n+y\n\\ No newline at end of file\n--- /dev/null\n+++ b/b\n@@ -0,0 +1,1 @@\n+z\n"},
+		{name: "multiple hunks", before: "--- a/a\n+++ b/a\n@@ -1,9 +1,9 @@\n-x\n+y\n@@ -8,9 +8,9 @@\n next\n-z\n", want: "--- a/a\n+++ b/a\n@@ -1,1 +1,1 @@\n-x\n+y\n@@ -8,2 +8,1 @@\n next\n-z\n"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			got, err := recountHunks(tc.before)

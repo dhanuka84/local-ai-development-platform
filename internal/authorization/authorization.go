@@ -1,3 +1,5 @@
+// Package authorization implements policy decisions for authenticated operations.
+// Database mutation boundaries separately enforce their authorization invariants.
 package authorization
 
 import (

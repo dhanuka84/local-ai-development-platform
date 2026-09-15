@@ -47,7 +47,7 @@ func VerifyPatch(ctx context.Context, packet Packet, patch []byte) VerificationR
 		return result
 	}
 
-	workspace, err := resolveWorkspace(packet.Workspace)
+	workspace, err := resolveWorkspace(ctx, packet.Workspace)
 	if err != nil {
 		result.Errors = append(result.Errors, err.Error())
 		return result
@@ -132,10 +132,12 @@ func VerifyPatch(ctx context.Context, packet Packet, patch []byte) VerificationR
 		result.Errors = append(result.Errors, "a verification command modified a tracked file outside the staged patch: "+commandError(err, output))
 		return result
 	}
-	if untracked, err := gitOutput(ctx, clonePath, "ls-files", "--others", "--exclude-standard"); err != nil {
+	untracked, err := gitOutput(ctx, clonePath, "ls-files", "--others", "--exclude-standard")
+	if err != nil {
 		result.Errors = append(result.Errors, "inspect untracked files: "+err.Error())
 		return result
-	} else if strings.TrimSpace(untracked) != "" {
+	}
+	if strings.TrimSpace(untracked) != "" {
 		result.Errors = append(result.Errors, "a verification command created untracked files: "+strings.Join(strings.Fields(untracked), ", "))
 		return result
 	}
@@ -152,7 +154,7 @@ func VerifyPatch(ctx context.Context, packet Packet, patch []byte) VerificationR
 	return result
 }
 
-func resolveWorkspace(value string) (string, error) {
+func resolveWorkspace(ctx context.Context, value string) (string, error) {
 	absolute, err := filepath.Abs(strings.TrimSpace(value))
 	if err != nil {
 		return "", fmt.Errorf("resolve workspace: %w", err)
@@ -165,7 +167,7 @@ func resolveWorkspace(value string) (string, error) {
 	if err != nil || !info.IsDir() {
 		return "", fmt.Errorf("workspace is not a directory")
 	}
-	if _, err := gitOutput(context.Background(), resolved, "rev-parse", "--show-toplevel"); err != nil {
+	if _, err := gitOutput(ctx, resolved, "rev-parse", "--show-toplevel"); err != nil {
 		return "", fmt.Errorf("workspace is not a Git repository: %w", err)
 	}
 	return resolved, nil
@@ -235,7 +237,10 @@ func runCheck(parent context.Context, repository string, check Check) CheckResul
 func gitOutput(ctx context.Context, repository string, args ...string) (string, error) {
 	output, err := commandOutput(ctx, repository, safeEnvironment(), "git", args...)
 	if err != nil {
-		return "", fmt.Errorf("git %s: %s", strings.Join(args, " "), commandError(err, output))
+		if output = strings.TrimSpace(output); output != "" {
+			return "", fmt.Errorf("git %s: %w: %s", strings.Join(args, " "), err, output)
+		}
+		return "", fmt.Errorf("git %s: %w", strings.Join(args, " "), err)
 	}
 	return output, nil
 }
@@ -290,6 +295,7 @@ func (b *limitedBuffer) Write(value []byte) (int, error) {
 		if len(value) > remaining {
 			value = value[:remaining]
 		}
+		// bytes.Buffer.Write always returns a nil error.
 		_, _ = b.buffer.Write(value)
 	}
 	return original, nil

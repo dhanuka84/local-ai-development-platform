@@ -1,3 +1,4 @@
+// Package logging constructs structured loggers for application boundaries.
 package logging
 
 import (

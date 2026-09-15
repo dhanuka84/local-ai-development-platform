@@ -5,6 +5,7 @@ package telemetry
 import (
 	"context"
 	"encoding/json"
+	"slices"
 	"time"
 
 	"github.com/dhanuka84/hybrid-ai-platform/internal/domain"
@@ -30,6 +31,8 @@ func WithRole(ctx context.Context, role string) context.Context {
 	return context.WithValue(ctx, roleKey{}, role)
 }
 
+// Start creates a span and an intent record with its own copy of refs. The
+// caller must persist the record and end the span at the operation boundary.
 func Start(ctx context.Context, name string, scope domain.OperationScope, refs []domain.EvidenceReference) (context.Context, trace.Span, domain.OperationRecord) {
 	parent := trace.SpanContextFromContext(ctx)
 	ctx, span := tracer.Start(ctx, name)
@@ -46,11 +49,14 @@ func Start(ctx context.Context, name string, scope domain.OperationScope, refs [
 	}
 	if refs == nil {
 		refs = []domain.EvidenceReference{}
+	} else {
+		refs = slices.Clone(refs)
 	}
+	// Scope and references contain only strings and integers, so encoding cannot fail.
 	payload, _ := json.Marshal(struct {
 		Scope      domain.OperationScope
 		References []domain.EvidenceReference
-	}{scope, refs})
+	}{Scope: scope, References: refs})
 	record := domain.OperationRecord{ID: eventID, OperationID: id, OperationScope: scope, TraceID: span.SpanContext().TraceID().String(), SpanID: span.SpanContext().SpanID().String(), Name: name, Phase: "intent", Outcome: "pending", Actor: actor, Role: role, InputSHA256: domain.Digest(payload), References: refs, Rationale: "preconditions_checked_at_owned_boundary", RecordedAt: time.Now().UTC()}
 	if model, ok := ctx.Value(modelKey{}).([2]string); ok {
 		record.Provider = model[0]
@@ -65,18 +71,21 @@ func Start(ctx context.Context, name string, scope domain.OperationScope, refs [
 	return ctx, span, record
 }
 
+// Result derives an outcome record without mutating the intent or its references.
 func Result(record domain.OperationRecord, outcome string, refs []domain.EvidenceReference) domain.OperationRecord {
 	record.ID, _ = domain.NewID()
 	record.Phase = "outcome"
 	record.Outcome = outcome
 	record.RecordedAt = time.Now().UTC()
+	record.References = slices.Clone(record.References)
 	if refs != nil {
 		record.References = append(record.References, refs...)
 	}
+	// The digest payload contains only strings and scalar evidence references.
 	payload, _ := json.Marshal(struct {
 		Outcome    string
 		References []domain.EvidenceReference
-	}{outcome, record.References})
+	}{Outcome: outcome, References: record.References})
 	record.ResultSHA256 = domain.Digest(payload)
 	return record
 }

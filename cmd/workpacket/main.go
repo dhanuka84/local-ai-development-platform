@@ -8,12 +8,16 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/dhanuka84/hybrid-ai-platform/components/workpacket"
 )
 
 func main() {
-	if code := run(context.Background(), os.Args[1:], os.Stdout, os.Stderr); code != 0 {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	if code := run(ctx, os.Args[1:], os.Stdout, os.Stderr); code != 0 {
 		os.Exit(code)
 	}
 }

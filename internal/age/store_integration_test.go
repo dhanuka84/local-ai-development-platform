@@ -22,7 +22,7 @@ func TestAGEProjectionAndTraversalIntegration(t *testing.T) {
 	if databaseURL == "" {
 		t.Skip("TEST_AGE_DATABASE_URL is not set")
 	}
-	ctx := context.Background()
+	ctx := t.Context()
 	repository, err := postgres.Open(ctx, databaseURL)
 	if err != nil {
 		t.Fatal(err)

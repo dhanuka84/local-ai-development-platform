@@ -5,11 +5,14 @@ package contextregistry
 import (
 	"encoding/json"
 	"fmt"
+	"time"
+
 	"github.com/dhanuka84/hybrid-ai-platform/contracts"
 	"github.com/dhanuka84/hybrid-ai-platform/internal/domain"
-	"time"
 )
 
+// Load validates the embedded registry and hashes its definitions, SQL, and
+// input contracts in registry order. It performs no database or network work.
 func Load() ([]domain.ContextDefinition, string, error) {
 	raw, err := contracts.Files.ReadFile("context/v1/registry.valid.json")
 	if err != nil {
@@ -18,53 +21,60 @@ func Load() ([]domain.ContextDefinition, string, error) {
 	if err = contracts.Validate("context/v1/registry.schema.json", raw); err != nil {
 		return nil, "", err
 	}
-	var defs []domain.ContextDefinition
-	if err = json.Unmarshal(raw, &defs); err != nil {
+	var definitions []domain.ContextDefinition
+	if err = json.Unmarshal(raw, &definitions); err != nil {
 		return nil, "", err
 	}
 	seen := map[string]bool{}
-	for _, d := range defs {
-		if seen[d.ID] {
+	for _, definition := range definitions {
+		if seen[definition.ID] {
 			return nil, "", fmt.Errorf("duplicate definition")
 		}
-		seen[d.ID] = true
-		if d.Kind == "metric" {
-			if _, err = SQL(d.ID); err != nil {
+		seen[definition.ID] = true
+		if definition.Kind == "metric" {
+			if _, err = SQL(definition.ID); err != nil {
 				return nil, "", err
 			}
 		}
 	}
-	canonical, _ := json.Marshal(defs)
+	canonical, err := json.Marshal(definitions)
+	if err != nil {
+		return nil, "", fmt.Errorf("encode context registry: %w", err)
+	}
 	// Bind executable meaning as well as prose; changing a fixed query requires
 	// a new registry validation and versioned approval, not silent semantic drift.
-	for _, d := range defs {
-		if d.Kind == "metric" {
-			query, _ := SQL(d.ID)
-			canonical = append(canonical, []byte("\n"+d.ID+"\n"+query)...)
+	for _, definition := range definitions {
+		if definition.Kind == "metric" {
+			query, err := SQL(definition.ID)
+			if err != nil {
+				return nil, "", err
+			}
+			canonical = append(canonical, []byte("\n"+definition.ID+"\n"+query)...)
 		}
-		if d.InputContract != "" {
-			schema, err := contracts.Files.ReadFile(d.InputContract)
+		if definition.InputContract != "" {
+			schema, err := contracts.Files.ReadFile(definition.InputContract)
 			if err != nil {
 				return nil, "", err
 			}
 			canonical = append(canonical, schema...)
 		}
 	}
-	return defs, domain.Digest(canonical), nil
+	return definitions, domain.Digest(canonical), nil
 }
-func ValidateRequest(r domain.MetricRequest) error {
-	if r.ProjectID == "" || r.Version != 1 || r.Start.IsZero() || !r.End.After(r.Start) || r.End.Sub(r.Start) > 366*24*time.Hour || r.End.After(time.Now().Add(time.Minute)) {
+func ValidateRequest(request domain.MetricRequest) error {
+	if request.ProjectID == "" || request.Version != 1 || request.Start.IsZero() || !request.End.After(request.Start) || request.End.Sub(request.Start) > 366*24*time.Hour || request.End.After(time.Now().Add(time.Minute)) {
 		return domain.ErrValidationRequired
 	}
-	for k, v := range r.Dimensions {
-		if k != "task_type" || len(v) < 1 || len(v) > 64 || r.MetricID == "pending_index_age_seconds" {
+	for k, v := range request.Dimensions {
+		if k != "task_type" || len(v) < 1 || len(v) > 64 || request.MetricID == "pending_index_age_seconds" {
 			return domain.ErrValidationRequired
 		}
 	}
-	_, err := SQL(r.MetricID)
+	_, err := SQL(request.MetricID)
 	return err
 }
 
+// SQL returns a reviewed query for id, rejecting all unknown metric IDs.
 // Every query takes project, start, end and optional task_type in that order.
 // Aggregates are calculated in PostgreSQL over authoritative, immutable facts.
 func SQL(id string) (string, error) {

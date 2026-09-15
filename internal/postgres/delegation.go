@@ -35,7 +35,7 @@ func (r *Repository) RecheckTaskDelegation(ctx context.Context, p domain.Princip
 
 func scanDelegation(row pgx.Row) (d domain.TaskDelegation, err error) {
 	err = row.Scan(&d.ID, &d.PrincipalID, &d.DelegatedBy, &d.ParentCredentialID, &d.ProjectID, &d.WorkflowID, &d.TaskID, &d.CreatedAt, &d.ExpiresAt, &d.RevokedAt)
-	return
+	return d, err
 }
 
 func (r *Repository) constrainDelegatedPrincipal(ctx context.Context, p domain.Principal) (domain.Principal, error) {

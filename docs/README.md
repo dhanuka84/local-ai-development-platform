@@ -51,6 +51,7 @@ approves their exact version. See [ADR-0011](adr/0011-scoped-autonomy-and-functi
 | [Current technology stack](hybrid-ai-platform-tech-stack.md) | Checked-in choices and their rationale |
 | [Local setup and indexing](local-setup-and-indexing.md) | Workstation setup and multi-repository ingestion |
 | [Contributing](../CONTRIBUTING.md) | Change and review requirements |
+| [Go readability guide](go-readability-style-guide.md) and [adoption notes](go-readability-adoption.md) | Coding practices, compatibility exceptions and validation evidence |
 | [Repository agent guidance](../AGENTS.md) | Autonomous work and publication boundaries |
 | [Glossary](glossary.md) | Plain-language definitions |
 

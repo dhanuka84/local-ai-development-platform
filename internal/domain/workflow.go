@@ -2,6 +2,7 @@ package domain
 
 import (
 	"context"
+	"slices"
 	"time"
 )
 
@@ -37,19 +38,19 @@ type Principal struct {
 	Delegation   *TaskDelegation     `json:"delegation,omitempty"`
 }
 
+// ProjectIDs returns an independent, sorted slice, including the wildcard
+// binding when present. An empty result is non-nil for JSON array consumers.
 func (p Principal) ProjectIDs() []string {
-	seen := make(map[string]struct{}, len(p.RoleBindings))
 	result := make([]string, 0, len(p.RoleBindings))
 	for projectID := range p.RoleBindings {
-		if _, ok := seen[projectID]; ok {
-			continue
-		}
-		seen[projectID] = struct{}{}
 		result = append(result, projectID)
 	}
+	slices.Sort(result)
 	return result
 }
 
+// RolesFor returns unique roles in wildcard-then-project binding order.
+// The returned slice does not share storage with RoleBindings.
 func (p Principal) RolesFor(projectID string) []string {
 	seen := make(map[string]struct{})
 	result := make([]string, 0)
@@ -66,12 +67,7 @@ func (p Principal) RolesFor(projectID string) []string {
 }
 
 func (p Principal) HasRole(projectID, role string) bool {
-	for _, candidate := range p.RolesFor(projectID) {
-		if candidate == role {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(p.RolesFor(projectID), role)
 }
 
 type GovernancePolicy struct {
@@ -91,21 +87,11 @@ func (p GovernancePolicy) RequiresDistinctPrincipal(gate string) bool {
 			return true
 		}
 	}
-	for _, candidate := range p.DistinctPrincipalGates {
-		if candidate == gate {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(p.DistinctPrincipalGates, gate)
 }
 
 func (p GovernancePolicy) RequiresHuman(gate string) bool {
-	for _, candidate := range p.AlwaysHumanGates {
-		if candidate == gate {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(p.AlwaysHumanGates, gate)
 }
 
 type WorkflowRun struct {

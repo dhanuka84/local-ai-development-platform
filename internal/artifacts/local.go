@@ -1,9 +1,12 @@
+// Package artifacts stores immutable evidence in content-addressed local files.
+// Reads verify the digest and size before returning bytes to validation code.
 package artifacts
 
 import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -12,6 +15,7 @@ import (
 	"github.com/dhanuka84/hybrid-ai-platform/internal/domain"
 )
 
+// LocalStore owns immutable, content-addressed files under its configured root.
 type LocalStore struct {
 	root string
 }
@@ -42,7 +46,9 @@ func (s *LocalStore) Read(ctx context.Context, digest string) ([]byte, error) {
 	return data, nil
 }
 
-func (s *LocalStore) Put(ctx context.Context, data []byte, mediaType string) (domain.Artifact, error) {
+// Put persists data with restricted permissions and verifies existing content.
+// It returns only after write, sync, close, and temporary-file cleanup complete.
+func (s *LocalStore) Put(ctx context.Context, data []byte, mediaType string) (_ domain.Artifact, err error) {
 	if err := ctx.Err(); err != nil {
 		return domain.Artifact{}, err
 	}
@@ -54,12 +60,14 @@ func (s *LocalStore) Put(ctx context.Context, data []byte, mediaType string) (do
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return domain.Artifact{}, fmt.Errorf("create artifact directory: %w", err)
 	}
-	if _, err := os.Stat(path); err == nil {
+	_, err = os.Stat(path)
+	if err == nil {
 		if _, err := s.Read(ctx, hexDigest); err != nil {
 			return domain.Artifact{}, err
 		}
 		return artifact(hexDigest, path, mediaType, int64(len(data))), nil
-	} else if !os.IsNotExist(err) {
+	}
+	if !errors.Is(err, os.ErrNotExist) {
 		return domain.Artifact{}, fmt.Errorf("inspect artifact: %w", err)
 	}
 
@@ -68,25 +76,33 @@ func (s *LocalStore) Put(ctx context.Context, data []byte, mediaType string) (do
 		return domain.Artifact{}, fmt.Errorf("create artifact: %w", err)
 	}
 	temporaryName := temporary.Name()
-	defer func() { _ = os.Remove(temporaryName) }()
+	closed := false
+	defer func() {
+		if !closed {
+			if closeErr := temporary.Close(); closeErr != nil {
+				err = errors.Join(err, fmt.Errorf("close artifact: %w", closeErr))
+			}
+		}
+		if removeErr := os.Remove(temporaryName); removeErr != nil && !errors.Is(removeErr, os.ErrNotExist) {
+			err = errors.Join(err, fmt.Errorf("remove temporary artifact: %w", removeErr))
+		}
+	}()
 
 	if err := temporary.Chmod(0o600); err != nil {
-		_ = temporary.Close()
 		return domain.Artifact{}, fmt.Errorf("secure artifact: %w", err)
 	}
 	if _, err := temporary.Write(data); err != nil {
-		_ = temporary.Close()
 		return domain.Artifact{}, fmt.Errorf("write artifact: %w", err)
 	}
 	if err := temporary.Sync(); err != nil {
-		_ = temporary.Close()
 		return domain.Artifact{}, fmt.Errorf("sync artifact: %w", err)
 	}
+	closed = true
 	if err := temporary.Close(); err != nil {
 		return domain.Artifact{}, fmt.Errorf("close artifact: %w", err)
 	}
 	if err := os.Rename(temporaryName, path); err != nil {
-		if _, statErr := os.Stat(path); statErr != nil {
+		if _, readErr := s.Read(ctx, hexDigest); readErr != nil {
 			return domain.Artifact{}, fmt.Errorf("publish artifact: %w", err)
 		}
 	}

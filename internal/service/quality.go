@@ -69,7 +69,8 @@ func (s *Service) verifySources(ctx context.Context, manifest domain.SourceManif
 			return fmt.Errorf("%w: source_unavailable", domain.ErrQualityBlocked)
 		}
 		current := strings.TrimSpace(string(output))
-		if source.ApplicableThrough != "" {
+		switch {
+		case source.ApplicableThrough != "":
 			for _, bounds := range [][2]string{{source.Revision, current}, {current, source.ApplicableThrough}} {
 				checkCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 				err := exec.CommandContext(checkCtx, "git", "--no-optional-locks", "-c", "safe.directory="+path, "-C", path, "merge-base", "--is-ancestor", bounds[0], bounds[1]).Run()
@@ -78,7 +79,7 @@ func (s *Service) verifySources(ctx context.Context, manifest domain.SourceManif
 					return fmt.Errorf("%w: source_changed", domain.ErrQualityBlocked)
 				}
 			}
-		} else if current != source.Revision {
+		case current != source.Revision:
 			return fmt.Errorf("%w: source_changed", domain.ErrQualityBlocked)
 		}
 	}

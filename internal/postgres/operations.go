@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+
 	"github.com/dhanuka84/hybrid-ai-platform/internal/domain"
 	"github.com/jackc/pgx/v5"
 )
@@ -95,5 +96,5 @@ func (r *Repository) EvidenceHealth(ctx context.Context, project string, retenti
 	v.RetentionDays = retentionDays
 	v.Policy = "Immutable evidence retained; records older than policy require operator retention review, never automatic deletion. Missing outcomes older than five minutes alert as unknown, not success."
 	err = r.pool.QueryRow(ctx, `SELECT count(*) FILTER(WHERE o.phase='intent' AND o.recorded_at<now()-interval '5 minutes' AND NOT EXISTS(SELECT 1 FROM operation_records result WHERE result.operation_id=o.operation_id AND result.phase IN('outcome','reconciliation'))),count(*) FILTER(WHERE q.exported_at IS NULL AND q.attempts>=3),count(*) FILTER(WHERE q.exported_at IS NULL),count(*) FILTER(WHERE o.recorded_at<now()-$2*interval '1 day') FROM operation_records o JOIN trace_export_queue q ON q.record_id=o.id WHERE o.project_id=$1`, project, retentionDays).Scan(&v.UnknownOutcomes, &v.FailedExports, &v.Unexported, &v.RetentionReviewDue)
-	return
+	return v, err
 }

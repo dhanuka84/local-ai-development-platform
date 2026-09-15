@@ -372,7 +372,7 @@ func (s *Service) DecideKnowledge(ctx context.Context, input DecisionInput) (dom
 	payload, err := json.Marshal(struct {
 		Input DecisionInput
 		Actor string
-	}{input, principal.ID})
+	}{Input: input, Actor: principal.ID})
 	if err != nil {
 		return item, err
 	}

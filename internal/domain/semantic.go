@@ -41,6 +41,7 @@ type GovernedDefinition struct {
 
 func (d GovernedDefinition) VectorID() string { return Digest([]byte(d.ProjectID + ":" + d.ID)) }
 func (d GovernedDefinition) ProjectionDigest() string {
+	// The ordered digest tuple contains only strings and integers.
 	raw, _ := json.Marshal([]any{d.ProjectID, d.ID, d.Version, d.SHA256, d.RegistrySHA256, "ollama", d.ProjectionModel, d.ProjectionDimension})
 	return Digest(raw)
 }
